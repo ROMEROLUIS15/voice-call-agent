@@ -98,7 +98,7 @@ There are **two entries** to one voice engine:
 | `http_hardening/` | Security headers (ADR 0007), generic error responses, rate limits per client address and route, trusted hosts, body size limit, closed CORS (constitution §15). |
 | `settings/` | Typed configuration from environment variables; each component receives only its section. |
 | `service_composition.py`, `asgi_app.py`, `__main__.py`, `graceful_http_server.py` | Composition root and process entry: wire the components, mount the entries, run uvicorn with a graceful drain. |
-| `evals/` (repository root, not shipped) | Golden dataset (`golden_dataset/*.yaml`), conversation harness (scripted providers and a loopback transport over the real runner), task metrics, judge scoring, baseline and model evals runner (ADR 0013). |
+| `evals/` (repository root, not shipped) | Golden dataset (`golden_dataset/*.yaml`), conversation harness (scripted providers and a loopback transport over the real runner), task metrics, judge scoring, baseline and model evals runner (ADR 0010). |
 
 ## 4. Flow of a call
 
@@ -159,7 +159,7 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 | TTS | Deepgram Aura-2 in Spanish over WebSocket; `aura-2-selena-es` (Latin American) by default | Already known; alternatives Cartesia or ElevenLabs. Flux TTS (`/v2/speak`) is left out for now: Spanish voices were not verified (Pipecat's examples only use `-en` voices). |
 | Testing | pytest, pytest-asyncio, strict mypy, reference conversations, syrupy snapshots | Constitution §7. |
 | Error tracking and traces | Sentry (`sentry-sdk==2.71.0`), project `voice-call-agent` | ADR 0009. |
-| Evals | DeepEval `4.2.8` (dependency group `evals`, telemetry off), judge `gemini-3.6-flash`, GitHub-hosted runners | ADR 0013. |
+| Evals | DeepEval `4.2.8` (dependency group `evals`, telemetry off), judge `gemini-3.6-flash`, GitHub-hosted runners | ADR 0010, amended by ADR 0013. |
 
 ## 8. v1 acceptance criteria
 
@@ -186,7 +186,7 @@ v1 is accepted with AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10 and AC-11, plus AC
 | 2 · Booking (v1) | Booking with proposals validated by code and confirmed by the caller (ADR 0011) | AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10, AC-11; AC-1 and AC-5 once Meta enables *Calling* on the real number |
 | 3 · v1.1 | Check appointments, reschedule and cancel with identity per channel; take a message | AC-7 |
 | 4 · Robustness | What real usage shows it needs: holding phrases, false-interruption filter, provider fallback, fault injection, load tests | AC-8 refined (false interruptions); the rest from measured calls |
-| 5 · Evals in CI | Simulated callers, end-to-end calls with recorded audio, judge calibration against human labels, sampled evaluation of production calls | CI blocks on regressions. Reference conversations and model evals against a baseline exist from phase 0 (ADR 0013). |
+| 5 · Evals in CI | Simulated callers, end-to-end calls with recorded audio, judge calibration against human labels, sampled evaluation of production calls | CI blocks on regressions. Reference conversations and model evals against a baseline exist from phase 0 (ADR 0010). |
 | 6 · Bilingual | English and language switching | Own criteria |
 
 ### 9.1 Registered work per phase (not implemented)
@@ -230,10 +230,10 @@ Cross-cutting decisions are ADRs in `docs/adr/`:
 *   [ADR 0007](../../adr/0007-own-security-headers-middleware.md) · Own security headers middleware.
 *   [ADR 0008](../../adr/0008-security-checks-shared-by-developers-and-ci.md) · Security checks shared by developers and CI.
 *   [ADR 0009](../../adr/0009-error-tracking-and-call-traces-with-sentry.md) · Error tracking and per-call traces with Sentry.
-*   [ADR 0010](../../adr/0010-golden-dataset-and-two-level-evals.md) · Golden dataset and evals at two levels, with a judge model. *Superseded by ADR 0013.*
+*   [ADR 0010](../../adr/0010-golden-dataset-and-two-level-evals.md) · Golden dataset and evals at two levels, with a judge model. *Amended by ADR 0013.*
 *   [ADR 0011](../../adr/0011-write-proposals-validated-by-code.md) · Write proposals validated by code; the model judges the caller's confirmation.
 *   [ADR 0012](../../adr/0012-pull-requests-with-required-checks.md) · Changes reach `main` through pull requests with required checks.
-*   [ADR 0013](../../adr/0013-evals-fingerprint-of-what-the-evals-measure.md) · Golden dataset and evals at two levels, with a fingerprint of what the evals measure.
+*   [ADR 0013](../../adr/0013-evals-fingerprint-of-what-the-evals-measure.md) · Evals fingerprint of what the evals measure, and the first baseline with the booking prompt (amends ADR 0010).
 
 Decisions local to this module:
 

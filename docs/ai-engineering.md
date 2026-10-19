@@ -2,7 +2,7 @@
 
 Practices for a voice agent that writes to a real system: what each one solves, how it applies here, the phase it belongs to (manifest §9) and its status. A practice is **done** when it runs and is tested, **partial** when part of it is in place, **pending** when it is only registered.
 
-This document starts with work registered on 2026-10-19 and not implemented yet. There is no separate stage for these practices: each one is added with the feature that needs it, to the extent that feature needs it (constitution §17). The practices already in place are described where they live (ADR 0009, ADR 0013, `docs/evals/golden-dataset.md`).
+This document starts with work registered on 2026-10-19 and not implemented yet. There is no separate stage for these practices: each one is added with the feature that needs it, to the extent that feature needs it (constitution §17). The practices already in place are described where they live (ADR 0009, ADR 0010 and its amendment ADR 0013, `docs/evals/golden-dataset.md`).
 
 ## Phase 0 · Technical test
 

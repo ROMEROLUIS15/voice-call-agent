@@ -1,11 +1,11 @@
 {
-  "fingerprint": "79fc41ca70d666db",
+  "fingerprint": "c1f7c3cb9b79c87f",
   "inputs": {
     "conversation_content": "es-c3d0810115bd",
     "language_model": "groq openai/gpt-oss-120b",
     "generation_settings": "5651239e3146bfd4",
     "golden_dataset": "00f63ba79c83",
-    "scoring": "fcd1d391007bf081",
+    "scoring": "657d494f3125e1d1",
     "judge_model": "gemini-3.6-flash"
   },
   "measured_with": null,
