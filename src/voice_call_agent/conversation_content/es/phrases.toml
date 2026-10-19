@@ -1,0 +1,4 @@
+# Fixed phrases the agent speaks to the caller, in this locale.
+# Phase 0: generic greeting. From phase 1 on, each business's greeting comes from the backend.
+
+greeting = "Hola, gracias por llamar. ¿En qué te puedo ayudar?"

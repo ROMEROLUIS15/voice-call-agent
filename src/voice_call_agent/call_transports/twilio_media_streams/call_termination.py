@@ -1,0 +1,38 @@
+"""Ending a phone-line call through Twilio's REST API."""
+
+from typing import Protocol
+
+import aiohttp
+from loguru import logger
+from pydantic import SecretStr
+
+_TWILIO_API = "https://api.twilio.com/2010-04-01"
+
+
+class CallTerminator(Protocol):
+    """Ends a call that is still connected after its conversation finished."""
+
+    async def end_call(self, call_sid: str) -> None: ...
+
+
+class TwilioCallTerminator:
+    """Sets the call to `completed`. Failures are logged, never raised: the call is over anyway."""
+
+    def __init__(self, account_sid: str, auth_token: SecretStr, timeout_seconds: float) -> None:
+        self._account_sid = account_sid
+        self._auth_token = auth_token
+        self._timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+
+    async def end_call(self, call_sid: str) -> None:
+        url = f"{_TWILIO_API}/Accounts/{self._account_sid}/Calls/{call_sid}.json"
+        auth = aiohttp.BasicAuth(self._account_sid, self._auth_token.get_secret_value())
+        log = logger.bind(call_id=call_sid)
+        try:
+            async with (
+                aiohttp.ClientSession(timeout=self._timeout) as http,
+                http.post(url, data={"Status": "completed"}, auth=auth) as response,
+            ):
+                if response.status >= 400:
+                    log.bind(status=response.status).warning("Twilio did not end the call")
+        except (aiohttp.ClientError, TimeoutError):
+            log.warning("ending the call through Twilio failed")

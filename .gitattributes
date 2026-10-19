@@ -1,0 +1,2 @@
+# LF everywhere: the service runs on Linux (CI, containers) and is developed on Windows.
+* text=auto eol=lf
