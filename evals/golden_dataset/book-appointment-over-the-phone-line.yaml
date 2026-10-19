@@ -3,7 +3,7 @@ title: A phone-line caller books an appointment after confirming it (AC-2)
 source: hand-written
 phase: 2
 status: pending
-pending_reason: Needs the booking tools, the two-turn confirmation and the backend catalog.
+pending_reason: Needs the booking tools, the confirmation of proposals and the backend catalog.
 levels: [conversation, model]
 channel: twilio
 language: es

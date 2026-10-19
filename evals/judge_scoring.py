@@ -1,4 +1,4 @@
-"""Judge-model scoring of a conversation with DeepEval's conversational G-Eval (ADR 0010).
+"""Judge-model scoring of a conversation with DeepEval's conversational G-Eval (ADR 0013).
 
 DeepEval belongs to the `evals` dependency group and is imported only when a judge is built.
 Its telemetry is switched off before that import, whatever the environment says.

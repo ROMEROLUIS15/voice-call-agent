@@ -2,7 +2,7 @@
 
 Practices for a voice agent that writes to a real system: what each one solves, how it applies here, the phase it belongs to (manifest §9) and its status. A practice is **done** when it runs and is tested, **partial** when part of it is in place, **pending** when it is only registered.
 
-This document starts with work registered on 2026-10-19 and not implemented yet. The rest of the catalog (practices already in place, and the foundations of the next stage) is added with that stage.
+This document starts with work registered on 2026-10-19 and not implemented yet. There is no separate stage for these practices: each one is added with the feature that needs it, to the extent that feature needs it (constitution §17). The practices already in place are described where they live (ADR 0009, ADR 0013, `docs/evals/golden-dataset.md`).
 
 ## Phase 0 · Technical test
 
@@ -15,7 +15,9 @@ This document starts with work registered on 2026-10-19 and not implemented yet.
 
 | Practice | What it solves | How it applies here | Status |
 |---|---|---|---|
-| Property-based tests of the confirmation gate (Hypothesis) | Example tests cover the dialogs someone thought of; INV-2 must hold for every possible sequence | Generate arbitrary sequences of dialog events (caller turns, proposals, confirmations, denials, ambiguous answers, interruptions, backend errors) and prove that a write happens only right after an explicit confirmation of that same proposal, and at most once per intent (INV-6) | Pending |
+| Tool arguments defined once, as Pydantic models | A hand-written JSON schema drifts from the code that validates the arguments | Each tool's arguments are a Pydantic model; the schema the language model receives is generated from it, and a test fails if a tool is declared with a hand-written schema | Pending |
+| Proposals and confirmations in the call trace | A wrong or missing write cannot be explained without what was proposed, what the backend answered and what the caller said | Each proposal and confirmation in the call trace: the tool, its arguments with personal data redacted, the validation result, the caller turn before the confirmation and the latency of each step (ADR 0011) | Pending |
+| Property-based tests of the write confirmation (Hypothesis) | Example tests cover the conversations someone thought of; INV-2 must hold for every possible sequence | Generate arbitrary sequences of call events (caller turns, proposals, confirmations, denials, interruptions, backend errors) and prove that a write happens only by confirming a pending, unchanged proposal of the same call after a caller turn that followed its read-back, and at most once per intent (INV-2, INV-6) | Pending |
 | Redaction patterns for identity documents | The second factor (phase 3) and messages for the business can carry national ID numbers; redaction covers phone numbers and names only | Patterns for national ID numbers, with and without separators or letter prefixes, in `personal_data_redaction.py` and the error tracking scrubber, with negative tests proving that ids and hashes stay readable | Pending |
 
 ## Phase 4 · Robustness
@@ -35,6 +37,13 @@ This document starts with work registered on 2026-10-19 and not implemented yet.
 | Inspectable language model traces | Explaining a wrong reply needs the exact prompt, context, tool calls and output; the call trace has versions and usage, not content | Self-hosted Langfuse, or a hosted tracer that receives content already redacted: decided in an ADR (data destination, retention, access, cost). It is a new data destination for the threat model | Pending |
 | Service level objectives with error budgets | Static alert thresholds give no shared notion of "good enough" nor a rule for when reliability comes first | SLOs on calls without a real failure, turn latency p95 (manifest §6) and golden dataset success, with an error budget per period; when the budget is spent, reliability work comes before features; burn-rate alerts replace static thresholds | Pending |
 | Runbooks and postmortems | Incidents are handled from memory and their lessons are lost | A runbook per alert (what it means, how to read the traces, how to mitigate) and a postmortems folder with a blameless template; every postmortem adds its golden case | Pending |
+
+## When real usage asks for it
+
+| Practice | What it solves | How it applies here | Status |
+|---|---|---|---|
+| Per-component metrics next to the end-to-end ones | A failed conversation does not say whether speech-to-text, the model or a tool failed | Scores per component (transcription, tool choice and arguments, replies) next to the end-to-end success of each golden case, once real failures need to be located | Pending |
+| OpenTelemetry GenAI semantic conventions | A tracer that follows a standard schema can be replaced without rewriting the instrumentation | Decided with the phase 5 ADR on inspectable language model traces | Pending |
 
 ## Deployment
 

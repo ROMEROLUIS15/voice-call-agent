@@ -2,7 +2,9 @@
 
 The baseline records the inputs it was measured with; `tests/evals/test_behavior_fingerprint.py`
 fails when they change, so no change to the prompt, the phrases, the model, its generation
-settings, the voice, the dataset or the metrics lands without new evals (constitution §16).
+settings, the dataset or the metrics lands without new evals (constitution §16). Only what the
+model evals exercise counts: they run with scripted speech, so the speech-to-text model and the
+voice are left out (ADR 0013).
 """
 
 import hashlib
@@ -58,8 +60,6 @@ def behavior_inputs() -> dict[str, str]:
         "conversation_content": load_conversation_content().version,
         "language_model": f"{configuration['provider']} {configuration['model']}",
         "generation_settings": _digest(configuration),
-        "stt_model": _default("stt_model"),
-        "tts_voice": _default("tts_voice"),
         "golden_dataset": golden_dataset_version(),
         "scoring": _digest({name: _normalized(_EVALS_DIR / name) for name in _SCORING_SOURCES}),
         "judge_model": JUDGE_MODEL,

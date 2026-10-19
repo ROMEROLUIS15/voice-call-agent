@@ -1,7 +1,7 @@
 """Domain models of the scheduling backend, independent of any wire format.
 
 Business outcomes (slot taken, identity mismatch, ...) are typed results, not exceptions:
-the dialog must handle each of them. Infrastructure failures are `scheduling_errors`.
+the agent's tools must handle each of them. Infrastructure failures are `scheduling_errors`.
 """
 
 from datetime import date, time
@@ -57,7 +57,7 @@ class BusinessContext(_Model):
     services: list[ServiceOffering]
     weekly_hours: WeeklyHours
     known_client_first_name: str | None
-    """Only the first name: enough to greet a returning client."""
+    """Only the first name, sent only when the caller's identity is verified (constitution §4)."""
 
 
 class AvailableSlots(_Model):

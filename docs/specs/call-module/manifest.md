@@ -13,7 +13,7 @@ There are **two entries** to one voice engine:
 | How the person calls | Call icon in the Cronix WhatsApp chat | Dials a phone number |
 | Number | Cronix's WhatsApp number (shared by every business) | One number per business |
 | Caller identity | **Verified by Meta** | Caller ID **not verified** |
-| Business resolution | Routing by session / client phone; if not possible, the agent asks (§4.1) | Dialed number (`voice_lines`) |
+| Business resolution | Routing by session / client phone; if not possible, the agent asks (§4.1) | Dialed number |
 | Transport | WebRTC (Cloud API Calling) | Twilio Media Streams (μ-law 8 kHz) |
 | What it is for | Real clients in Venezuela, free for them | Calls to a traditional phone number (PSTN), with US and other countries' numbers |
 
@@ -27,13 +27,17 @@ There are **two entries** to one voice engine:
 
 ## 2. Scope
 
-### v1
-*   **Inbound** calls through both entries.
+### v1: booking by phone
+*   **Inbound** calls through both entries. The WhatsApp entry counts for v1 once Meta enables *Calling* on the real number (§10); until then the phone line is the path.
 *   Language: **Spanish**.
-*   Intents: ask about services and hours, **book**, check "my appointments", **reschedule**, **cancel**, and take a message for the business when the request cannot be resolved.
-*   Transfer to a human: **not** in v1 (a message is taken).
+*   Intents: ask about services and hours, and **book**. If the backend fails, the agent confirms nothing and says so (INV-5).
+*   Transfer to a human: **not** in v1.
 
-### Outside v1 (§9)
+### v1.1
+*   Check "my appointments", **reschedule** and **cancel**, with the second factor on the phone line (INV-4).
+*   Take a message for the business when the request cannot be resolved (contract §4.6).
+
+### Outside v1 and v1.1 (§9)
 *   English and switching language mid-call.
 *   Transfer to a business number.
 *   Outbound calls.
@@ -55,7 +59,7 @@ There are **two entries** to one voice engine:
 │  call_supervision/  concurrency limit · graceful drain            │
 │                             ▼                                     │
 │  speech_pipeline/   turns → STT → LLM → TTS   ← same for both     │
-│  dialog_state/ · intent_understanding/ · write_guards/            │
+│  agent_tools/ · write_guards/                                     │
 │                             │ depend on ports only                │
 │                             ▼                                     │
 │  ports: scheduling_backend.SchedulingBackend                      │
@@ -67,9 +71,8 @@ There are **two entries** to one voice engine:
 └─────────────────────────────┬─────────────────────────────────────┘
                               │ HTTPS + HMAC
                               ▼
- Cronix: Edge Function `phone-agent-api` (see contract)
-   reuses fn_book_appointment_wa, fn_reschedule_appointment_wa,
-   fn_find_client_by_phone, computeAvailableSlots, emit*Event
+ Cronix: `phone-agent-api` (see contract)
+   reuses the booking logic and notifications of its WhatsApp channel
 ```
 
 **Design rule:** everything that depends on the channel lives in `call_transports/` and is summarized in a `CallSession`. From the pipeline inwards the concepts "WhatsApp" and "Twilio" **do not exist**; only `session.identity_verified` and `session.business_id`. Likewise, nothing outside `adapters/cronix_scheduling_api/` (and the composition root that wires it) knows that the backend is Cronix.
@@ -85,9 +88,8 @@ There are **two entries** to one voice engine:
 | `call_supervision/` | Per-instance call slots: concurrency limit, supervised call tasks, graceful drain on shutdown. |
 | `speech_pipeline/` | Pipecat pipeline (turns, STT, LLM, TTS, interruptions), common to both channels. Receives provider factories; knows no vendor. |
 | `conversation_content/` | What the agent says to the caller, per locale (`es/system_prompt.md`, `es/phrases.toml`). |
-| `dialog_state/` | State machine of the call. No I/O. (Phase 2.) |
-| `intent_understanding/` | Prompt and tools of the LLM. Returns a **proposal**, never executes. (Phase 2.) |
-| `write_guards/` | Mention guards, two-turn confirmation, identity requirement. (Phase 2.) |
+| `agent_tools/` | The tools the language model calls, each defined once as a Pydantic model (the schema the model receives is generated from it): reads from the backend, and write proposals and confirmations handed to `write_guards/`. Understanding the caller is the model's work: no intent classification in code. (Phase 2.) |
+| `write_guards/` | Validates a write proposal (the call's business, a service of the catalog, a slot the backend offers at that moment) and its confirmation (the same unchanged proposal of this call, after a caller turn that followed its read-back, executed at most once); identity requirement (v1.1). The only call state it keeps: pending proposals, writes done and the identity factor (ADR 0011). (Phase 2.) |
 | `scheduling_backend/` | `SchedulingBackend` port with its domain models (typed results) and infrastructure errors. |
 | `adapters/cronix_scheduling_api/` | **Only place that knows Cronix:** implements `SchedulingBackend` and `BusinessResolver` over the contract: HMAC signature, timeouts, idempotency, error mapping. (Phase 1.) |
 | `adapters/deepgram_speech/` | Flux STT and Aura-2 TTS factories. |
@@ -96,34 +98,34 @@ There are **two entries** to one voice engine:
 | `http_hardening/` | Security headers (ADR 0007), generic error responses, rate limits per client address and route, trusted hosts, body size limit, closed CORS (constitution §15). |
 | `settings/` | Typed configuration from environment variables; each component receives only its section. |
 | `service_composition.py`, `asgi_app.py`, `__main__.py`, `graceful_http_server.py` | Composition root and process entry: wire the components, mount the entries, run uvicorn with a graceful drain. |
-| `evals/` (repository root, not shipped) | Golden dataset (`golden_dataset/*.yaml`), conversation harness (scripted providers and a loopback transport over the real runner), task metrics, judge scoring, baseline and model evals runner (ADR 0010). |
+| `evals/` (repository root, not shipped) | Golden dataset (`golden_dataset/*.yaml`), conversation harness (scripted providers and a loopback transport over the real runner), task metrics, judge scoring, baseline and model evals runner (ADR 0013). |
 
 ## 4. Flow of a call
 
 ### 4.1 Business resolution per channel
-*   **Twilio:** the dialed number (`To`) is looked up in `voice_lines`. No match → fixed message and hang up.
-*   **WhatsApp:** the Cronix number is shared, and a call has no `#slug`. The same levels as message routing (`tenant-routing.ts`) apply, without the first one:
-    1. the sender's active session (`wa_sessions`);
+*   **Twilio:** the backend looks up the dialed number (`To`) among its voice lines. No match → fixed message and hang up.
+*   **WhatsApp:** the Cronix number is shared, and a call has no `#slug`. The same levels as Cronix's message routing apply, without the first one:
+    1. the sender's active WhatsApp session;
     2. the business that has the sender as a client (if several, the one of their next active appointment);
     3. if it cannot be decided: the agent **asks** "Which business do you want to book with?" and resolves the name against the active businesses (fuzzy match with confirmation). **Never guess.**
 
 ### 4.2 Steps
 1.  **Entry.** The transport validates the webhook signature and asks the backend for the call context through `BusinessResolver.resolve_call_business` (`POST /v1/calls/start` with the `channel`).
 2.  **Greeting.** The business's greeting (or Cronix's generic greeting if the business is not yet resolved on WhatsApp). Recording notice if recording is enabled.
-3.  **Client identification.** If the phone belongs to a known client, greet them by first name.
-4.  **Conversation.** Turn by turn: end of turn → final transcript → `dialog_state` + `intent_understanding` → TTS. Questions are answered with reads from the backend.
-5.  **Proposal and confirmation.** Before writing, the agent reads aloud what it is going to do: service, day, time and name. Only an unambiguous affirmation in the next turn enables the write.
-6.  **Write.** The corresponding `SchedulingBackend` method with an idempotency key. The real result is communicated.
+3.  **Client identification.** If the identity is verified (WhatsApp) and the phone belongs to a known client, greet them by first name. On the phone line the backend sends no name (constitution §4).
+4.  **Conversation.** Turn by turn: end of turn → final transcript → the language model, with the agent's tools → TTS. The model converses and asks for what is missing; questions are answered with the business context and reads from the backend.
+5.  **Proposal and confirmation.** The agent proposes the write with a tool. The code validates it (INV-3) and returns a proposal id and a summary that the agent reads aloud: service, day, time and name. The model judges whether the caller's answer is a yes; if it is, it confirms that proposal id. The code executes only the same unchanged proposal of this call, after a caller turn that followed its read-back (INV-2, ADR 0011).
+6.  **Write.** The corresponding `SchedulingBackend` method, with the proposal id as its idempotency key. The real result is communicated.
 7.  **Closing.** "Anything else?" → goodbye → `SchedulingBackend.close_call` (`POST /v1/calls/{id}/end`).
 
 ## 5. Invariants
 
 *   **INV-1 · Fixed tenant.** Once the `business_id` is resolved (§4.1), it does not change during the call.
-*   **INV-2 · Two-turn confirmation.** Without explicit confirmation in the previous turn, the LLM does not receive the write tools (`tools = []`), as in `confirmation-gate.ts`.
-*   **INV-3 · Argument traceability.** Service, date and time must appear in what the caller said **and** match the catalog and a time slot the backend returned as available during this call.
-*   **INV-4 · Identity per channel.** `identity_verified = true` only on WhatsApp calls. On the phone line, rescheduling or cancelling requires a second factor (name + appointment date, or SMS OTP); without it, a message is taken.
-*   **INV-5 · No invented result.** If the backend fails or does not answer in time, the agent says so and offers to take a message.
-*   **INV-6 · One write per intent.** Fingerprint `(action + sorted arguments)` per call.
+*   **INV-2 · Confirmation of the exact proposal.** A write executes only by confirming a pending proposal of this call, unchanged since the code validated it, after a caller turn that followed its read-back. Whether the caller said yes is the model's judgement, measured with margin 0 by golden cases (`no-write-without-confirmation`); the code never classifies the caller's words (ADR 0011).
+*   **INV-3 · Real values.** The service and the slot of a write come from what the backend returned: the call's catalog and the availability the code reads when it validates the proposal. The caller confirmed them after hearing them (INV-2); the code does not look for them in the transcript.
+*   **INV-4 · Identity per channel.** `identity_verified = true` only on WhatsApp calls. On the phone line, reading the caller's appointments, rescheduling or cancelling requires a second factor (name + appointment date, or SMS OTP); without it, a message is taken (v1.1). The caller is greeted by name only when the identity is verified.
+*   **INV-5 · No invented result.** If the backend fails or does not answer in time, the agent confirms nothing, says so and suggests calling back or writing over WhatsApp. A message is taken only while the backend answers (v1.1).
+*   **INV-6 · One write per intent.** Fingerprint `(action + sorted arguments)` per call; the proposal id is the idempotency key.
 *   **INV-7 · Interruptions.** If the caller speaks while the agent is speaking, the audio stops. Exception: a write in progress is not cancelled; its result is reported when it ends.
 *   **INV-8 · Isolated channel.** No module outside `call_transports/` and `call_session/` checks which channel the call came from.
 
@@ -155,22 +157,23 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 | STT | Deepgram Flux **`flux-general-multi` with `language_hint=es`** (built-in turn detection) | Already used in Cronix. `flux-general-en` only understands English and rejects `language_hint`. **Validate quality on 8 kHz phone audio.** |
 | LLM | Chosen by measuring in phase 0 (Groq, Gemini or OpenAI); `LLM_PROVIDER` / `LLM_MODEL` | Swappable (`adapters/language_model_providers/`). |
 | TTS | Deepgram Aura-2 in Spanish over WebSocket; `aura-2-selena-es` (Latin American) by default | Already known; alternatives Cartesia or ElevenLabs. Flux TTS (`/v2/speak`) is left out for now: Spanish voices were not verified (Pipecat's examples only use `-en` voices). |
-| Fast decisions (optional) | Evaluate Jev (TypeSafe) for router and reviewer | Only if it improves against the existing evals; not a core dependency. |
 | Testing | pytest, pytest-asyncio, strict mypy, reference conversations, syrupy snapshots | Constitution §7. |
 | Error tracking and traces | Sentry (`sentry-sdk==2.71.0`), project `voice-call-agent` | ADR 0009. |
-| Evals | DeepEval `4.2.8` (dependency group `evals`, telemetry off), judge `gemini-3.6-flash`, GitHub-hosted runners | ADR 0010. |
+| Evals | DeepEval `4.2.8` (dependency group `evals`, telemetry off), judge `gemini-3.6-flash`, GitHub-hosted runners | ADR 0013. |
 
 ## 8. v1 acceptance criteria
 
-*   **AC-1 · Booking over WhatsApp.** A WhatsApp call books an appointment; it shows on the dashboard and the owner gets the notification.
+v1 is accepted with AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10 and AC-11, plus AC-1 and AC-5 once Meta enables *Calling* on the real number (§10). AC-7 belongs to v1.1.
+
+*   **AC-1 · Booking over WhatsApp.** A WhatsApp call books an appointment; it shows on the dashboard and the owner gets the notification. *Counts for v1 once Meta enables Calling on the real number.*
 *   **AC-2 · Booking over the phone line.** The same from a call to a Twilio number.
 *   **AC-3 · No write without confirmation.** "No" or an ambiguous answer creates nothing.
 *   **AC-4 · Slot taken.** If the slot is taken between proposal and confirmation, the backend returns `SLOT_CONFLICT` and the agent offers another one; there is no duplicate.
-*   **AC-5 · Unresolved business (WhatsApp).** If the sender has no session and is not a client of any business, the agent asks for the business and does not book until it is confirmed.
+*   **AC-5 · Unresolved business (WhatsApp).** If the sender has no session and is not a client of any business, the agent asks for the business and does not book until it is confirmed. *Counts for v1 once Meta enables Calling on the real number.*
 *   **AC-6 · Unknown number (Twilio).** A call to a number without a business → fixed message, hang up, trace recorded.
-*   **AC-7 · Identity on the phone line.** Cancelling from Twilio without the correct name and date does **not** cancel; a message is taken. On WhatsApp it is not required.
+*   **AC-7 · Identity on the phone line (v1.1).** Cancelling from Twilio without the correct name and date does **not** cancel; a message is taken. Without the second factor no appointment is read either. On WhatsApp it is not required.
 *   **AC-8 · Interruption.** The agent goes silent in less than 300 ms when the caller interrupts. *To be refined in phase 4 with the false-interruption filter: silent in under 300 ms on a real interruption, and keeps speaking through coughs, noise and fillers.*
-*   **AC-9 · Cronix down.** The agent confirms nothing and offers to take a message.
+*   **AC-9 · Backend down.** The agent confirms nothing, says so and suggests calling back or writing over WhatsApp. It takes no message: the message would be stored in the backend that is down.
 *   **AC-10 · Latency.** 20 real calls per channel meet §6.
 *   **AC-11 · Safe retry.** The same idempotency key does not create a second appointment.
 
@@ -180,10 +183,10 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 |---|---|---|
 | 0 · Technical test | Pipecat conversing through **both entries**, without Cronix | It is known whether the Cronix number can receive WhatsApp calls (§10); latency measured per segment and channel; LLM and TTS chosen |
 | 1 · Cronix contract | Edge Function `phone-agent-api` with reads and tests; `adapters/cronix_scheduling_api/` | Reads pass against a local Cronix |
-| 2 · Booking | Booking with two-turn confirmation | AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-11 |
-| 3 · Reschedule and cancel | With identity per channel | AC-7 |
-| 4 · Robustness | Interruptions, Cronix down, holding phrases | AC-8, AC-9, AC-10 |
-| 5 · Evals in CI | Simulated callers, end-to-end calls with recorded audio, judge calibration against human labels, sampled evaluation of production calls | CI blocks on regressions. Reference conversations and model evals against a baseline exist from phase 0 (ADR 0010). |
+| 2 · Booking (v1) | Booking with proposals validated by code and confirmed by the caller (ADR 0011) | AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10, AC-11; AC-1 and AC-5 once Meta enables *Calling* on the real number |
+| 3 · v1.1 | Check appointments, reschedule and cancel with identity per channel; take a message | AC-7 |
+| 4 · Robustness | What real usage shows it needs: holding phrases, false-interruption filter, provider fallback, fault injection, load tests | AC-8 refined (false interruptions); the rest from measured calls |
+| 5 · Evals in CI | Simulated callers, end-to-end calls with recorded audio, judge calibration against human labels, sampled evaluation of production calls | CI blocks on regressions. Reference conversations and model evals against a baseline exist from phase 0 (ADR 0013). |
 | 6 · Bilingual | English and language switching | Own criteria |
 
 ### 9.1 Registered work per phase (not implemented)
@@ -191,9 +194,10 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 Registered on 2026-10-19; what each item solves and how it applies here is in [`docs/ai-engineering.md`](../../ai-engineering.md).
 
 *   **Phase 0:** measure speech-to-text on real phone audio (names, numbers, national ID numbers, fillers); a measured results section in `README.md` (latency p50/p95 per segment, golden dataset success, cost per call, capacity per instance), updated with every measurement.
-*   **Phase 2:** property-based tests (Hypothesis) proving there is never a write without confirmation; redaction patterns for identity documents.
+*   **Phase 2:** tool arguments defined once as Pydantic models, with a test that fails on a hand-written schema; each proposal and confirmation in the call trace (arguments redacted, the validation result, the caller turn before the confirmation); property-based tests (Hypothesis) proving there is never a write without confirmation; redaction patterns for identity documents.
 *   **Phase 4:** a deadline on the language model's first token with a retry on the fallback model **before speaking**, never in the middle of a reply; a false-interruption filter (coughs, fillers) that refines AC-8; provider fault injection; load tests and capacity per instance; Redis for replay protection and rate limits before a second instance runs.
 *   **Phase 5:** inspectable language model traces (self-hosted Langfuse, or a hosted tracer with redaction beforehand, decided in an ADR); SLOs with an error budget; runbooks and a postmortems folder.
+*   **When real usage asks for it:** per-component metrics next to the end-to-end ones; the OpenTelemetry GenAI semantic conventions, decided with the phase 5 ADR on language model traces.
 *   **Deployment:** a multi-stage Dockerfile on Debian slim, **not Alpine**: musl breaks onnxruntime (needed by Silero VAD, which ships no musl wheels nor sources) and other native dependencies.
 
 ## 10. Known risks
@@ -211,7 +215,7 @@ Registered on 2026-10-19; what each item solves and how it applies here is in [`
 *   **uvicorn closes every WebSocket on shutdown** (code 1012) before waiting for anything; without mitigation a restart cuts every phone-line call. Mitigated by `GracefulHttpServer`, which drains calls on the first signal.
 *   **Pipecat logs conversation content at `DEBUG`** (transcripts, which may include names): production runs at `INFO` or higher (constitution §12).
 *   **Sentry project not created yet** (2026-10-19): the organization does not let members create projects (`403`). An owner creates `voice-call-agent` (or allows members to); then the DSN goes to `SENTRY_DSN` and the alert rules of `docs/observability/alerts.md` are created. Until then nothing is sent.
-*   **Model evals without secrets** (threat model R-07): until `GROQ_API_KEY` and `GOOGLE_API_KEY` are repository secrets, the model evals are skipped and the baseline stays unmeasured. Whether GitHub-hosted runners reach each provider is checked with `provider-reachability.yml` after the first push; if one is not reachable, the maintainers weigh the alternatives (never a self-hosted runner).
+*   **Model evals not measured yet** (threat model R-07): the first baseline is measured with the booking prompt of phase 2 (ADR 0013); until then the fingerprint records the inputs unmeasured. In CI the model evals also need `GROQ_API_KEY` and `GOOGLE_API_KEY` as repository secrets; whether GitHub-hosted runners reach each provider is checked with `provider-reachability.yml`; if one is not reachable, the maintainers weigh the alternatives (never a self-hosted runner).
 *   **Replay and rate-limit state per instance** (accepted risk R-01 of `docs/security/threat-model.md`): with several instances, a repeat or a flood split across them is not seen as a whole. **Redis** is the planned shared store: `RATE_LIMIT_STORAGE_URI=async+redis://…` for the rate limits and a Redis-backed `ReplayGuard`, before a second instance runs.
 
 ## 11. Recorded trade-offs
@@ -226,11 +230,17 @@ Cross-cutting decisions are ADRs in `docs/adr/`:
 *   [ADR 0007](../../adr/0007-own-security-headers-middleware.md) · Own security headers middleware.
 *   [ADR 0008](../../adr/0008-security-checks-shared-by-developers-and-ci.md) · Security checks shared by developers and CI.
 *   [ADR 0009](../../adr/0009-error-tracking-and-call-traces-with-sentry.md) · Error tracking and per-call traces with Sentry.
-*   [ADR 0010](../../adr/0010-golden-dataset-and-two-level-evals.md) · Golden dataset and evals at two levels, with a judge model.
+*   [ADR 0010](../../adr/0010-golden-dataset-and-two-level-evals.md) · Golden dataset and evals at two levels, with a judge model. *Superseded by ADR 0013.*
+*   [ADR 0011](../../adr/0011-write-proposals-validated-by-code.md) · Write proposals validated by code; the model judges the caller's confirmation.
+*   [ADR 0012](../../adr/0012-pull-requests-with-required-checks.md) · Changes reach `main` through pull requests with required checks.
+*   [ADR 0013](../../adr/0013-evals-fingerprint-of-what-the-evals-measure.md) · Golden dataset and evals at two levels, with a fingerprint of what the evals measure.
 
 Decisions local to this module:
 
 *   **First case = booking in Cronix**.
+*   **v1 is booking; checking, rescheduling, cancelling and messages are v1.1.** Booking solves the problem end to end with one kind of write and no second factor; the rest needs the phone line's identity check and a message store that is not decided yet (contract §4.6).
+*   **No message when the backend is down** (AC-9): the message would be stored in the backend that failed.
+*   **`calls/{id}/end` sends only the outcome:** latency and cost stay in the agent's call trace (ADR 0009).
 *   **Stream admission token on Twilio Media Streams**. The `/twilio/stream` WebSocket is public; without control anyone could open an STT + LLM + TTS session at our expense. The signed webhook issues an HMAC token bound to the `CallSid`, valid for 60 s, inside the TwiML; the WebSocket requires it in the `start` event. The key is derived from the Twilio auth token: no new secret. Stateless, so any instance can verify it. Rejected alternative: validating `X-Twilio-Signature` on the WebSocket handshake, a Twilio behaviour not verified in its documentation.
 *   **Answer `200` to Meta immediately, even if accepting the call fails**. A retried `connect` is useless (its SDP offer has expired); the failure stays in the log instead of producing retries.
 *   **Nearest-rank percentile** in the latency report: with 20 calls per channel it does not interpolate values that were never measured.
@@ -263,7 +273,7 @@ Observability and quality (stage 1):
 
 **Done (2026-10-19), stage 1 — observability and quality:** error taxonomy with codes and kinds, `report_error` everywhere (an architecture test forbids silent handlers); one `CallTrace` per call with versions (prompt and phrases version, model, STT model, voice), per-segment latency, usage, estimated cost from a versioned price table, and errors by code, published to `var/call_traces.jsonl` and to Sentry (transaction per call, span per turn, latency distributions), privacy-first configuration with scrubbing; alert rules defined (`docs/observability/alerts.md`); golden dataset in YAML with 7 active and 9 pending cases; reference conversations through the real runner (greeting, barge-in, identity per channel); model evals with task metrics and a Gemini judge against `evals/baseline.json`, behaviour fingerprint test and syrupy snapshots; `evals.yml` and `provider-reachability.yml` workflows.
 
-**Finding of the reference conversations:** Pipecat's `UserBotLatencyObserver` discards a turn's measurement when the interruption that starts the turn arrives after the VAD's end of speech. On a call Flux starts the turn while the caller speaks, so production is not affected; the harness models a caller who speaks for a while between start and end of turn. `dialog_state/`, `intent_understanding/`, `write_guards/` and `adapters/cronix_scheduling_api/` exist empty until their phases.
+**Finding of the reference conversations:** Pipecat's `UserBotLatencyObserver` discards a turn's measurement when the interruption that starts the turn arrives after the VAD's end of speech. On a call Flux starts the turn while the caller speaks, so production is not affected; the harness models a caller who speaks for a while between start and end of turn. `agent_tools/`, `write_guards/` and `adapters/cronix_scheduling_api/` exist empty until their phases.
 
 **§6 segments from Pipecat's contributions** (`LatencyBreakdown.contributions[].key`):
 
@@ -276,4 +286,6 @@ Observability and quality (stage 1):
 
 **Pending to close phase 0** (needs accounts and real calls): Twilio number and Meta test app/number configured; 20 measured calls per channel; choose the LLM and the TTS voice with that data; cost per minute per channel; verify whether the real Cronix number can enable *Calling* and how it coexists with the message webhook (§10); verify the multi-instance `terminate` risk (§10).
 
-**Next:** stage 2 (AI engineering foundations; its plan is presented before any implementation). The next big task after it is phase 0's **first real call, measured per segment**.
+**Changed (2026-10-19), balance between the agent and the code:** v1 narrowed to booking (§2); writes validated by code and confirmed by the caller, with the yes judged by the model (INV-2, INV-3, ADR 0011), without mention guards nor a call state machine; `dialog_state/` removed and `intent_understanding/` renamed `agent_tools/`; AC-9 without a message; on the phone line no name and no appointments without the second factor (INV-4); changes reach `main` through pull requests (ADR 0012); the evals fingerprint covers only what the model evals exercise, and the first baseline waits for the booking prompt (ADR 0013).
+
+**Next:** phase 0's **first real call, measured per segment**. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).

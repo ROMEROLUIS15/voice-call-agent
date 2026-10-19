@@ -1,13 +1,11 @@
 {
-  "fingerprint": "c2868793a98f801c",
+  "fingerprint": "79fc41ca70d666db",
   "inputs": {
     "conversation_content": "es-c3d0810115bd",
     "language_model": "groq openai/gpt-oss-120b",
     "generation_settings": "5651239e3146bfd4",
-    "stt_model": "flux-general-multi",
-    "tts_voice": "aura-2-selena-es",
-    "golden_dataset": "633c502feb6b",
-    "scoring": "657d494f3125e1d1",
+    "golden_dataset": "00f63ba79c83",
+    "scoring": "fcd1d391007bf081",
     "judge_model": "gemini-3.6-flash"
   },
   "measured_with": null,

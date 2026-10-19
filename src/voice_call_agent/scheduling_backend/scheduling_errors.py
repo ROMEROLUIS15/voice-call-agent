@@ -12,7 +12,7 @@ class SchedulingBackendUnavailableError(SchedulingBackendError):
     """Timeout, rate limit or transient failure, after the allowed retry.
 
     The agent never invents a result (INV-5): it says it could not complete the action and
-    offers to take a message. After a write timeout it checks the real state first (contract §7).
+    confirms nothing. After a write timeout it checks the real state first (contract §7).
     """
 
 

@@ -29,7 +29,7 @@ class CallSession(BaseModel):
     caller_phone: str | None
     """Caller's number in E.164, or `None` when the channel withheld it."""
     dialed_phone: str | None
-    """Dialed number in E.164; on the phone line it resolves the business (`voice_lines`)."""
+    """Dialed number in E.164; on the phone line it resolves the business."""
     business_id: str | None = None
     """Business resolved by the scheduling backend (phase 1). Fixed once resolved (INV-1)."""
 

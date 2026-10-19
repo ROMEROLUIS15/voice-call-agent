@@ -1,7 +1,7 @@
 name: Model evals
 
 # The model-level golden cases with the real language model, scored by task metrics and a
-# judge model, compared with the baseline of the commit the change starts from (ADR 0010,
+# judge model, compared with the baseline of the commit the change starts from (ADR 0013,
 # docs/evals/golden-dataset.md). Runs when what shapes the agent's replies changes, and on
 # demand. Without the provider secrets the job is skipped with a notice: pull requests from
 # forks never receive secrets, and this workflow never runs on `pull_request_target`.
