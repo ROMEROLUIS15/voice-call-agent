@@ -66,7 +66,7 @@ The margins were set for 3 repetitions of a small dataset; they are reviewed as 
 
 1. Write `evals/golden_dataset/<id>.yaml` following the format above, with its levels, tags and expectations.
 2. `uv run pytest tests/evals` — the dataset validates; a conversation-level case runs.
-3. Any edit to the dataset changes the behaviour fingerprint: run the model evals and store the new baseline (below). `tests/evals/test_behavior_fingerprint.py` fails until then.
+3. Any edit to the dataset changes the behaviour fingerprint, and `tests/evals/test_behavior_fingerprint.py` fails until the baseline follows it: run the model evals and store the new baseline (below) or, until the first baseline is measured, record the inputs with `--record-fingerprint`.
 
 ## Running
 
@@ -78,7 +78,7 @@ uv run --env-file .env --group evals python -m evals.model_evals --write-baselin
 
 The model evals need the key of the configured provider (`LLM_PROVIDER`, `GROQ_API_KEY` by default) and `GOOGLE_API_KEY` for the judge. They exit with 0 (no regression), 1 (regression) or 2 (could not run), write a Markdown report (`var/evals/report.md`) and print it. `--write-baseline` stores the scores only without a regression and only for the default model. `--record-fingerprint` records the inputs without measuring, allowed only while the baseline has never been measured.
 
-In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies change, compares with the baseline of the commit the change starts from and puts the report in the run summary. Without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets it is skipped with a notice.
+In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies change, compares with the baseline of the commit the change starts from and puts the report in the run summary. Without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets it is skipped with a notice. Its check is not required (it runs only on those changes), but a pull request is not merged with it failing (ADR 0012).
 
 ## Rules
 
@@ -88,4 +88,4 @@ In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, mode
 
 ## Status
 
-Phase 0: four reference conversations (greeting, barge-in, identity per channel) and five model-level cases about the test line, plus pending cases for AC-1 to AC-9. The baseline is recorded **unmeasured** until the CI secrets exist; its first measured run becomes the baseline.
+Phase 0: four reference conversations (greeting, barge-in, identity per channel) and five model-level cases about the test line, plus pending cases for AC-1 to AC-9 and for what a spoofed caller ID must not reveal. The baseline stays **unmeasured** until the booking prompt of phase 2 exists (ADR 0013): the phase 0 prompt is provisional, and the first measured run with the booking prompt becomes the baseline.

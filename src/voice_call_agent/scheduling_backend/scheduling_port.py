@@ -1,7 +1,7 @@
 """`SchedulingBackend`: the system of record for appointments, seen from the agent.
 
-The dialog and the guards depend on this protocol, never on a concrete backend. Every method
-may raise a `SchedulingBackendError`; business outcomes come back as typed results.
+The agent's tools and the write guards depend on this protocol, never on a concrete backend.
+Every method may raise a `SchedulingBackendError`; business outcomes come back as typed results.
 """
 
 from datetime import date

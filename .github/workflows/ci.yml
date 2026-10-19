@@ -2,7 +2,7 @@ name: CI
 
 # Every job runs the hooks of .pre-commit-config.yaml: the same commands developers run with
 #   uv run pre-commit run --all-files --hook-stage manual
-# All jobs are blocking: mark them as required checks in the branch protection of `main`.
+# All jobs are required checks in the branch protection of `main` (ADR 0012).
 
 on:
   push:

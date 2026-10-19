@@ -1,7 +1,8 @@
 """In-memory `SchedulingBackend` with the contract's tenancy semantics (contract §4).
 
 The business of every request comes from the registered call, never from the request. Later
-dialog tests run against it; the real enforcement lives in Cronix (RLS and server-side scoping).
+tests of the agent's tools run against it; the real enforcement lives in Cronix (row-level security
+and server-side scoping).
 """
 
 from dataclasses import dataclass, field
