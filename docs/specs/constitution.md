@@ -64,6 +64,7 @@ Documentation is updated as part of the change, not afterwards. **Before every c
 *   If a change does not affect documentation, the change summary says so explicitly ("no documentation changes because …"); it is never omitted silently.
 *   Removing code or a feature removes its documentation: documentation never describes something that no longer exists.
 *   Every trade-off records its context, the alternatives considered and its consequences: as an ADR in `docs/adr/NNNN-title-in-english.md` (numbered, see `docs/adr/README.md`) if it is cross-cutting, in the module's manifest if it is local.
+*   **ADRs are versioned, not rewritten.** Before it is published (it reaches the default branch of the public repository), an ADR is edited freely. Once published, only editorial corrections are allowed (wording, links, removing sensitive data), each listed with its date in the ADR's `Revisions` section. A different decision takes a new ADR that says `Supersedes NNNN`, and the earlier one becomes `Superseded by NNNN`.
 *   **Where documentation lives:** additional public documentation inside `docs/`; architecture decisions in `docs/adr/`; at the repository root only `README.md` and `CLAUDE.md` as documentation (tool configuration files such as `pyproject.toml` stay where their tools expect them).
 
 ## 9. Language policy

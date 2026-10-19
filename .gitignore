@@ -19,3 +19,6 @@ coverage.xml
 
 # Local state of the evals tooling (DeepEval creates it on import)
 .deepeval/
+
+# Personal instructions for coding agents, per developer (never committed)
+CLAUDE.local.md

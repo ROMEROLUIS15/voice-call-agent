@@ -18,9 +18,17 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 ## Process
 
 *   File name: `NNNN-title-in-english.md`, numbered in sequence, never reused.
-*   Status: `Proposed`, `Accepted`, or `Superseded by NNNN`. An accepted ADR is not rewritten; a new ADR supersedes it and both link to each other.
+*   Status: `Proposed`, `Accepted`, or `Superseded by NNNN`.
 *   Every ADR records its context, the decision, the alternatives considered and its consequences (constitution §8).
 *   Add the ADR to the table above in the same change.
+
+## Changing an ADR
+
+An ADR is **published** once it reaches the default branch of the public repository.
+
+*   **Before it is published**, an ADR is edited freely.
+*   **Once published**, only editorial corrections are allowed: wording, links, or removing sensitive data. Each one is listed in a `## Revisions` section at the end of the ADR, with its date and what changed. The decision does not change.
+*   **A different decision** takes a new ADR whose header says `Supersedes NNNN`; the earlier ADR's status becomes `Superseded by NNNN`. Both stay in the index.
 
 ## Template
 
@@ -29,6 +37,7 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 
 *   **Status:** Proposed
 *   **Date:** YYYY-MM-DD
+*   **Supersedes:** NNNN (only when it replaces an earlier ADR)
 
 ## Context
 What forces the decision.
@@ -41,4 +50,7 @@ Each option and why it was not chosen.
 
 ## Consequences
 What gets easier, what gets harder, and how the costs are mitigated.
+
+## Revisions
+Only once published, for editorial corrections: YYYY-MM-DD · what changed.
 ```
