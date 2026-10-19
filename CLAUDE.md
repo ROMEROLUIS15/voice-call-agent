@@ -9,9 +9,10 @@ Summary only; the full, binding text is `docs/specs/constitution.md`.
 *   **Typing and structure.** `mypy --strict` with zero errors; no `Any` without a justifying comment; Pydantic models across layers; files ≤ ~300 lines, functions ≤ ~50; dependencies injected from `service_composition.py`; no global singletons, no import-time side effects, nothing blocking the event loop.
 *   **Secrets.** Only environment variables loaded as `SecretStr`; never in code, logs or errors. `.env` is git-ignored; `.env.example` documents every variable.
 *   **Repository scope.** The repository describes only the product and its technical decisions. It never references third-party organizations, clients, employers, job opportunities or the personal motivations of its maintainers. External context, if any, stays outside the repository.
+*   **Documentation.** Updated as part of every change, before every commit and every push: `README.md` and `docs/` (specs and ADRs in `docs/adr/NNNN-title-in-english.md`). A change without documentation impact says so explicitly in its summary ("no documentation changes because …"). Removed code takes its documentation with it. At the root, only `README.md` and `CLAUDE.md` are documentation.
 *   **Verification.** A task is not done until the checks below pass and the module's manifest is updated (SDD).
 
-**Before any commit**, all of these must pass:
+**Before any commit and any push**, all of these must pass:
 
 ```bash
 uv run ruff check .
@@ -20,6 +21,8 @@ uv run mypy            # strict, configured in pyproject.toml
 uv run pytest
 git status             # secrets review: no .env, token, key or credential file staged
 ```
+
+And: **README and `docs/` (specs and ADRs) updated, or the summary says why not.**
 
 If a secret was ever tracked: `git rm --cached <file>` and rotate the secret.
 
@@ -33,6 +36,7 @@ Read, in this order, and follow them:
 1. `docs/specs/constitution.md` — non-negotiable rules (law zero: the model proposes, the code decides).
 2. `docs/specs/call-module/manifest.md` — scope, architecture, invariants, latency, acceptance criteria and phases.
 3. `docs/specs/cronix-phone-api-contract.md` — HTTP contract with Cronix.
+4. `docs/adr/` — architecture decisions already taken.
 
 No task is finished without updating the manifest if a contract, invariant or flow changed (SDD).
 

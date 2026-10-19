@@ -5,8 +5,9 @@ Real-time voice agent that answers calls over **WhatsApp** (Cloud API Calling, W
 (Deepgram Flux → LLM → Deepgram Aura-2) on Pipecat. Its first scheduling backend is Cronix.
 
 Before touching code: [`CLAUDE.md`](CLAUDE.md), [constitution](docs/specs/constitution.md),
-[manifest](docs/specs/call-module/manifest.md) and
-[Cronix contract](docs/specs/cronix-phone-api-contract.md).
+[manifest](docs/specs/call-module/manifest.md),
+[Cronix contract](docs/specs/cronix-phone-api-contract.md) and
+[architecture decisions](docs/adr/README.md).
 
 **Status: phase 0** (technical test, without Cronix). The agent talks in Spanish and measures
 latency per segment and per channel; it does not book yet.

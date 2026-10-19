@@ -1,6 +1,6 @@
 # 📋 Domain Manifest: Call Agent (WhatsApp + Phone Line)
 
-Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md` and `../cronix-phone-api-contract.md`.
+Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md` and the architecture decisions in `../../adr/`.
 
 ## 1. Purpose
 
@@ -198,12 +198,18 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 
 ## 11. Recorded trade-offs
 
-*   **Service separate from Cronix**.
-*   **Python + Pipecat over TypeScript**.
+Cross-cutting decisions are ADRs in `docs/adr/`:
+
+*   [ADR 0001](../../adr/0001-separate-service-from-the-scheduling-backend.md) · Separate service from the scheduling backend.
+*   [ADR 0002](../../adr/0002-python-and-pipecat-for-the-voice-engine.md) · Python and Pipecat for the voice engine.
+*   [ADR 0003](../../adr/0003-cascaded-speech-architecture.md) · Cascaded speech architecture (STT → LLM → TTS).
+*   [ADR 0004](../../adr/0004-two-call-entries-over-one-engine.md) · Two call entries over one engine.
+*   [ADR 0005](../../adr/0005-english-repository-with-localized-caller-content.md) · English repository with localized caller content.
+*   [ADR 0006](../../adr/0006-names-by-function-and-ports-for-external-systems.md) · Names by function and ports for external systems.
+
+Decisions local to this module:
+
 *   **First case = booking in Cronix**.
-*   **Two entries (WhatsApp + Twilio) over one engine**: it covers the risk of Meta's calling requirement (§10: the Cronix number may not qualify for WhatsApp calls) and supports traditional phone calls (PSTN). Cost: two adapters and per-channel tests; mitigated by isolating the channel in `call_transports/` (INV-8).
-*   **Repository in English, caller-facing content in Spanish**: code, docs, logs and commits in English; prompts and spoken phrases in resource files per locale (`conversation_content/<locale>/`). Constitution §9.
-*   **Names by function and an agnostic package**: package `voice_call_agent`; names say what the code does; "Cronix" only in `adapters/cronix_scheduling_api/` and the composition root; the domain depends on the `SchedulingBackend` and `BusinessResolver` ports. Vendor factories (Deepgram, LLM providers) moved to `adapters/` so the speech pipeline knows no vendor. Constitution §10.
 *   **Stream admission token on Twilio Media Streams**. The `/twilio/stream` WebSocket is public; without control anyone could open an STT + LLM + TTS session at our expense. The signed webhook issues an HMAC token bound to the `CallSid`, valid for 60 s, inside the TwiML; the WebSocket requires it in the `start` event. The key is derived from the Twilio auth token: no new secret. Stateless, so any instance can verify it. Rejected alternative: validating `X-Twilio-Signature` on the WebSocket handshake, a Twilio behaviour not verified in its documentation.
 *   **Answer `200` to Meta immediately, even if accepting the call fails**. A retried `connect` is useless (its SDP offer has expired); the failure stays in the log instead of producing retries.
 *   **Nearest-rank percentile** in the latency report: with 20 calls per channel it does not interpolate values that were never measured.

@@ -57,8 +57,14 @@ Non-negotiable rules for all code in this repository. It inherits the principles
 
 ## 8. Documentation (SDD)
 
-*   No task is done until the manifest of the module it touched is updated.
-*   Every trade-off records its context, the alternatives considered and its consequences (ADR if cross-cutting, the manifest if local).
+Documentation is updated as part of the change, not afterwards. **Before every commit and every push**, without being asked:
+
+*   **`README.md`** is updated if anything it describes changed: installation, usage, architecture, status or environment variables.
+*   **Public documentation in `docs/`** reflects every addition, removal or behaviour change: the specs (`docs/specs/`) and the architecture decisions (`docs/adr/`). No task is done until the manifest of the module it touched is updated.
+*   If a change does not affect documentation, the change summary says so explicitly ("no documentation changes because …"); it is never omitted silently.
+*   Removing code or a feature removes its documentation: documentation never describes something that no longer exists.
+*   Every trade-off records its context, the alternatives considered and its consequences: as an ADR in `docs/adr/NNNN-title-in-english.md` (numbered, see `docs/adr/README.md`) if it is cross-cutting, in the module's manifest if it is local.
+*   **Where documentation lives:** additional public documentation inside `docs/`; architecture decisions in `docs/adr/`; at the repository root only `README.md` and `CLAUDE.md` as documentation (tool configuration files such as `pyproject.toml` stay where their tools expect them).
 
 ## 9. Language policy
 
@@ -83,7 +89,7 @@ Non-negotiable rules for all code in this repository. It inherits the principles
 *   **Async:** nothing blocks the event loop, where other calls are streaming audio. CPU-heavy work or file I/O goes to `asyncio.to_thread`; heavy imports happen at startup.
 *   **Errors:** each package defines its own domain exceptions. Expected business outcomes (slot taken, identity mismatch) are typed results, not exceptions.
 *   **Logging:** structured logging with loguru, configured once by the entrypoint (JSON by default). No `print`; the only exception is the program output of a command-line tool.
-*   **Before every commit** these must pass: `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest`, and the secrets review of §12.
+*   **Before every commit** these must pass: `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest`, the secrets review of §12 and the documentation review of §8. The same review applies before every push.
 
 ## 12. Secrets handling
 
@@ -105,3 +111,4 @@ Non-negotiable rules for all code in this repository. It inherits the principles
 
 *   The repository describes only the product and its technical decisions. It never references third-party organizations, clients, employers, job opportunities or the personal motivations of its maintainers. External context, if any, stays outside the repository.
 *   This applies to every file, comment, test, commit message and pull request description.
+*   Technology providers the product integrates with (Meta, Twilio, Deepgram, language model providers) are technical dependencies, not external context.
