@@ -75,7 +75,7 @@ uv run python -m voice_call_agent.observability.latency_budget_report var/call_t
 
 ## Evals
 
-One golden dataset (`evals/golden_dataset/`), two levels (ADR 0013):
+One golden dataset (`evals/golden_dataset/`), two levels (ADR 0010):
 
 ```bash
 uv run pytest tests/evals tests/snapshots                         # reference conversations, snapshots

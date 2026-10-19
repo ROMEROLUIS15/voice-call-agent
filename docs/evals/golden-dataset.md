@@ -1,6 +1,6 @@
 # Golden dataset
 
-The reference behaviour of the agent, as conversations with their expected result. One dataset feeds two levels of evaluation (ADR 0013):
+The reference behaviour of the agent, as conversations with their expected result. One dataset feeds two levels of evaluation (ADR 0010):
 
 | Level | What runs | Scored by | Where |
 |---|---|---|---|
