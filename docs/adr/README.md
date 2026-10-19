@@ -8,7 +8,6 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 | [0002](0002-python-and-pipecat-for-the-voice-engine.md) | Python and Pipecat for the voice engine | Accepted |
 | [0003](0003-cascaded-speech-architecture.md) | Cascaded speech architecture (STT → LLM → TTS) | Accepted |
 | [0004](0004-two-call-entries-over-one-engine.md) | Two call entries over one engine | Accepted |
-| [0005](0005-english-repository-with-localized-caller-content.md) | English repository with localized caller content | Accepted |
 | [0006](0006-names-by-function-and-ports-for-external-systems.md) | Names by function and ports for external systems | Accepted |
 | [0007](0007-own-security-headers-middleware.md) | Own security headers middleware | Accepted |
 | [0008](0008-security-checks-shared-by-developers-and-ci.md) | Security checks shared by developers and CI | Accepted |

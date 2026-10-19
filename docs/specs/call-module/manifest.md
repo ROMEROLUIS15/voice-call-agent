@@ -222,7 +222,6 @@ Cross-cutting decisions are ADRs in `docs/adr/`:
 *   [ADR 0002](../../adr/0002-python-and-pipecat-for-the-voice-engine.md) · Python and Pipecat for the voice engine.
 *   [ADR 0003](../../adr/0003-cascaded-speech-architecture.md) · Cascaded speech architecture (STT → LLM → TTS).
 *   [ADR 0004](../../adr/0004-two-call-entries-over-one-engine.md) · Two call entries over one engine.
-*   [ADR 0005](../../adr/0005-english-repository-with-localized-caller-content.md) · English repository with localized caller content.
 *   [ADR 0006](../../adr/0006-names-by-function-and-ports-for-external-systems.md) · Names by function and ports for external systems.
 *   [ADR 0007](../../adr/0007-own-security-headers-middleware.md) · Own security headers middleware.
 *   [ADR 0008](../../adr/0008-security-checks-shared-by-developers-and-ci.md) · Security checks shared by developers and CI.
