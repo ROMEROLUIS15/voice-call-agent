@@ -118,7 +118,7 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 
 | Id | Risk | Why it is accepted | Revisit |
 |---|---|---|---|
-| R-01 | Replay and rate-limit state live in memory, per instance: a repeat or a flood split across instances is not seen as a whole | One instance in phase 0; a shared store is a configuration change (`RATE_LIMIT_STORAGE_URI`, a `ReplayGuard` adapter) | When a second instance runs |
+| R-01 | Replay and rate-limit state live in memory, per instance: a repeat or a flood split across instances is not seen as a whole | One instance in phase 0. **Redis** is the planned shared store: `RATE_LIMIT_STORAGE_URI=async+redis://…` and a Redis-backed `ReplayGuard` | Before a second instance runs |
 | R-02 | Twilio signs no timestamp: a captured voice webhook cannot be rejected by age | Deduplication and one stream per `CallSid` leave a replay nothing to obtain | — |
 | R-03 | A genuine Twilio retry whose first delivery reached us but whose answer was lost is rejected (fail closed) | Twilio retries only when it got no answer; the handler answers in milliseconds | If dropped calls show up in traces |
 | R-04 | Booking on the phone line trusts the spoofable caller ID | The worst case is an unwanted, reversible appointment (constitution §4) | Phase 3 |
@@ -130,3 +130,4 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | Date | Change | Surfaces |
 |---|---|---|
 | 2026-10-18 | First version: HTTP hardening, replay protection, rate limits, tenant boundary tests, security checks in CI | S1–S3, S5, S8–S10 |
+| 2026-10-19 | R-01: Redis recorded as the planned shared store for replay and rate-limit state | S1–S3 |
