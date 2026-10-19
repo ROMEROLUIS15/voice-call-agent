@@ -1,0 +1,94 @@
+name: Model evals
+
+# The model-level golden cases with the real language model, scored by task metrics and a
+# judge model, compared with the baseline of the commit the change starts from (ADR 0010,
+# docs/evals/golden-dataset.md). Runs when what shapes the agent's replies changes, and on
+# demand. Without the provider secrets the job is skipped with a notice: pull requests from
+# forks never receive secrets, and this workflow never runs on `pull_request_target`.
+
+on:
+  pull_request:
+    paths:
+      - "src/voice_call_agent/conversation_content/**"
+      - "src/voice_call_agent/adapters/language_model_providers/**"
+      - "src/voice_call_agent/speech_pipeline/**"
+      - "src/voice_call_agent/settings/**"
+      - "evals/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/evals.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/voice_call_agent/conversation_content/**"
+      - "src/voice_call_agent/adapters/language_model_providers/**"
+      - "src/voice_call_agent/speech_pipeline/**"
+      - "src/voice_call_agent/settings/**"
+      - "evals/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/evals.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEEPEVAL_TELEMETRY_OPT_OUT: "1"
+
+jobs:
+  model-evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Provider secrets present
+        id: secrets
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GROQ_API_KEY" ] || [ -z "$GOOGLE_API_KEY" ]; then
+            echo "::notice::Model evals skipped: the GROQ_API_KEY and GOOGLE_API_KEY secrets are not available."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.secrets.outputs.present == 'true'
+        with:
+          fetch-depth: 0  # The baseline compared against is read from an earlier commit.
+      - uses: astral-sh/setup-uv@v10
+        if: steps.secrets.outputs.present == 'true'
+        with:
+          enable-cache: true
+      - if: steps.secrets.outputs.present == 'true'
+        run: uv sync --locked --group evals
+      - name: Baseline of the commit the change starts from
+        if: steps.secrets.outputs.present == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE_SHA" ] && git cat-file -e "$BASE_SHA:evals/baseline.json" 2>/dev/null; then
+            git show "$BASE_SHA:evals/baseline.json" > "$RUNNER_TEMP/baseline.json"
+          else
+            cp evals/baseline.json "$RUNNER_TEMP/baseline.json"
+          fi
+      - name: Model evals
+        if: steps.secrets.outputs.present == 'true'
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: >-
+          uv run --group evals python -m evals.model_evals
+          --compare-with "$RUNNER_TEMP/baseline.json"
+          --report "$RUNNER_TEMP/evals-report.md"
+      - name: Report in the run summary
+        if: always() && steps.secrets.outputs.present == 'true'
+        run: |
+          if [ -f "$RUNNER_TEMP/evals-report.md" ]; then
+            cat "$RUNNER_TEMP/evals-report.md" >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,0 +1,19 @@
+id: interruption-silences-the-agent-quickly
+title: The agent goes silent in under 300 ms when the caller interrupts a reply (AC-8)
+source: hand-written
+phase: 4
+status: pending
+pending_reason: Needs the time to silence measured on real call audio, not on scripted frames.
+levels: [conversation]
+channel: whatsapp
+language: es
+turns:
+  - says: Hola, ¿me puedes explicar cómo funciona la agenda?
+  - says: Espera, espera, mejor otra cosa.
+    barge_in: true
+expected:
+  intent: ask-info
+  outcome: info_only
+  identity_verified: true
+  agent_interrupted: true
+tags: [interruption, ac-8, inv-7, latency]

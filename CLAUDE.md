@@ -11,6 +11,7 @@ Summary only; the full, binding text is `docs/specs/constitution.md`.
 *   **Repository scope.** The repository describes only the product and its technical decisions. It never references third-party organizations, clients, employers, job opportunities or the personal motivations of its maintainers. External context, if any, stays outside the repository.
 *   **Documentation.** Updated as part of every change, before every commit and every push: `README.md` and `docs/` (specs and ADRs in `docs/adr/NNNN-title-in-english.md`). A change without documentation impact says so explicitly in its summary ("no documentation changes because …"). Removed code takes its documentation with it. At the root, only `README.md` and `CLAUDE.md` are documentation.
 *   **Security and tenancy per feature.** Negative security tests, the threat model and tenant isolation tests ship with the feature, not later. CORS stays closed; security headers on every response; the business comes only from the `CallSession` (constitution §15).
+*   **Observability first.** Find a failure in the observability first (logs by error code, the call trace, Sentry); if it cannot show it, instrument it first (an error code, an attribute or a span, with its test), then fix it. Every feature ships with its trace data, its error codes in `observability/error_taxonomy.py` reported through `report_error`, and its golden case (`docs/evals/golden-dataset.md`). No change to the prompt, phrases, model, generation settings or tools without model evals against the baseline (constitution §16, ADR 0010).
 *   **Verification.** A task is not done until the checks below pass and the module's manifest is updated (SDD).
 
 **Before any commit and any push**, all of these must pass:
@@ -26,6 +27,7 @@ Once per clone: `uv run pre-commit install` (ruff and gitleaks then run on every
 
 And: **README and `docs/` (specs and ADRs) updated, or the summary says why not.**
 And: **negative security tests and the threat model updated if the change touches an attack surface.**
+And: **a changed snapshot is reviewed and regenerated (`uv run pytest tests/snapshots --snapshot-update`); a changed behaviour fingerprint needs the model evals and a new baseline (`uv run --env-file .env --group evals python -m evals.model_evals --write-baseline`).**
 
 If a secret was ever tracked: `git rm --cached <file>` and rotate the secret.
 

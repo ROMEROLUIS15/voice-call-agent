@@ -1,6 +1,6 @@
 # 📋 Domain Manifest: Call Agent (WhatsApp + Phone Line)
 
-Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md`, the architecture decisions in `../../adr/` and the threat model in `../../security/threat-model.md`.
+Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md`, the architecture decisions in `../../adr/`, the threat model in `../../security/threat-model.md` and the golden dataset in `../../evals/golden-dataset.md`.
 
 ## 1. Purpose
 
@@ -63,7 +63,7 @@ There are **two entries** to one voice engine:
 │                             ▲ implemented by                      │
 │  adapters/cronix_scheduling_api/   HMAC-signed HTTP, idempotency  │
 │  adapters/deepgram_speech/ · adapters/language_model_providers/   │
-│  observability/     traces · per-segment latency · redaction      │
+│  observability/     error codes · call traces · Sentry · redaction│
 └─────────────────────────────┬─────────────────────────────────────┘
                               │ HTTPS + HMAC
                               ▼
@@ -92,10 +92,11 @@ There are **two entries** to one voice engine:
 | `adapters/cronix_scheduling_api/` | **Only place that knows Cronix:** implements `SchedulingBackend` and `BusinessResolver` over the contract: HMAC signature, timeouts, idempotency, error mapping. (Phase 1.) |
 | `adapters/deepgram_speech/` | Flux STT and Aura-2 TTS factories. |
 | `adapters/language_model_providers/` | Groq, Google and OpenAI LLM factories with explicit request timeouts. |
-| `observability/` | Per-call traces and per-segment latency; structured logging; redaction of personal data. |
+| `observability/` | Error taxonomy and `report_error` (log, metric, issue for real failures, call trace); one `CallTrace` per call (versions, per-segment latency, usage, estimated cost, errors) published to a JSON-lines file and to Sentry; structured logging; redaction of personal data (ADR 0009). |
 | `http_hardening/` | Security headers (ADR 0007), generic error responses, rate limits per client address and route, trusted hosts, body size limit, closed CORS (constitution §15). |
 | `settings/` | Typed configuration from environment variables; each component receives only its section. |
 | `service_composition.py`, `asgi_app.py`, `__main__.py`, `graceful_http_server.py` | Composition root and process entry: wire the components, mount the entries, run uvicorn with a graceful drain. |
+| `evals/` (repository root, not shipped) | Golden dataset (`golden_dataset/*.yaml`), conversation harness (scripted providers and a loopback transport over the real runner), task metrics, judge scoring, baseline and model evals runner (ADR 0010). |
 
 ## 4. Flow of a call
 
@@ -155,7 +156,9 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 | LLM | Chosen by measuring in phase 0 (Groq, Gemini or OpenAI); `LLM_PROVIDER` / `LLM_MODEL` | Swappable (`adapters/language_model_providers/`). |
 | TTS | Deepgram Aura-2 in Spanish over WebSocket; `aura-2-selena-es` (Latin American) by default | Already known; alternatives Cartesia or ElevenLabs. Flux TTS (`/v2/speak`) is left out for now: Spanish voices were not verified (Pipecat's examples only use `-en` voices). |
 | Fast decisions (optional) | Evaluate Jev (TypeSafe) for router and reviewer | Only if it improves against the existing evals; not a core dependency. |
-| Testing | pytest, pytest-asyncio, strict mypy, simulated calls | Constitution §7. |
+| Testing | pytest, pytest-asyncio, strict mypy, reference conversations, syrupy snapshots | Constitution §7. |
+| Error tracking and traces | Sentry (`sentry-sdk==2.71.0`), project `voice-call-agent` | ADR 0009. |
+| Evals | DeepEval `4.2.8` (dependency group `evals`, telemetry off), judge `gemini-3.6-flash`, GitHub-hosted runners | ADR 0010. |
 
 ## 8. v1 acceptance criteria
 
@@ -180,7 +183,7 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 | 2 · Booking | Booking with two-turn confirmation | AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-11 |
 | 3 · Reschedule and cancel | With identity per channel | AC-7 |
 | 4 · Robustness | Interruptions, Cronix down, holding phrases | AC-8, AC-9, AC-10 |
-| 5 · Evals in CI | Simulated calls and reference conversations | CI blocks on regressions |
+| 5 · Evals in CI | Simulated callers, end-to-end calls with recorded audio, judge calibration against human labels, sampled evaluation of production calls | CI blocks on regressions. Reference conversations and model evals against a baseline exist from phase 0 (ADR 0010). |
 | 6 · Bilingual | English and language switching | Own criteria |
 
 ## 10. Known risks
@@ -197,6 +200,8 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 *   **Network calls owned by libraries without a configurable timeout** (known limitation): Deepgram's STT/TTS WebSocket connect uses the `websockets` library default open timeout (10 s); WebRTC/ICE negotiation is managed by aiortc. Every network call the agent's own code makes or configures has an explicit timeout (Graph API session, Twilio REST, LLM clients, Media Stream handshake).
 *   **uvicorn closes every WebSocket on shutdown** (code 1012) before waiting for anything; without mitigation a restart cuts every phone-line call. Mitigated by `GracefulHttpServer`, which drains calls on the first signal.
 *   **Pipecat logs conversation content at `DEBUG`** (transcripts, which may include names): production runs at `INFO` or higher (constitution §12).
+*   **Sentry project not created yet** (2026-10-19): the organization does not let members create projects (`403`). An owner creates `voice-call-agent` (or allows members to); then the DSN goes to `SENTRY_DSN` and the alert rules of `docs/observability/alerts.md` are created. Until then nothing is sent.
+*   **Model evals without secrets** (threat model R-07): until `GROQ_API_KEY` and `GOOGLE_API_KEY` are repository secrets, the model evals are skipped and the baseline stays unmeasured. Whether GitHub-hosted runners reach each provider is checked with `provider-reachability.yml` after the first push; if one is not reachable, the maintainers weigh the alternatives (never a self-hosted runner).
 *   **Replay and rate-limit state per instance** (accepted risk R-01 of `docs/security/threat-model.md`): with several instances, a repeat or a flood split across them is not seen as a whole. **Redis** is the planned shared store: `RATE_LIMIT_STORAGE_URI=async+redis://…` for the rate limits and a Redis-backed `ReplayGuard`, before a second instance runs.
 
 ## 11. Recorded trade-offs
@@ -209,6 +214,10 @@ Cross-cutting decisions are ADRs in `docs/adr/`:
 *   [ADR 0004](../../adr/0004-two-call-entries-over-one-engine.md) · Two call entries over one engine.
 *   [ADR 0005](../../adr/0005-english-repository-with-localized-caller-content.md) · English repository with localized caller content.
 *   [ADR 0006](../../adr/0006-names-by-function-and-ports-for-external-systems.md) · Names by function and ports for external systems.
+*   [ADR 0007](../../adr/0007-own-security-headers-middleware.md) · Own security headers middleware.
+*   [ADR 0008](../../adr/0008-security-checks-shared-by-developers-and-ci.md) · Security checks shared by developers and CI.
+*   [ADR 0009](../../adr/0009-error-tracking-and-call-traces-with-sentry.md) · Error tracking and per-call traces with Sentry.
+*   [ADR 0010](../../adr/0010-golden-dataset-and-two-level-evals.md) · Golden dataset and evals at two levels, with a judge model.
 
 Decisions local to this module:
 
@@ -232,9 +241,20 @@ Security hardening:
 *   **Production is the default environment**: HSTS on and API documentation off unless `ENVIRONMENT=development`.
 *   **Coverage threshold 85 % now, 90 % from phase 2**, measured with branches; never lowered to make a change pass.
 
+Observability and quality (stage 1):
+
+*   **Margins of the model evals: 0 for security, 0.05 for quality, 3 repetitions per case.** Set for a small dataset; **reviewed as the dataset grows**, when the measured noise between runs is known.
+*   **The YAML of the scenarios is the golden dataset's only format** (`docs/evals/golden-dataset.md`), and every call trace records the prompt and model versions that answered.
+*   **A security criterion counts as met or not met** (judge score ≥ 0.5), so judge noise alone does not fail a run with no margin; quality criteria are averaged.
+*   **Per-call identifiers tag issues, transactions and logs, never metrics**: one value per call would explode the metrics' cardinality.
+
 ## 12. Phase 0 status
 
-**Done (2026-10-18):** skeleton with the structure of §3 (uv, FastAPI, `pipecat-ai==1.12.0`, pytest, `mypy --strict`, ruff, CI); phone entry (signature, TwiML `<Connect><Stream>`, stream admission token, handshake timeout, μ-law 8 kHz transport, busy rejection when full, own hang-up with timeout); WhatsApp entry (subscription check, `X-Hub-Signature-256` over the raw body, `calls` filtering, admission against the concurrency limit with Graph API `reject`, WebRTC acceptance with Pipecat's `WhatsAppClient`); common Flux → LLM → Aura-2 pipeline with a fixed greeting; test prompt that confirms no appointment and invents no data; `SchedulingBackend` and `BusinessResolver` ports with their domain models; concurrency limit, readiness and graceful drain; HTTP hardening (security headers, closed CORS, trusted hosts, body limit, generic errors, no documentation in production), replay protection and rate limits on both entries, tenant boundary tests; security checks (bandit, pip-audit, gitleaks) shared by pre-commit and CI; structured JSON logging with redaction; per-turn, per-segment latency stored in `var/latency.jsonl` and summarized against §6 (`python -m voice_call_agent.observability.latency_budget_report`). `dialog_state/`, `intent_understanding/`, `write_guards/` and `adapters/cronix_scheduling_api/` exist empty until their phases.
+**Done (2026-10-18):** skeleton with the structure of §3 (uv, FastAPI, `pipecat-ai==1.12.0`, pytest, `mypy --strict`, ruff, CI); phone entry (signature, TwiML `<Connect><Stream>`, stream admission token, handshake timeout, μ-law 8 kHz transport, busy rejection when full, own hang-up with timeout); WhatsApp entry (subscription check, `X-Hub-Signature-256` over the raw body, `calls` filtering, admission against the concurrency limit with Graph API `reject`, WebRTC acceptance with Pipecat's `WhatsAppClient`); common Flux → LLM → Aura-2 pipeline with a fixed greeting; test prompt that confirms no appointment and invents no data; `SchedulingBackend` and `BusinessResolver` ports with their domain models; concurrency limit, readiness and graceful drain; HTTP hardening (security headers, closed CORS, trusted hosts, body limit, generic errors, no documentation in production), replay protection and rate limits on both entries, tenant boundary tests; security checks (bandit, pip-audit, gitleaks) shared by pre-commit and CI; structured JSON logging with redaction; per-turn, per-segment latency summarized against §6 (`python -m voice_call_agent.observability.latency_budget_report`).
+
+**Done (2026-10-19), stage 1 — observability and quality:** error taxonomy with codes and kinds, `report_error` everywhere (an architecture test forbids silent handlers); one `CallTrace` per call with versions (prompt and phrases version, model, STT model, voice), per-segment latency, usage, estimated cost from a versioned price table, and errors by code, published to `var/call_traces.jsonl` and to Sentry (transaction per call, span per turn, latency distributions), privacy-first configuration with scrubbing; alert rules defined (`docs/observability/alerts.md`); golden dataset in YAML with 7 active and 9 pending cases; reference conversations through the real runner (greeting, barge-in, identity per channel); model evals with task metrics and a Gemini judge against `evals/baseline.json`, behaviour fingerprint test and syrupy snapshots; `evals.yml` and `provider-reachability.yml` workflows.
+
+**Finding of the reference conversations:** Pipecat's `UserBotLatencyObserver` discards a turn's measurement when the interruption that starts the turn arrives after the VAD's end of speech. On a call Flux starts the turn while the caller speaks, so production is not affected; the harness models a caller who speaks for a while between start and end of turn. `dialog_state/`, `intent_understanding/`, `write_guards/` and `adapters/cronix_scheduling_api/` exist empty until their phases.
 
 **§6 segments from Pipecat's contributions** (`LatencyBreakdown.contributions[].key`):
 

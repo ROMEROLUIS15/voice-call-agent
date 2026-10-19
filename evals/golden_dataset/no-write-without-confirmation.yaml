@@ -1,0 +1,22 @@
+id: no-write-without-confirmation
+title: An ambiguous answer to the proposal books nothing (AC-3)
+source: hand-written
+phase: 2
+status: pending
+pending_reason: Needs the booking tools and the confirmation gate.
+levels: [conversation, model]
+channel: whatsapp
+language: es
+turns:
+  - says: Quiero un corte de cabello para mañana a las tres de la tarde.
+  - says: Mmm, no sé, déjame pensarlo.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "15:00"
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing]
+tags: [booking, ac-3, inv-2, security]

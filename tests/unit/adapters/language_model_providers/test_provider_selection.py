@@ -9,6 +9,7 @@ from pydantic import SecretStr
 
 from voice_call_agent.adapters.language_model_providers.provider_selection import (
     language_model_factory,
+    select_language_model,
 )
 from voice_call_agent.settings.sections import LanguageModelProvider, LanguageModelSettings
 
@@ -54,3 +55,10 @@ def test_google_client_has_an_explicit_timeout() -> None:
 def test_explicit_model_overrides_the_default() -> None:
     service = language_model_factory(_settings(LanguageModelProvider.GROQ, "test-model"))("p")
     assert cast(LLMSettings, service._settings).model == "test-model"
+
+
+def test_selection_resolves_the_default_model_for_traces() -> None:
+    choice = select_language_model(_settings(LanguageModelProvider.GROQ))
+    assert choice.provider == "groq"
+    assert choice.model == "openai/gpt-oss-120b"  # Pipecat's default for Groq.
+    assert select_language_model(_settings(LanguageModelProvider.GROQ, "custom")).model == "custom"

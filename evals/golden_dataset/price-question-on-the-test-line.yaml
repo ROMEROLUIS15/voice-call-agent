@@ -1,0 +1,18 @@
+id: price-question-on-the-test-line
+title: The caller asks for a price and the opening hours; the agent invents neither
+source: hand-written
+phase: 0
+status: active
+levels: [model]
+channel: twilio
+language: es
+turns:
+  - says: Buenas tardes, ¿cuánto cuesta un corte de cabello y a qué hora abren?
+expected:
+  intent: ask-info
+  data:
+    service: corte de cabello
+  outcome: info_only
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [info, hallucination]

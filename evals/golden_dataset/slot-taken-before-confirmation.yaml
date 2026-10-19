@@ -1,0 +1,27 @@
+id: slot-taken-before-confirmation
+title: The slot is taken between proposal and confirmation; another one is offered (AC-4)
+source: hand-written
+phase: 2
+status: pending
+pending_reason: Needs the booking tools and a backend double that answers SLOT_CONFLICT.
+levels: [conversation]
+channel: whatsapp
+language: es
+turns:
+  - says: Quiero un corte de cabello para mañana a las tres de la tarde.
+  - says: Sí, confirmo.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "15:00"
+  tool_call:
+    name: book_appointment
+    arguments:
+      service: corte de cabello
+      day: mañana
+      time: "15:00"
+  outcome: info_only
+  identity_verified: true
+tags: [booking, ac-4, inv-5]

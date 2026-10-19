@@ -77,8 +77,8 @@ class CallSupervisionSettings(_Section):
     """How long a shutdown waits for in-progress calls before cutting them."""
 
 
-class LatencyLogSettings(_Section):
-    """Where per-call latency records are stored."""
+class CallTraceLogSettings(_Section):
+    """Where per-call traces are stored locally (one JSON line per call)."""
 
     path: Path
 
@@ -133,3 +133,12 @@ class WebhookProtectionSettings(_Section):
     """How long an event id is remembered to reject repeats."""
     connect_event_max_age_seconds: float = Field(gt=0)
     """Older WhatsApp `connect` events are dropped: Meta allows ~30-60 s to accept a call."""
+
+
+class ErrorTrackingSettings(_Section):
+    """Error tracking and per-call traces in Sentry (ADR 0009). Disabled without a DSN."""
+
+    dsn: SecretStr | None
+    environment: DeploymentEnvironment
+    release: str
+    traces_sample_rate: float = Field(ge=0, le=1)

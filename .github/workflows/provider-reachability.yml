@@ -1,0 +1,53 @@
+name: Provider reachability
+
+# Checks, on demand, that GitHub-hosted runners reach each provider the evals and the service
+# use, with one authenticated read per provider (ADR 0010). Only the HTTP status is printed,
+# never a response body. A provider whose secret is absent is skipped with a notice.
+# If a provider is not reachable from GitHub-hosted runners, the maintainers weigh the other
+# options; a self-hosted runner is not one of them (public repository).
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  reach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        provider:
+          - name: Groq
+            secret: GROQ_API_KEY
+            url: https://api.groq.com/openai/v1/models
+            header: "Authorization: Bearer"
+          - name: Google Gemini
+            secret: GOOGLE_API_KEY
+            url: https://generativelanguage.googleapis.com/v1beta/models
+            header: "x-goog-api-key:"
+          - name: OpenAI
+            secret: OPENAI_API_KEY
+            url: https://api.openai.com/v1/models
+            header: "Authorization: Bearer"
+          - name: Deepgram
+            secret: DEEPGRAM_API_KEY
+            url: https://api.deepgram.com/v1/projects
+            header: "Authorization: Token"
+    name: ${{ matrix.provider.name }}
+    steps:
+      - name: Authenticated read
+        env:
+          API_KEY: ${{ secrets[matrix.provider.secret] }}
+          URL: ${{ matrix.provider.url }}
+          HEADER: ${{ matrix.provider.header }}
+        run: |
+          if [ -z "$API_KEY" ]; then
+            echo "::notice::${{ matrix.provider.name }} skipped: the ${{ matrix.provider.secret }} secret is not set."
+            exit 0
+          fi
+          status=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+            --max-time 15 --header "$HEADER $API_KEY" "$URL") || status="unreachable"
+          echo "${{ matrix.provider.name }}: HTTP $status"
+          [ "$status" = "200" ]

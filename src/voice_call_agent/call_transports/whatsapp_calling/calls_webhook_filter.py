@@ -1,6 +1,5 @@
 """Filtering of Meta webhooks: this service only handles the `calls` field."""
 
-from loguru import logger
 from pipecat.transports.whatsapp.api import (
     WhatsAppConnectCall,
     WhatsAppConnectCallValue,
@@ -8,6 +7,9 @@ from pipecat.transports.whatsapp.api import (
     WhatsAppWebhookRequest,
 )
 from pydantic import BaseModel, ConfigDict, ValidationError
+
+from voice_call_agent.observability.error_reporting import report_error
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 
 
 class CallEvents(BaseModel):
@@ -44,7 +46,7 @@ def extract_call_events(raw_body: bytes) -> CallEvents | None:
     try:
         envelope = _Envelope.model_validate_json(raw_body)
     except ValidationError:
-        logger.warning("Meta webhook with an unknown shape")
+        report_error(ErrorCode.WEBHOOK_PAYLOAD_IGNORED, reason="unknown_shape")
         return None
     if envelope.object != "whatsapp_business_account":
         return None
@@ -53,7 +55,7 @@ def extract_call_events(raw_body: bytes) -> CallEvents | None:
     try:
         webhook = WhatsAppWebhookRequest.model_validate_json(raw_body)
     except ValidationError:
-        logger.info("`calls` event without connect/terminate; ignored")
+        report_error(ErrorCode.WEBHOOK_PAYLOAD_IGNORED, reason="unmodeled_calls_event")
         return None
     return CallEvents(
         webhook=webhook, connect_calls=_connect_calls(webhook), event_ids=_event_ids(webhook)

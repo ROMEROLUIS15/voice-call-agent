@@ -1,0 +1,18 @@
+id: identity-verified-on-whatsapp
+title: A WhatsApp caller asks to cancel; the call counts as identity verified
+source: hand-written
+phase: 0
+status: active
+levels: [conversation, model]
+channel: whatsapp
+language: es
+turns:
+  - says: Buenas, quiero cancelar mi cita del viernes.
+expected:
+  intent: cancel
+  data:
+    day: viernes
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing, admits-test-line]
+tags: [identity, inv-4, cancel, test-line]

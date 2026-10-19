@@ -16,3 +16,6 @@ var/
 .coverage.*
 htmlcov/
 coverage.xml
+
+# Local state of the evals tooling (DeepEval creates it on import)
+.deepeval/

@@ -1,5 +1,11 @@
 """Redaction of personal data before it reaches logs or traces (constitution §4)."""
 
+import re
+
+# Phone-like digit runs (E.164 or with separators), the personal data most likely to leak.
+# Not glued to letters or digits, so ids and hashes such as `CA0123ab` or `es-0123456789ab`
+# stay readable.
+PHONE_NUMBER_PATTERN = re.compile(r"(?<![\w+])\+?\d[\d\s().-]{6,}\d(?!\w)")
 _VISIBLE_PHONE_PREFIX = 3
 _VISIBLE_PHONE_SUFFIX = 4
 

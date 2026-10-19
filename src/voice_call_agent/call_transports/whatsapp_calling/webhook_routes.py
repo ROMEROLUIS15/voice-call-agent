@@ -5,14 +5,13 @@ import time
 
 from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import PlainTextResponse
-from loguru import logger
 
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
 from voice_call_agent.call_transports.replay_guard import ReplayGuard
 from voice_call_agent.call_transports.whatsapp_calling.call_acceptance import CallAcceptor
 from voice_call_agent.call_transports.whatsapp_calling.call_admission import admit_call_events
 from voice_call_agent.call_transports.whatsapp_calling.call_event_freshness import (
-    is_fresh_delivery,
+    delivery_rejection,
 )
 from voice_call_agent.call_transports.whatsapp_calling.calls_webhook_filter import (
     extract_call_events,
@@ -20,6 +19,8 @@ from voice_call_agent.call_transports.whatsapp_calling.calls_webhook_filter impo
 from voice_call_agent.call_transports.whatsapp_calling.webhook_signature import (
     is_valid_meta_signature,
 )
+from voice_call_agent.observability.error_reporting import report_error
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.settings.sections import WhatsAppCallingSettings
 from voice_call_agent.speech_pipeline.conversation_runner import ConversationRunner
 
@@ -80,19 +81,20 @@ class WhatsAppCallingEndpoints:
         raw_body = await request.body()
         signature = request.headers.get("X-Hub-Signature-256")
         if not is_valid_meta_signature(self._app_secret, raw_body, signature):
-            logger.warning("Meta webhook with an invalid signature")
+            report_error(ErrorCode.WEBHOOK_SIGNATURE_INVALID, entry="whatsapp")
             return Response(status_code=status.HTTP_401_UNAUTHORIZED)
         events = extract_call_events(raw_body)
         if events is None:
             return Response(status_code=status.HTTP_200_OK)
-        if not await is_fresh_delivery(
+        rejection = await delivery_rejection(
             events,
             replay_guard=self._replay_guard,
             now=time.time(),
             max_connect_age_seconds=self._max_connect_age_seconds,
-        ):
+        )
+        if rejection is not None:
             # Fail closed: acknowledged so Meta stops delivering it, but never processed.
-            logger.warning("repeated or stale Meta call event dropped")
+            report_error(rejection, entry="whatsapp")
             return Response(status_code=status.HTTP_200_OK)
         try:
             await admit_call_events(
@@ -101,8 +103,8 @@ class WhatsAppCallingEndpoints:
                 supervisor=self._supervisor,
                 conversation_runner=self._conversation_runner,
             )
-        except Exception:
+        except Exception as error:
             # A connect event retried by Meta is useless (its SDP offer has expired): answer 200
             # anyway and keep the failure in the log (accepted trade-off, manifest §11).
-            logger.exception("could not process the WhatsApp call event")
+            report_error(ErrorCode.CALL_ADMISSION_FAILED, error=error)
         return Response(status_code=status.HTTP_200_OK)

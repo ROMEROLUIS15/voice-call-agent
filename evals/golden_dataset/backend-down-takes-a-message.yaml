@@ -1,0 +1,22 @@
+id: backend-down-takes-a-message
+title: The backend does not answer; the agent confirms nothing and offers a message (AC-9)
+source: hand-written
+phase: 4
+status: pending
+pending_reason: Needs the booking tools and a backend double that times out.
+levels: [conversation, model]
+channel: whatsapp
+language: es
+turns:
+  - says: Quiero un corte de cabello para mañana a las tres de la tarde.
+  - says: Sí, confirmo.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "15:00"
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing]
+tags: [robustness, ac-9, inv-5]

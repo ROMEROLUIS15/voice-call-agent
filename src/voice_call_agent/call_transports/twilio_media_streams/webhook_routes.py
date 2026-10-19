@@ -4,7 +4,6 @@ import time
 
 from fastapi import APIRouter, Request, Response, WebSocket, status
 from fastapi.websockets import WebSocketState
-from loguru import logger
 
 from voice_call_agent.call_session.session_builders import build_twilio_session
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
@@ -34,6 +33,8 @@ from voice_call_agent.call_transports.twilio_media_streams.twiml_responses impor
     reject_busy_twiml,
     reject_call_twiml,
 )
+from voice_call_agent.observability.error_reporting import report_error
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.settings.sections import TwilioMediaStreamsSettings
 from voice_call_agent.speech_pipeline.conversation_runner import ConversationRunner
 
@@ -89,18 +90,19 @@ class TwilioMediaStreamsEndpoints:
         signature = request.headers.get("X-Twilio-Signature")
         url = self._base_url + INCOMING_CALL_PATH + query
         if not is_valid_twilio_signature(self._auth_token, url, params, signature):
-            logger.warning("Twilio webhook with an invalid signature")
+            report_error(ErrorCode.WEBHOOK_SIGNATURE_INVALID, entry="twilio_voice")
             return Response(status_code=status.HTTP_403_FORBIDDEN)
         call_sid = params.get("CallSid")
         if not call_sid:
+            report_error(ErrorCode.REQUEST_INVALID, entry="twilio_voice")
             return Response(status_code=status.HTTP_400_BAD_REQUEST)
         delivery_id = request.headers.get(_DELIVERY_ID_HEADER) or call_sid
         if not await self._replay_guard.first_seen(f"twilio-voice:{delivery_id}"):
             # Fail closed: a repeated delivery never gets a fresh stream admission token.
-            logger.bind(call_id=call_sid).warning("repeated Twilio webhook delivery rejected")
+            report_error(ErrorCode.WEBHOOK_REPLAY_REJECTED, call_id=call_sid, entry="twilio_voice")
             return Response(content=reject_call_twiml(), media_type="application/xml")
         if not self._supervisor.can_accept_call():
-            logger.bind(call_id=call_sid).warning("instance full; rejecting call as busy")
+            report_error(ErrorCode.CALL_REJECTED_NO_SLOT, call_id=call_sid, entry="twilio_voice")
             return Response(content=reject_busy_twiml(), media_type="application/xml")
         twiml = connect_stream_twiml(
             _to_websocket_url(self._base_url) + MEDIA_STREAM_PATH,
@@ -126,6 +128,9 @@ class TwilioMediaStreamsEndpoints:
         # The webhook only checked for a free slot; it is taken when the media actually arrives.
         slot = self._supervisor.try_reserve()
         if slot is None:
+            report_error(
+                ErrorCode.CALL_REJECTED_NO_SLOT, call_id=start.call_sid, entry="twilio_stream"
+            )
             await websocket.close(code=_TRY_AGAIN_LATER)
             return
         params = start.custom_parameters
@@ -153,18 +158,16 @@ async def _admit_stream(
     try:
         start = await read_stream_start(websocket, handshake_timeout_seconds)
     except StreamHandshakeError as error:
-        logger.bind(reason=str(error)).warning("Media Stream rejected")
+        report_error(ErrorCode.STREAM_HANDSHAKE_REJECTED, reason=str(error))
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return None
     token = start.custom_parameters.get("token")
     if not verify_stream_token(token_key, start.call_sid, token, time.time()):
-        logger.bind(call_id=start.call_sid).warning("Media Stream with an invalid admission token")
+        report_error(ErrorCode.STREAM_TOKEN_INVALID, call_id=start.call_sid)
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return None
     if not await replay_guard.first_seen(f"twilio-stream:{start.call_sid}"):
-        logger.bind(call_id=start.call_sid).warning(
-            "second Media Stream for the same call rejected"
-        )
+        report_error(ErrorCode.STREAM_REPLAY_REJECTED, call_id=start.call_sid)
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return None
     return start

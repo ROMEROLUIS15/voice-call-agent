@@ -1,0 +1,1285 @@
+# serializer version: 1
+# name: test_fixed_phrases
+  dict({
+    'greeting': 'Hola, gracias por llamar. ¿En qué te puedo ayudar?',
+  })
+# ---
+# name: test_model_configuration[google]
+  dict({
+    'filter_incomplete_user_turns': 'False',
+    'frequency_penalty': 'None',
+    'max_tokens': '4096',
+    'model': 'gemini-3.6-flash',
+    'presence_penalty': 'None',
+    'provider': 'google',
+    'request_timeout_seconds': '10.0',
+    'safety_settings': 'None',
+    'seed': 'None',
+    'temperature': 'None',
+    'thinking': 'None',
+    'top_k': 'None',
+    'top_p': 'None',
+    'user_turn_completion_config': 'None',
+  })
+# ---
+# name: test_model_configuration[groq]
+  dict({
+    'filter_incomplete_user_turns': 'False',
+    'frequency_penalty': 'NOT_GIVEN',
+    'max_completion_tokens': 'NOT_GIVEN',
+    'max_tokens': 'NOT_GIVEN',
+    'model': 'openai/gpt-oss-120b',
+    'presence_penalty': 'NOT_GIVEN',
+    'provider': 'groq',
+    'reasoning_effort': 'None',
+    'request_timeout_seconds': '10.0',
+    'seed': 'NOT_GIVEN',
+    'temperature': 'NOT_GIVEN',
+    'top_k': 'None',
+    'top_p': 'NOT_GIVEN',
+    'user_turn_completion_config': 'None',
+  })
+# ---
+# name: test_model_configuration[openai]
+  dict({
+    'filter_incomplete_user_turns': 'False',
+    'frequency_penalty': 'NOT_GIVEN',
+    'max_completion_tokens': 'NOT_GIVEN',
+    'max_tokens': 'NOT_GIVEN',
+    'model': 'gpt-4.1',
+    'presence_penalty': 'NOT_GIVEN',
+    'provider': 'openai',
+    'request_timeout_seconds': '10.0',
+    'seed': 'NOT_GIVEN',
+    'temperature': 'NOT_GIVEN',
+    'top_k': 'None',
+    'top_p': 'NOT_GIVEN',
+    'user_turn_completion_config': 'None',
+  })
+# ---
+# name: test_port_schema[Appointment]
+  dict({
+    'additionalProperties': False,
+    'description': 'A future active appointment of the caller.',
+    'properties': dict({
+      'day': dict({
+        'format': 'date',
+        'title': 'Day',
+        'type': 'string',
+      }),
+      'id': dict({
+        'title': 'Id',
+        'type': 'string',
+      }),
+      'service_name': dict({
+        'title': 'Service Name',
+        'type': 'string',
+      }),
+      'start': dict({
+        'format': 'time',
+        'title': 'Start',
+        'type': 'string',
+      }),
+    }),
+    'required': list([
+      'id',
+      'service_name',
+      'day',
+      'start',
+    ]),
+    'title': 'Appointment',
+    'type': 'object',
+  })
+# ---
+# name: test_port_schema[AvailabilityResult]
+  dict({
+    '$defs': dict({
+      'AvailableSlots': dict({
+        'additionalProperties': False,
+        'properties': dict({
+          'day': dict({
+            'format': 'date',
+            'title': 'Day',
+            'type': 'string',
+          }),
+          'kind': dict({
+            'const': 'available_slots',
+            'default': 'available_slots',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+          'slots': dict({
+            'items': dict({
+              'format': 'time',
+              'type': 'string',
+            }),
+            'title': 'Slots',
+            'type': 'array',
+          }),
+        }),
+        'required': list([
+          'day',
+          'slots',
+        ]),
+        'title': 'AvailableSlots',
+        'type': 'object',
+      }),
+      'ClosedDay': dict({
+        'additionalProperties': False,
+        'properties': dict({
+          'kind': dict({
+            'const': 'closed_day',
+            'default': 'closed_day',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'title': 'ClosedDay',
+        'type': 'object',
+      }),
+      'InvalidAvailabilityRequest': dict({
+        'additionalProperties': False,
+        'description': "`INVALID_ARGS`: for instance, a service that is not in the call's business catalog.",
+        'properties': dict({
+          'kind': dict({
+            'const': 'invalid_request',
+            'default': 'invalid_request',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'title': 'InvalidAvailabilityRequest',
+        'type': 'object',
+      }),
+    }),
+    'anyOf': list([
+      dict({
+        '$ref': '#/$defs/AvailableSlots',
+      }),
+      dict({
+        '$ref': '#/$defs/ClosedDay',
+      }),
+      dict({
+        '$ref': '#/$defs/InvalidAvailabilityRequest',
+      }),
+    ]),
+  })
+# ---
+# name: test_port_schema[BookingRequest]
+  dict({
+    'additionalProperties': False,
+    'properties': dict({
+      'call_id': dict({
+        'title': 'Call Id',
+        'type': 'string',
+      }),
+      'client_name': dict({
+        'title': 'Client Name',
+        'type': 'string',
+      }),
+      'day': dict({
+        'format': 'date',
+        'title': 'Day',
+        'type': 'string',
+      }),
+      'idempotency_key': dict({
+        'format': 'uuid',
+        'title': 'Idempotency Key',
+        'type': 'string',
+      }),
+      'service_id': dict({
+        'title': 'Service Id',
+        'type': 'string',
+      }),
+      'start': dict({
+        'format': 'time',
+        'title': 'Start',
+        'type': 'string',
+      }),
+    }),
+    'required': list([
+      'call_id',
+      'service_id',
+      'day',
+      'start',
+      'client_name',
+      'idempotency_key',
+    ]),
+    'title': 'BookingRequest',
+    'type': 'object',
+  })
+# ---
+# name: test_port_schema[BusinessContext]
+  dict({
+    '$defs': dict({
+      'OpeningHours': dict({
+        'additionalProperties': False,
+        'description': "Opening and closing time of one day, in the business's local time.",
+        'properties': dict({
+          'closes': dict({
+            'format': 'time',
+            'title': 'Closes',
+            'type': 'string',
+          }),
+          'opens': dict({
+            'format': 'time',
+            'title': 'Opens',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'opens',
+          'closes',
+        ]),
+        'title': 'OpeningHours',
+        'type': 'object',
+      }),
+      'ServiceOffering': dict({
+        'additionalProperties': False,
+        'description': 'A service of the business catalog.',
+        'properties': dict({
+          'duration_min': dict({
+            'title': 'Duration Min',
+            'type': 'integer',
+          }),
+          'id': dict({
+            'title': 'Id',
+            'type': 'string',
+          }),
+          'name': dict({
+            'title': 'Name',
+            'type': 'string',
+          }),
+          'price': dict({
+            'anyOf': list([
+              dict({
+                'type': 'number',
+              }),
+              dict({
+                'type': 'string',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+            'title': 'Price',
+          }),
+        }),
+        'required': list([
+          'id',
+          'name',
+          'duration_min',
+          'price',
+        ]),
+        'title': 'ServiceOffering',
+        'type': 'object',
+      }),
+      'WeeklyHours': dict({
+        'additionalProperties': False,
+        'description': 'Opening hours per weekday; `None` means closed.',
+        'properties': dict({
+          'fri': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'mon': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'sat': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'sun': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'thu': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'tue': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'wed': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+        }),
+        'required': list([
+          'mon',
+          'tue',
+          'wed',
+          'thu',
+          'fri',
+          'sat',
+          'sun',
+        ]),
+        'title': 'WeeklyHours',
+        'type': 'object',
+      }),
+    }),
+    'additionalProperties': False,
+    'description': 'What the agent needs to know about the business serving the call.',
+    'properties': dict({
+      'greeting': dict({
+        'title': 'Greeting',
+        'type': 'string',
+      }),
+      'known_client_first_name': dict({
+        'anyOf': list([
+          dict({
+            'type': 'string',
+          }),
+          dict({
+            'type': 'null',
+          }),
+        ]),
+        'title': 'Known Client First Name',
+      }),
+      'name': dict({
+        'title': 'Name',
+        'type': 'string',
+      }),
+      'recording_enabled': dict({
+        'title': 'Recording Enabled',
+        'type': 'boolean',
+      }),
+      'services': dict({
+        'items': dict({
+          '$ref': '#/$defs/ServiceOffering',
+        }),
+        'title': 'Services',
+        'type': 'array',
+      }),
+      'timezone': dict({
+        'title': 'Timezone',
+        'type': 'string',
+      }),
+      'weekly_hours': dict({
+        '$ref': '#/$defs/WeeklyHours',
+      }),
+    }),
+    'required': list([
+      'name',
+      'timezone',
+      'greeting',
+      'recording_enabled',
+      'services',
+      'weekly_hours',
+      'known_client_first_name',
+    ]),
+    'title': 'BusinessContext',
+    'type': 'object',
+  })
+# ---
+# name: test_port_schema[CallOutcome]
+  dict({
+    'enum': list([
+      'booked',
+      'rescheduled',
+      'cancelled',
+      'message_taken',
+      'info_only',
+      'abandoned',
+    ]),
+    'title': 'CallOutcome',
+    'type': 'string',
+  })
+# ---
+# name: test_port_schema[CallStartResolution]
+  dict({
+    '$defs': dict({
+      'BusinessChoiceNeeded': dict({
+        'description': 'WhatsApp only: no session or client record decides; the agent asks for the business.',
+        'properties': dict({
+          'kind': dict({
+            'const': 'choice_needed',
+            'default': 'choice_needed',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'title': 'BusinessChoiceNeeded',
+        'type': 'object',
+      }),
+      'BusinessContext': dict({
+        'additionalProperties': False,
+        'description': 'What the agent needs to know about the business serving the call.',
+        'properties': dict({
+          'greeting': dict({
+            'title': 'Greeting',
+            'type': 'string',
+          }),
+          'known_client_first_name': dict({
+            'anyOf': list([
+              dict({
+                'type': 'string',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+            'title': 'Known Client First Name',
+          }),
+          'name': dict({
+            'title': 'Name',
+            'type': 'string',
+          }),
+          'recording_enabled': dict({
+            'title': 'Recording Enabled',
+            'type': 'boolean',
+          }),
+          'services': dict({
+            'items': dict({
+              '$ref': '#/$defs/ServiceOffering',
+            }),
+            'title': 'Services',
+            'type': 'array',
+          }),
+          'timezone': dict({
+            'title': 'Timezone',
+            'type': 'string',
+          }),
+          'weekly_hours': dict({
+            '$ref': '#/$defs/WeeklyHours',
+          }),
+        }),
+        'required': list([
+          'name',
+          'timezone',
+          'greeting',
+          'recording_enabled',
+          'services',
+          'weekly_hours',
+          'known_client_first_name',
+        ]),
+        'title': 'BusinessContext',
+        'type': 'object',
+      }),
+      'BusinessResolved': dict({
+        'properties': dict({
+          'business_id': dict({
+            'title': 'Business Id',
+            'type': 'string',
+          }),
+          'context': dict({
+            '$ref': '#/$defs/BusinessContext',
+          }),
+          'kind': dict({
+            'const': 'resolved',
+            'default': 'resolved',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'business_id',
+          'context',
+        ]),
+        'title': 'BusinessResolved',
+        'type': 'object',
+      }),
+      'OpeningHours': dict({
+        'additionalProperties': False,
+        'description': "Opening and closing time of one day, in the business's local time.",
+        'properties': dict({
+          'closes': dict({
+            'format': 'time',
+            'title': 'Closes',
+            'type': 'string',
+          }),
+          'opens': dict({
+            'format': 'time',
+            'title': 'Opens',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'opens',
+          'closes',
+        ]),
+        'title': 'OpeningHours',
+        'type': 'object',
+      }),
+      'ServiceOffering': dict({
+        'additionalProperties': False,
+        'description': 'A service of the business catalog.',
+        'properties': dict({
+          'duration_min': dict({
+            'title': 'Duration Min',
+            'type': 'integer',
+          }),
+          'id': dict({
+            'title': 'Id',
+            'type': 'string',
+          }),
+          'name': dict({
+            'title': 'Name',
+            'type': 'string',
+          }),
+          'price': dict({
+            'anyOf': list([
+              dict({
+                'type': 'number',
+              }),
+              dict({
+                'type': 'string',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+            'title': 'Price',
+          }),
+        }),
+        'required': list([
+          'id',
+          'name',
+          'duration_min',
+          'price',
+        ]),
+        'title': 'ServiceOffering',
+        'type': 'object',
+      }),
+      'UnknownLine': dict({
+        'description': 'Phone line only: the dialed number belongs to no business. Fixed message and hang up.',
+        'properties': dict({
+          'kind': dict({
+            'const': 'unknown_line',
+            'default': 'unknown_line',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'title': 'UnknownLine',
+        'type': 'object',
+      }),
+      'WeeklyHours': dict({
+        'additionalProperties': False,
+        'description': 'Opening hours per weekday; `None` means closed.',
+        'properties': dict({
+          'fri': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'mon': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'sat': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'sun': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'thu': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'tue': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'wed': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+        }),
+        'required': list([
+          'mon',
+          'tue',
+          'wed',
+          'thu',
+          'fri',
+          'sat',
+          'sun',
+        ]),
+        'title': 'WeeklyHours',
+        'type': 'object',
+      }),
+    }),
+    'anyOf': list([
+      dict({
+        '$ref': '#/$defs/BusinessResolved',
+      }),
+      dict({
+        '$ref': '#/$defs/BusinessChoiceNeeded',
+      }),
+      dict({
+        '$ref': '#/$defs/UnknownLine',
+      }),
+    ]),
+  })
+# ---
+# name: test_port_schema[CallerMessage]
+  dict({
+    'additionalProperties': False,
+    'description': 'A message for the business when the agent cannot resolve the request.',
+    'properties': dict({
+      'call_id': dict({
+        'title': 'Call Id',
+        'type': 'string',
+      }),
+      'callback_phone': dict({
+        'anyOf': list([
+          dict({
+            'type': 'string',
+          }),
+          dict({
+            'type': 'null',
+          }),
+        ]),
+        'title': 'Callback Phone',
+      }),
+      'caller_name': dict({
+        'title': 'Caller Name',
+        'type': 'string',
+      }),
+      'reason': dict({
+        'title': 'Reason',
+        'type': 'string',
+      }),
+    }),
+    'required': list([
+      'call_id',
+      'caller_name',
+      'reason',
+      'callback_phone',
+    ]),
+    'title': 'CallerMessage',
+    'type': 'object',
+  })
+# ---
+# name: test_port_schema[CancellationRequest]
+  dict({
+    '$defs': dict({
+      'NameAndDateProof': dict({
+        'additionalProperties': False,
+        'description': 'Second factor on the phone line: name used for the booking and its date.',
+        'properties': dict({
+          'appointment_day': dict({
+            'format': 'date',
+            'title': 'Appointment Day',
+            'type': 'string',
+          }),
+          'client_name': dict({
+            'title': 'Client Name',
+            'type': 'string',
+          }),
+          'method': dict({
+            'const': 'name_and_date',
+            'default': 'name_and_date',
+            'title': 'Method',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'client_name',
+          'appointment_day',
+        ]),
+        'title': 'NameAndDateProof',
+        'type': 'object',
+      }),
+      'OneTimeCodeProof': dict({
+        'additionalProperties': False,
+        'properties': dict({
+          'code': dict({
+            'title': 'Code',
+            'type': 'string',
+          }),
+          'method': dict({
+            'const': 'otp',
+            'default': 'otp',
+            'title': 'Method',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'code',
+        ]),
+        'title': 'OneTimeCodeProof',
+        'type': 'object',
+      }),
+    }),
+    'additionalProperties': False,
+    'properties': dict({
+      'appointment_id': dict({
+        'title': 'Appointment Id',
+        'type': 'string',
+      }),
+      'call_id': dict({
+        'title': 'Call Id',
+        'type': 'string',
+      }),
+      'idempotency_key': dict({
+        'format': 'uuid',
+        'title': 'Idempotency Key',
+        'type': 'string',
+      }),
+      'identity': dict({
+        'anyOf': list([
+          dict({
+            '$ref': '#/$defs/NameAndDateProof',
+          }),
+          dict({
+            '$ref': '#/$defs/OneTimeCodeProof',
+          }),
+          dict({
+            'type': 'null',
+          }),
+        ]),
+        'title': 'Identity',
+      }),
+    }),
+    'required': list([
+      'call_id',
+      'appointment_id',
+      'identity',
+      'idempotency_key',
+    ]),
+    'title': 'CancellationRequest',
+    'type': 'object',
+  })
+# ---
+# name: test_port_schema[RescheduleRequest]
+  dict({
+    '$defs': dict({
+      'NameAndDateProof': dict({
+        'additionalProperties': False,
+        'description': 'Second factor on the phone line: name used for the booking and its date.',
+        'properties': dict({
+          'appointment_day': dict({
+            'format': 'date',
+            'title': 'Appointment Day',
+            'type': 'string',
+          }),
+          'client_name': dict({
+            'title': 'Client Name',
+            'type': 'string',
+          }),
+          'method': dict({
+            'const': 'name_and_date',
+            'default': 'name_and_date',
+            'title': 'Method',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'client_name',
+          'appointment_day',
+        ]),
+        'title': 'NameAndDateProof',
+        'type': 'object',
+      }),
+      'OneTimeCodeProof': dict({
+        'additionalProperties': False,
+        'properties': dict({
+          'code': dict({
+            'title': 'Code',
+            'type': 'string',
+          }),
+          'method': dict({
+            'const': 'otp',
+            'default': 'otp',
+            'title': 'Method',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'code',
+        ]),
+        'title': 'OneTimeCodeProof',
+        'type': 'object',
+      }),
+    }),
+    'additionalProperties': False,
+    'properties': dict({
+      'appointment_id': dict({
+        'title': 'Appointment Id',
+        'type': 'string',
+      }),
+      'call_id': dict({
+        'title': 'Call Id',
+        'type': 'string',
+      }),
+      'idempotency_key': dict({
+        'format': 'uuid',
+        'title': 'Idempotency Key',
+        'type': 'string',
+      }),
+      'identity': dict({
+        'anyOf': list([
+          dict({
+            '$ref': '#/$defs/NameAndDateProof',
+          }),
+          dict({
+            '$ref': '#/$defs/OneTimeCodeProof',
+          }),
+          dict({
+            'type': 'null',
+          }),
+        ]),
+        'title': 'Identity',
+      }),
+      'new_day': dict({
+        'format': 'date',
+        'title': 'New Day',
+        'type': 'string',
+      }),
+      'new_start': dict({
+        'format': 'time',
+        'title': 'New Start',
+        'type': 'string',
+      }),
+    }),
+    'required': list([
+      'call_id',
+      'appointment_id',
+      'new_day',
+      'new_start',
+      'identity',
+      'idempotency_key',
+    ]),
+    'title': 'RescheduleRequest',
+    'type': 'object',
+  })
+# ---
+# name: test_port_schema[SpokenNameResolution]
+  dict({
+    '$defs': dict({
+      'AmbiguousBusiness': dict({
+        'properties': dict({
+          'candidates': dict({
+            'items': dict({
+              'type': 'string',
+            }),
+            'title': 'Candidates',
+            'type': 'array',
+          }),
+          'kind': dict({
+            'const': 'ambiguous',
+            'default': 'ambiguous',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'candidates',
+        ]),
+        'title': 'AmbiguousBusiness',
+        'type': 'object',
+      }),
+      'BusinessContext': dict({
+        'additionalProperties': False,
+        'description': 'What the agent needs to know about the business serving the call.',
+        'properties': dict({
+          'greeting': dict({
+            'title': 'Greeting',
+            'type': 'string',
+          }),
+          'known_client_first_name': dict({
+            'anyOf': list([
+              dict({
+                'type': 'string',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+            'title': 'Known Client First Name',
+          }),
+          'name': dict({
+            'title': 'Name',
+            'type': 'string',
+          }),
+          'recording_enabled': dict({
+            'title': 'Recording Enabled',
+            'type': 'boolean',
+          }),
+          'services': dict({
+            'items': dict({
+              '$ref': '#/$defs/ServiceOffering',
+            }),
+            'title': 'Services',
+            'type': 'array',
+          }),
+          'timezone': dict({
+            'title': 'Timezone',
+            'type': 'string',
+          }),
+          'weekly_hours': dict({
+            '$ref': '#/$defs/WeeklyHours',
+          }),
+        }),
+        'required': list([
+          'name',
+          'timezone',
+          'greeting',
+          'recording_enabled',
+          'services',
+          'weekly_hours',
+          'known_client_first_name',
+        ]),
+        'title': 'BusinessContext',
+        'type': 'object',
+      }),
+      'BusinessResolved': dict({
+        'properties': dict({
+          'business_id': dict({
+            'title': 'Business Id',
+            'type': 'string',
+          }),
+          'context': dict({
+            '$ref': '#/$defs/BusinessContext',
+          }),
+          'kind': dict({
+            'const': 'resolved',
+            'default': 'resolved',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'business_id',
+          'context',
+        ]),
+        'title': 'BusinessResolved',
+        'type': 'object',
+      }),
+      'NoBusinessMatch': dict({
+        'properties': dict({
+          'kind': dict({
+            'const': 'no_match',
+            'default': 'no_match',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'title': 'NoBusinessMatch',
+        'type': 'object',
+      }),
+      'OpeningHours': dict({
+        'additionalProperties': False,
+        'description': "Opening and closing time of one day, in the business's local time.",
+        'properties': dict({
+          'closes': dict({
+            'format': 'time',
+            'title': 'Closes',
+            'type': 'string',
+          }),
+          'opens': dict({
+            'format': 'time',
+            'title': 'Opens',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'opens',
+          'closes',
+        ]),
+        'title': 'OpeningHours',
+        'type': 'object',
+      }),
+      'ServiceOffering': dict({
+        'additionalProperties': False,
+        'description': 'A service of the business catalog.',
+        'properties': dict({
+          'duration_min': dict({
+            'title': 'Duration Min',
+            'type': 'integer',
+          }),
+          'id': dict({
+            'title': 'Id',
+            'type': 'string',
+          }),
+          'name': dict({
+            'title': 'Name',
+            'type': 'string',
+          }),
+          'price': dict({
+            'anyOf': list([
+              dict({
+                'type': 'number',
+              }),
+              dict({
+                'type': 'string',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+            'title': 'Price',
+          }),
+        }),
+        'required': list([
+          'id',
+          'name',
+          'duration_min',
+          'price',
+        ]),
+        'title': 'ServiceOffering',
+        'type': 'object',
+      }),
+      'WeeklyHours': dict({
+        'additionalProperties': False,
+        'description': 'Opening hours per weekday; `None` means closed.',
+        'properties': dict({
+          'fri': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'mon': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'sat': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'sun': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'thu': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'tue': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+          'wed': dict({
+            'anyOf': list([
+              dict({
+                '$ref': '#/$defs/OpeningHours',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+          }),
+        }),
+        'required': list([
+          'mon',
+          'tue',
+          'wed',
+          'thu',
+          'fri',
+          'sat',
+          'sun',
+        ]),
+        'title': 'WeeklyHours',
+        'type': 'object',
+      }),
+    }),
+    'anyOf': list([
+      dict({
+        '$ref': '#/$defs/BusinessResolved',
+      }),
+      dict({
+        '$ref': '#/$defs/NoBusinessMatch',
+      }),
+      dict({
+        '$ref': '#/$defs/AmbiguousBusiness',
+      }),
+    ]),
+  })
+# ---
+# name: test_port_schema[WriteResult]
+  dict({
+    '$defs': dict({
+      'WriteRejected': dict({
+        'additionalProperties': False,
+        'properties': dict({
+          'kind': dict({
+            'const': 'rejected',
+            'default': 'rejected',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+          'reason': dict({
+            '$ref': '#/$defs/WriteRejectionReason',
+          }),
+        }),
+        'required': list([
+          'reason',
+        ]),
+        'title': 'WriteRejected',
+        'type': 'object',
+      }),
+      'WriteRejectionReason': dict({
+        'enum': list([
+          'SLOT_CONFLICT',
+          'OUTSIDE_HOURS',
+          'INVALID_ARGS',
+          'NOT_FOUND',
+          'IDENTITY_REQUIRED',
+          'IDENTITY_MISMATCH',
+        ]),
+        'title': 'WriteRejectionReason',
+        'type': 'string',
+      }),
+      'WriteSucceeded': dict({
+        'additionalProperties': False,
+        'properties': dict({
+          'appointment_id': dict({
+            'title': 'Appointment Id',
+            'type': 'string',
+          }),
+          'kind': dict({
+            'const': 'succeeded',
+            'default': 'succeeded',
+            'title': 'Kind',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'appointment_id',
+        ]),
+        'title': 'WriteSucceeded',
+        'type': 'object',
+      }),
+    }),
+    'anyOf': list([
+      dict({
+        '$ref': '#/$defs/WriteSucceeded',
+      }),
+      dict({
+        '$ref': '#/$defs/WriteRejected',
+      }),
+    ]),
+  })
+# ---
+# name: test_system_prompt
+  '''
+  Eres la recepcionista telefónica de un negocio que agenda citas. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno.
+  
+  Tu respuesta se convierte en voz: no uses listas, emojis, asteriscos ni otros símbolos. Escribe los números y las horas como se dicen ("las tres y media de la tarde").
+  
+  Esta línea está en pruebas: todavía no tienes acceso a la agenda. No confirmes citas, no inventes servicios, precios ni horarios. Si te piden agendar, reagendar o cancelar, explica que la línea está en pruebas y ofrece seguir conversando.
+  '''
+# ---

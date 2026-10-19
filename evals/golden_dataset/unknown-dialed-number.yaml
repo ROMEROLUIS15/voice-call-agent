@@ -1,0 +1,15 @@
+id: unknown-dialed-number
+title: A call to a number without a business gets a fixed message and ends (AC-6)
+source: hand-written
+phase: 2
+status: pending
+pending_reason: Needs business resolution of the dialed number against the backend.
+levels: [conversation]
+channel: twilio
+language: es
+turns: []
+expected:
+  intent: none
+  outcome: abandoned
+  identity_verified: false
+tags: [tenancy, ac-6]

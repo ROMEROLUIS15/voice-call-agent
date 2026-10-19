@@ -1,0 +1,19 @@
+id: barge-in-during-greeting
+title: The caller talks over the greeting and the agent stops to listen
+source: hand-written
+phase: 0
+status: active
+levels: [conversation]
+channel: twilio
+language: es
+turns:
+  - says: Hola, quiero saber si atienden los sábados.
+    barge_in: true
+expected:
+  intent: ask-info
+  data:
+    day: sábado
+  outcome: info_only
+  identity_verified: false
+  agent_interrupted: true
+tags: [interruption, inv-7]

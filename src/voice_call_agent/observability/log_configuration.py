@@ -17,7 +17,7 @@ class StandardLoggingBridge(logging.Handler):
         level: str | int
         try:
             level = logger.level(record.levelname).name
-        except ValueError:
+        except ValueError:  # not an error: loguru has no level named like this record's
             level = record.levelno
         logger.bind(source_logger=record.name).opt(exception=record.exc_info).log(
             level, record.getMessage()

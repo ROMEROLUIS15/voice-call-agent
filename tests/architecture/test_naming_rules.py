@@ -5,10 +5,13 @@ import re
 from pathlib import Path
 
 from tests.architecture.source_tree import (
+    EVALS_ROOT,
     all_source_files,
+    evals_modules,
     is_composition_root,
     python_modules,
     relative_parts,
+    repository_path,
 )
 
 BANNED_MODULE_NAMES = frozenset(
@@ -86,6 +89,18 @@ def test_no_generic_class_or_function_names() -> None:
         "/".join(relative_parts(path)): names
         for path in python_modules()
         if (names := banned_identifiers(path.read_text(encoding="utf-8")))
+    }
+    assert offenders == {}
+
+
+def test_the_evals_follow_the_same_naming_rules() -> None:
+    offenders = {
+        repository_path(path): names
+        for path in evals_modules()
+        if (
+            names := banned_module_names(path.relative_to(EVALS_ROOT).parts)
+            + banned_identifiers(path.read_text(encoding="utf-8"))
+        )
     }
     assert offenders == {}
 

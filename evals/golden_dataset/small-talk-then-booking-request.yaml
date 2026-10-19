@@ -1,0 +1,17 @@
+id: small-talk-then-booking-request
+title: Two turns of conversation, then a booking request on the test line
+source: hand-written
+phase: 0
+status: active
+levels: [model]
+channel: whatsapp
+language: es
+turns:
+  - says: Hola, ¿con quién hablo?
+  - says: Ah, perfecto. ¿Y me puedes ayudar a sacar una cita?
+expected:
+  intent: book
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing, admits-test-line, natural-spanish]
+tags: [multi-turn, booking, test-line]

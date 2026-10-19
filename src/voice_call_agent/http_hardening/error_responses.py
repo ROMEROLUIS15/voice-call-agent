@@ -8,8 +8,10 @@ from http import HTTPStatus
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from voice_call_agent.observability.error_reporting import report_error
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 
 
 def install_error_responses(app: FastAPI) -> None:
@@ -25,7 +27,7 @@ def error_body(status_code: int) -> dict[str, str]:
 
 
 async def _invalid_request(request: Request, error: Exception) -> Response:
-    logger.bind(path=request.url.path).info("request failed validation")
+    report_error(ErrorCode.REQUEST_INVALID, path=request.url.path)
     return JSONResponse(error_body(422), status_code=422)
 
 
@@ -38,7 +40,10 @@ async def _http_error(request: Request, error: Exception) -> Response:
 
 
 async def _unexpected_error(request: Request, error: Exception) -> Response:
-    logger.bind(path=request.url.path, method=request.method).opt(exception=error).error(
-        "unhandled error"
+    report_error(
+        ErrorCode.UNHANDLED_REQUEST_ERROR,
+        error=error,
+        path=request.url.path,
+        method=request.method,
     )
     return JSONResponse(error_body(500), status_code=500)

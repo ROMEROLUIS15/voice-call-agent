@@ -9,6 +9,9 @@ from collections.abc import Awaitable, Callable, Coroutine
 
 from loguru import logger
 
+from voice_call_agent.observability.error_reporting import report_error
+from voice_call_agent.observability.error_taxonomy import ErrorCode
+
 
 class CallSlot:
     """A call slot reserved for one call. Releasing it twice has no effect."""
@@ -83,9 +86,7 @@ class CallSupervisor:
         )
         _, still_running = await asyncio.wait(pending, timeout=grace_seconds)
         if still_running:
-            logger.bind(cancelled_calls=len(still_running)).warning(
-                "shutdown grace period exceeded; cancelling calls"
-            )
+            report_error(ErrorCode.CALLS_CUT_AT_SHUTDOWN, cancelled_calls=len(still_running))
             for call in still_running:
                 call.cancel()
             await asyncio.gather(*still_running, return_exceptions=True)
@@ -93,8 +94,8 @@ class CallSupervisor:
     async def _run_launched(self, slot: CallSlot, conversation: Awaitable[None]) -> None:
         try:
             await conversation
-        except Exception:
-            logger.exception("call ended with an error")
+        except Exception as error:
+            report_error(ErrorCode.CALL_TASK_FAILED, error=error)
         finally:
             slot.release()
 

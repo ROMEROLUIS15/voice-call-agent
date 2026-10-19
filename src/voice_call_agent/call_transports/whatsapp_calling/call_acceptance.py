@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable
 from typing import Protocol
 
 import aiohttp
-from loguru import logger
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.whatsapp.api import (
     WhatsAppApi,
@@ -13,6 +12,8 @@ from pipecat.transports.whatsapp.api import (
 )
 from pipecat.transports.whatsapp.client import WhatsAppClient
 
+from voice_call_agent.observability.error_reporting import report_error
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.settings.sections import WhatsAppCallingSettings
 
 OnCallAccepted = Callable[[SmallWebRTCConnection, WhatsAppConnectCall], Awaitable[None]]
@@ -84,11 +85,10 @@ class WhatsAppCallAcceptor:
     async def reject(self, call_id: str) -> None:
         if self._api is None:
             raise CallAcceptorNotStartedError
-        log = logger.bind(call_id=call_id)
         try:
             result = await self._api.reject_call_to_whatsapp(call_id)
-        except (aiohttp.ClientError, TimeoutError):
-            log.warning("rejecting the WhatsApp call failed")
+        except (aiohttp.ClientError, TimeoutError) as error:
+            report_error(ErrorCode.GRAPH_API_REJECT_FAILED, error=error, call_id=call_id)
             return
         if not result.get("success", False):
-            log.warning("Graph API did not reject the WhatsApp call")
+            report_error(ErrorCode.GRAPH_API_REJECT_FAILED, call_id=call_id)

@@ -2,9 +2,12 @@
 
 from pathlib import Path
 
+import evals
 import voice_call_agent
 
 PACKAGE_ROOT = Path(voice_call_agent.__file__).parent
+EVALS_ROOT = Path(evals.__file__).parent
+REPOSITORY_ROOT = EVALS_ROOT.parent
 
 # Composition root: picks and wires concrete components; decides nothing per call.
 COMPOSITION_ROOT = frozenset({("__main__.py",), ("asgi_app.py",), ("service_composition.py",)})
@@ -16,6 +19,15 @@ def relative_parts(path: Path) -> tuple[str, ...]:
 
 def python_modules() -> list[Path]:
     return sorted(PACKAGE_ROOT.rglob("*.py"))
+
+
+def evals_modules() -> list[Path]:
+    """The evaluation code: not shipped, but held to the same size and naming rules."""
+    return sorted(EVALS_ROOT.rglob("*.py"))
+
+
+def repository_path(path: Path) -> str:
+    return path.resolve().relative_to(REPOSITORY_ROOT).as_posix()
 
 
 def all_source_files() -> list[Path]:

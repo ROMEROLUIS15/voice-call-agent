@@ -25,6 +25,7 @@ dependencies = [
     "uvicorn[standard]>=0.54",
     # Rate limiting of the call entries (exact pin: security relevant).
     "limits==5.8.0",
+    "sentry-sdk==2.71.0",
 ]
 
 [project.scripts]
@@ -43,13 +44,19 @@ dev = [
     "pytest>=9.1",
     "pytest-asyncio>=1.4",
     "pytest-cov==7.1.0",
+    "pyyaml>=6.0",
     "ruff>=0.17",
+    "syrupy==6.1.1",
+    "types-pyyaml>=6.0",
+]
+evals = [
+    "deepeval==4.2.8",
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "tests"]
+src = ["src", "."]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "B", "UP", "SIM", "RUF", "ASYNC", "S", "C90"]
@@ -63,13 +70,19 @@ max-complexity = 10
 [tool.mypy]
 strict = true
 python_version = "3.12"
-files = ["src", "tests"]
+files = ["src", "tests", "evals"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 # The Twilio SDK ships no type information; it is only used inside
 # `call_transports/twilio_media_streams/`.
 module = ["twilio.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# DeepEval belongs to the `evals` dependency group, absent from the default environment;
+# it is only imported inside `evals/judge_scoring.py`.
+module = ["deepeval.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

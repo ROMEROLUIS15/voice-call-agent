@@ -1,29 +1,19 @@
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from tests.call_trace_factory import make_call_trace
+from voice_call_agent.observability.call_trace import CallTrace
 from voice_call_agent.observability.latency_budget_report import (
     main,
     nearest_rank_percentile,
     render_budget_table,
     summarize_by_channel,
 )
-from voice_call_agent.observability.turn_latency import CallLatencyRecord, TurnLatency
 
 
-def _record(channel: str, totals: list[float]) -> CallLatencyRecord:
-    return CallLatencyRecord(
-        call_id="x",
-        channel_label=channel,
-        started_at=datetime(2026, 10, 18, tzinfo=UTC),
-        duration_s=60,
-        greeting_ms=None,
-        turns=[
-            TurnLatency(stt_ms=200, llm_ms=300, tts_ms=150, other_ms=0, total_ms=total)
-            for total in totals
-        ],
-    )
+def _record(channel: str, totals: list[float]) -> CallTrace:
+    return make_call_trace(channel, tuple(totals))
 
 
 def test_nearest_rank_percentile() -> None:

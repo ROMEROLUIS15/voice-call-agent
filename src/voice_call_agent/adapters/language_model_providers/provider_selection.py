@@ -1,6 +1,7 @@
 """Selection of the language model provider."""
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from pipecat.services.ai_service import AIService
 
@@ -32,3 +33,29 @@ def language_model_factory(settings: LanguageModelSettings) -> Callable[[str], A
             )
 
             return openai_model_factory(settings)
+
+
+@dataclass(frozen=True)
+class LanguageModelChoice:
+    """The configured model, as recorded in every call trace."""
+
+    provider: str
+    model: str
+    """The configured model, or Pipecat's default for the provider when none is configured."""
+    create: Callable[[str], AIService]
+
+
+def select_language_model(settings: LanguageModelSettings) -> LanguageModelChoice:
+    """Factory and resolved model id of the configured provider. Called once at startup."""
+    create = language_model_factory(settings)
+    return LanguageModelChoice(
+        provider=settings.provider.value,
+        model=settings.model or _default_model(create),
+        create=create,
+    )
+
+
+def _default_model(create: Callable[[str], AIService]) -> str:
+    # Building a service opens no connection; its settings carry the provider's default model.
+    model = create("").settings.model
+    return model if isinstance(model, str) else "unknown"

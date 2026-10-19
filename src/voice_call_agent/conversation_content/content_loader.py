@@ -4,6 +4,8 @@ Code is English; what the agent says to the caller lives in `<locale>/system_pro
 `<locale>/phrases.toml` next to this module (constitution: language policy).
 """
 
+import hashlib
+import json
 import tomllib
 from importlib import resources
 
@@ -21,6 +23,13 @@ class ConversationContent(BaseModel):
     locale: str
     system_prompt: str
     greeting: str
+
+    @property
+    def version(self) -> str:
+        """Content hash recorded in every call trace; any edit to a prompt or phrase changes it."""
+        canonical = json.dumps([self.locale, self.system_prompt, self.greeting])
+        digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return f"{self.locale}-{digest[:12]}"
 
 
 class _Phrases(BaseModel):

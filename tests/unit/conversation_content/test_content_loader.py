@@ -16,3 +16,11 @@ def test_spanish_content_is_complete() -> None:
 def test_unknown_locale_is_an_error() -> None:
     with pytest.raises(UnsupportedLocaleError):
         load_conversation_content("xx")
+
+
+def test_version_changes_with_the_prompt() -> None:
+    content = load_conversation_content("es")
+    edited = content.model_copy(update={"system_prompt": content.system_prompt + " Sé breve."})
+    assert content.version.startswith("es-")
+    assert edited.version != content.version
+    assert load_conversation_content("es").version == content.version

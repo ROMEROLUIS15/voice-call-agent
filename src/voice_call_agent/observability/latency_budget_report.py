@@ -1,6 +1,9 @@
 """p50/p95 per channel and segment, checked against the latency budget of manifest §6.
 
-Usage: `uv run python -m voice_call_agent.observability.latency_budget_report [var/latency.jsonl]`
+Usage:
+    uv run python -m voice_call_agent.observability.latency_budget_report [traces.jsonl]
+
+Default file: `var/call_traces.jsonl`.
 """
 
 import math
@@ -11,8 +14,8 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from voice_call_agent.observability.latency_record_store import read_latency_records
-from voice_call_agent.observability.turn_latency import CallLatencyRecord, TurnLatency
+from voice_call_agent.observability.call_trace import CallTrace, TurnLatency
+from voice_call_agent.observability.call_trace_store import read_call_traces
 
 
 class LatencyBudget(BaseModel):
@@ -58,7 +61,7 @@ def nearest_rank_percentile(values: Sequence[float], q: float) -> float:
     return ordered[rank - 1]
 
 
-def summarize_by_channel(records: Iterable[CallLatencyRecord]) -> list[ChannelSummary]:
+def summarize_by_channel(records: Iterable[CallTrace]) -> list[ChannelSummary]:
     """Group turns by channel and compute p50/p95 of each segment."""
     calls: dict[str, int] = defaultdict(int)
     turns: dict[str, list[TurnLatency]] = defaultdict(list)
@@ -111,11 +114,11 @@ def render_budget_table(summaries: list[ChannelSummary]) -> str:
 
 def main(argv: list[str]) -> int:
     """Command-line entry. The report is program output on stdout, not a log."""
-    path = Path(argv[1]) if len(argv) > 1 else Path("var/latency.jsonl")
+    path = Path(argv[1]) if len(argv) > 1 else Path("var/call_traces.jsonl")
     if not path.exists():
         sys.stderr.write(f"{path} does not exist\n")
         return 1
-    sys.stdout.write(render_budget_table(summarize_by_channel(read_latency_records(path))) + "\n")
+    sys.stdout.write(render_budget_table(summarize_by_channel(read_call_traces(path))) + "\n")
     return 0
 
 

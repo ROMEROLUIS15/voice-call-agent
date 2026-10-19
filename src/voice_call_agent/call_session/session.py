@@ -50,4 +50,9 @@ class CallSession(BaseModel):
 
     def trace_context(self) -> CallTraceContext:
         """Labels of the call for traces, logs and metrics."""
-        return CallTraceContext(call_id=self.call_id, channel_label=self.channel.value)
+        return CallTraceContext(
+            call_id=self.call_id,
+            channel_label=self.channel.value,
+            business_id=self.business_id,
+            identity_verified=self.identity_verified,
+        )

@@ -13,8 +13,6 @@ def test_greeting_and_turns_are_kept_apart() -> None:
     )
     tracker.record(breakdown(("llm_inference", 0.5), measured_from=MeasuredFrom.USER_SILENCE))
 
-    record = tracker.finish()
-    assert record.channel_label == "twilio"
-    assert record.greeting_ms == pytest.approx(400)
-    assert len(record.turns) == 1
-    assert record.turns[0].llm_ms == pytest.approx(500)
+    assert tracker.greeting_ms == pytest.approx(400)
+    assert len(tracker.turns) == 1
+    assert tracker.turns[0].llm_ms == pytest.approx(500)

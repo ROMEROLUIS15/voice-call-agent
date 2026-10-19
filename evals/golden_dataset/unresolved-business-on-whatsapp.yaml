@@ -1,0 +1,19 @@
+id: unresolved-business-on-whatsapp
+title: The caller is not a client of any business; the agent asks which one (AC-5)
+source: hand-written
+phase: 2
+status: pending
+pending_reason: Needs business resolution against the backend (manifest §4.1).
+levels: [conversation, model]
+channel: whatsapp
+language: es
+turns:
+  - says: Hola, quiero sacar una cita para el lunes.
+expected:
+  intent: book
+  data:
+    day: lunes
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing]
+tags: [tenancy, ac-5, inv-1]

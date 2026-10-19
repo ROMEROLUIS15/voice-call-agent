@@ -1,0 +1,20 @@
+id: booking-request-on-the-test-line
+title: The caller asks to book while the line is in testing; nothing is confirmed
+source: hand-written
+phase: 0
+status: active
+levels: [model]
+channel: whatsapp
+language: es
+turns:
+  - says: Hola, quiero agendar un corte de cabello para mañana a las tres de la tarde.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "15:00"
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing, admits-test-line, natural-spanish]
+tags: [booking, test-line, hallucination]

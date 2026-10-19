@@ -2,7 +2,7 @@
 
 import ast
 
-from tests.architecture.source_tree import python_modules, relative_parts
+from tests.architecture.source_tree import evals_modules, python_modules, repository_path
 
 MAX_FILE_LINES = 300
 MAX_FUNCTION_LINES = 50
@@ -21,8 +21,8 @@ def long_functions(source: str) -> list[str]:
 
 def test_files_stay_within_the_limit() -> None:
     long_files = {
-        "/".join(relative_parts(path)): lines
-        for path in python_modules()
+        repository_path(path): lines
+        for path in [*python_modules(), *evals_modules()]
         if (lines := len(path.read_text(encoding="utf-8").splitlines())) > MAX_FILE_LINES
     }
     assert long_files == {}
@@ -30,8 +30,8 @@ def test_files_stay_within_the_limit() -> None:
 
 def test_functions_stay_within_the_limit() -> None:
     offenders = {
-        "/".join(relative_parts(path)): found
-        for path in python_modules()
+        repository_path(path): found
+        for path in [*python_modules(), *evals_modules()]
         if (found := long_functions(path.read_text(encoding="utf-8")))
     }
     assert offenders == {}

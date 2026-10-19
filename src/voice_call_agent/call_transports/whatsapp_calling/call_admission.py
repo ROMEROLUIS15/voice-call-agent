@@ -11,6 +11,8 @@ from voice_call_agent.call_transports.whatsapp_calling.pipecat_webrtc_transport 
     WHATSAPP_AUDIO_FORMAT,
     build_webrtc_transport,
 )
+from voice_call_agent.observability.error_reporting import report_error
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.speech_pipeline.conversation_runner import ConversationRunner
 
 
@@ -32,6 +34,7 @@ async def admit_call_events(
     slot = supervisor.try_reserve()
     if slot is None:
         for call in events.connect_calls:
+            report_error(ErrorCode.CALL_REJECTED_NO_SLOT, call_id=call.id, entry="whatsapp")
             await acceptor.reject(call.id)
         return
 

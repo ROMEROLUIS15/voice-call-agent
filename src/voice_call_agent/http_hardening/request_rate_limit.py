@@ -11,11 +11,12 @@ from limits import RateLimitItem, parse
 from limits.aio.storage import Storage
 from limits.aio.strategies import MovingWindowRateLimiter
 from limits.storage import storage_from_string
-from loguru import logger
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from voice_call_agent.http_hardening.error_responses import error_body
+from voice_call_agent.observability.error_reporting import report_error
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 
 _POLICY_VIOLATION = 1008
 
@@ -57,7 +58,7 @@ class RequestRateLimitMiddleware:
         if await self._limiter.hit(self._limit, address, scope["path"]):
             await self._app(scope, receive, send)
             return
-        logger.bind(path=scope["path"]).warning("rate limit exceeded")
+        report_error(ErrorCode.RATE_LIMITED, path=scope["path"])
         if scope["type"] == "websocket":
             await send({"type": "websocket.close", "code": _POLICY_VIOLATION})
             return

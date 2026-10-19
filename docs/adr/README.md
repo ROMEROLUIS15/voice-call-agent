@@ -12,6 +12,8 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 | [0006](0006-names-by-function-and-ports-for-external-systems.md) | Names by function and ports for external systems | Accepted |
 | [0007](0007-own-security-headers-middleware.md) | Own security headers middleware | Accepted |
 | [0008](0008-security-checks-shared-by-developers-and-ci.md) | Security checks shared by developers and CI | Accepted |
+| [0009](0009-error-tracking-and-call-traces-with-sentry.md) | Error tracking and per-call traces with Sentry | Accepted |
+| [0010](0010-golden-dataset-and-two-level-evals.md) | Golden dataset and evals at two levels, with a judge model | Accepted |
 
 ## Process
 

@@ -1,0 +1,14 @@
+id: greeting-then-hang-up
+title: The caller hears the greeting and hangs up without speaking
+source: hand-written
+phase: 0
+status: active
+levels: [conversation]
+channel: twilio
+language: es
+turns: []
+expected:
+  intent: none
+  outcome: abandoned
+  identity_verified: false
+tags: [greeting, hang-up, latency]

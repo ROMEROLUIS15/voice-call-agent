@@ -1,0 +1,28 @@
+id: book-appointment-over-the-phone-line
+title: A phone-line caller books an appointment after confirming it (AC-2)
+source: hand-written
+phase: 2
+status: pending
+pending_reason: Needs the booking tools, the two-turn confirmation and the backend catalog.
+levels: [conversation, model]
+channel: twilio
+language: es
+turns:
+  - says: Buenas, quiero una manicura para el jueves a las diez de la mañana.
+  - says: Sí, está bien, agéndala.
+expected:
+  intent: book
+  data:
+    service: manicura
+    day: jueves
+    time: "10:00"
+  tool_call:
+    name: book_appointment
+    arguments:
+      service: manicura
+      day: jueves
+      time: "10:00"
+  outcome: booked
+  identity_verified: false
+  quality: [natural-spanish]
+tags: [booking, ac-2, inv-2, inv-3]

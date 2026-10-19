@@ -51,9 +51,9 @@ Non-negotiable rules for all code in this repository. It inherits the principles
 ## 7. Testing and quality
 
 *   **Pyramid:** unit tests (pytest) for intent understanding, state and the backend client; integration against a local Cronix; end-to-end **simulated calls** in CI with recorded audio and conversation scripts.
-*   **Evals:** multi-turn reference conversations (as in Cronix) that block the merge if the rate of correct appointments drops or p95 latency rises.
+*   **Evals:** one golden dataset of multi-turn conversations (`docs/evals/golden-dataset.md`, ADR 0010) at two levels: reference conversations through the real conversation runner with scripted providers, on every change; and model evals with the real language model, task metrics and a judge model against a baseline, blocking the merge when a measure drops beyond its margin (0 for security, 0.05 for quality).
 *   A test is worth something only if it fails when what it claims to cover breaks: guard tests are verified by injecting the defect. A test that hangs instead of failing when its guard breaks does not count: bound every wait.
-*   Tests mirror `src/`: `tests/unit/`, `tests/integration/`, and `tests/architecture/` for rules checked on the source itself (channel isolation, naming, dependency direction).
+*   Tests mirror `src/`: `tests/unit/`, `tests/integration/`, and `tests/architecture/` for rules checked on the source itself (channel isolation, naming, dependency direction, error handling, file contents); `tests/evals/` for the golden dataset and `tests/snapshots/` for the prompt, phrases, model configuration and port schemas.
 
 ## 8. Documentation (SDD)
 
@@ -121,3 +121,11 @@ Documentation is updated as part of the change, not afterwards. **Before every c
 *   **HTTP surface:** security headers on every response (ADR 0007); no `Server` header; **CORS closed** by default, opened only by configuration to explicit origins, never `*`; trusted hosts by configuration; `X-Forwarded-*` trusted only from configured proxies; request body size limited; no interactive API documentation in production; error responses never reveal traces, internal paths, input values or settings.
 *   **Webhooks:** signatures validated in constant time before parsing; replays rejected by event id and, when the provider allows it, by age; rate limits per client address and route. Every failure path fails closed.
 *   **Checks:** bandit, pip-audit and gitleaks run with lint, types and tests, the same hooks locally and in CI (ADR 0008); every CI job is blocking.
+
+## 16. Observability first
+
+*   **A failure is looked for in the observability first**: the logs by error code, the call trace, error tracking. If they cannot show it, the first change instruments it (an error code, an attribute or a span, with its test), and only then is it fixed.
+*   **Every error has a code and a kind** in `observability/error_taxonomy.py`, real failure or expected outcome, and is reported with `report_error`: structured log, `voice.error` metric, an issue only for real failures, and the trace of the call. No handler silences an error (`tests/architecture/test_error_handling.py`).
+*   **Every feature ships with** what it adds to the call trace, its error codes, and its case in the golden dataset; a reference conversation when it changes how the call flows.
+*   **No change to the prompt, the phrases, the model, its generation settings or the tools lands without model evals against the baseline** (ADR 0010; enforced by the behaviour fingerprint). No behaviour change without a golden case that shows it; every production failure that is fixed adds its case.
+*   **Personal data never leaves in errors or traces**: error tracking is configured without personal data and scrubs what it sends (ADR 0009); attributes are identifiers and categories, and per-call identifiers tag issues and traces, never metrics.

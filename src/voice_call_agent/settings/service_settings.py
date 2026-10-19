@@ -4,6 +4,7 @@ An entry (phone line, WhatsApp) is enabled only when its group of variables is c
 partial group is a startup error, not an entry that fails on its first call.
 """
 
+from importlib.metadata import version
 from pathlib import Path
 from typing import Self
 
@@ -13,11 +14,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from voice_call_agent.settings.sections import (
     CallSupervisionSettings,
+    CallTraceLogSettings,
     DeploymentEnvironment,
+    ErrorTrackingSettings,
     HttpHardeningSettings,
     LanguageModelProvider,
     LanguageModelSettings,
-    LatencyLogSettings,
     LogFormat,
     LogSettings,
     ServerSettings,
@@ -81,7 +83,9 @@ class ServiceSettings(BaseSettings):
     replay_window_seconds: float = 300.0
     meta_connect_max_age_seconds: float = 60.0
 
-    latency_log_path: Path = Path("var/latency.jsonl")
+    call_trace_log_path: Path = Path("var/call_traces.jsonl")
+    sentry_dsn: SecretStr | None = None
+    sentry_traces_sample_rate: float = 1.0
     log_level: str = "INFO"
     log_format: LogFormat = LogFormat.JSON
 
@@ -187,8 +191,16 @@ class ServiceSettings(BaseSettings):
             connect_event_max_age_seconds=self.meta_connect_max_age_seconds,
         )
 
-    def latency_log(self) -> LatencyLogSettings:
-        return LatencyLogSettings(path=self.latency_log_path)
+    def call_trace_log(self) -> CallTraceLogSettings:
+        return CallTraceLogSettings(path=self.call_trace_log_path)
+
+    def error_tracking(self) -> ErrorTrackingSettings:
+        return ErrorTrackingSettings(
+            dsn=self.sentry_dsn,
+            environment=self.environment,
+            release=f"voice-call-agent@{version('voice-call-agent')}",
+            traces_sample_rate=self.sentry_traces_sample_rate,
+        )
 
     def logging_output(self) -> LogSettings:
         return LogSettings(level=self.log_level, output_format=self.log_format)

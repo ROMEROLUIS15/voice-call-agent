@@ -4,10 +4,11 @@ Pipecat's `UserBotLatencyObserver` splits the "end of speech → first audio" in
 named contributions (`key`); they are grouped here into the manifest's segments.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pipecat.observers.user_bot_latency_observer import LatencyBreakdown
-from pydantic import BaseModel
+
+from voice_call_agent.observability.call_trace import TurnLatency
 
 # End of speech → final transcript.
 _STT_KEYS = frozenset({"endpointing_wait", "transcription"})
@@ -27,28 +28,6 @@ _LLM_KEYS = frozenset(
 _TTS_KEYS = frozenset({"sentence_aggregation", "speech_synthesis", "output_transport"})
 
 
-class TurnLatency(BaseModel):
-    """One measured turn, in milliseconds. `other_ms` is pipeline time no service owns."""
-
-    stt_ms: float
-    llm_ms: float
-    tts_ms: float
-    other_ms: float
-    total_ms: float
-
-
-class CallLatencyRecord(BaseModel):
-    """Latencies of a whole call."""
-
-    call_id: str
-    channel_label: str
-    started_at: datetime
-    duration_s: float
-    greeting_ms: float | None
-    """Connection → first audio of the greeting."""
-    turns: list[TurnLatency]
-
-
 def group_turn_segments(breakdown: LatencyBreakdown) -> TurnLatency:
     """Group a turn's contributions into the manifest's segments."""
     stt = llm = tts = other = 0.0
@@ -62,6 +41,12 @@ def group_turn_segments(breakdown: LatencyBreakdown) -> TurnLatency:
             tts += ms
         else:
             other += ms
+    started = breakdown.user_turn_start_time
     return TurnLatency(
-        stt_ms=stt, llm_ms=llm, tts_ms=tts, other_ms=other, total_ms=breakdown.total_secs * 1000
+        started_at=datetime.fromtimestamp(started, UTC) if started is not None else None,
+        stt_ms=stt,
+        llm_ms=llm,
+        tts_ms=tts,
+        other_ms=other,
+        total_ms=breakdown.total_secs * 1000,
     )

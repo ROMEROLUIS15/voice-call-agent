@@ -4,17 +4,19 @@ import asyncio
 from typing import cast
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import Frame, StartFrame
 from pipecat.processors.filters.identity_filter import IdentityFilter
-from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.services.ai_service import AIService
 from pipecat.services.stt_service import STTService
 from pipecat.services.tts_service import TTSService
-from pipecat.transports.base_transport import BaseTransport
 
+from evals.conversation_harness.loopback_transport import LoopbackTransport
+from tests.call_trace_factory import SERVICES
 from voice_call_agent.call_session.session_builders import build_twilio_session
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
-from voice_call_agent.observability.turn_latency import CallLatencyRecord
+from voice_call_agent.observability.call_trace import CallTrace
+from voice_call_agent.observability.cost_estimation import load_price_table
+from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
 from voice_call_agent.speech_pipeline.audio_format import AudioFormat
 from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
 from voice_call_agent.speech_pipeline.pipeline_assembly import SpeechServiceFactories
@@ -25,44 +27,11 @@ def _pass_through() -> FrameProcessor:
     return IdentityFilter()  # type: ignore[no-untyped-call]  # Pipecat's __init__ is unannotated.
 
 
-class StartAwareInput(IdentityFilter):
-    """Forwards every frame and records when the pipeline has started."""
-
+class RecordingTraceSink:
     def __init__(self) -> None:
-        super().__init__()  # type: ignore[no-untyped-call]  # Pipecat's __init__ is unannotated.
-        self.started = asyncio.Event()
+        self.records: list[CallTrace] = []
 
-    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
-        await super().process_frame(frame, direction)
-        if isinstance(frame, StartFrame):
-            self.started.set()
-
-
-class EventfulLoopbackTransport(BaseTransport):
-    """Pass-through transport that lets the test fire connect and disconnect."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.started_input = StartAwareInput()
-        self._output = _pass_through()
-        self._register_event_handler("on_client_connected")
-        self._register_event_handler("on_client_disconnected")
-
-    def input(self) -> FrameProcessor:
-        return self.started_input
-
-    def output(self) -> FrameProcessor:
-        return self._output
-
-    async def fire(self, event_name: str) -> None:
-        await self._call_event_handler(event_name, object())
-
-
-class RecordingLatencySink:
-    def __init__(self) -> None:
-        self.records: list[CallLatencyRecord] = []
-
-    async def write(self, record: CallLatencyRecord) -> None:
+    async def write(self, record: CallTrace) -> None:
         self.records.append(record)
 
 
@@ -76,24 +45,32 @@ def _pass_through_factories() -> SpeechServiceFactories:
     )
 
 
-async def test_conversation_ends_on_hang_up_and_stores_its_latency() -> None:
-    sink = RecordingLatencySink()
+async def test_conversation_ends_on_hang_up_and_publishes_its_trace() -> None:
+    sink = RecordingTraceSink()
     runner = PipecatConversationRunner(
         factories=_pass_through_factories(),
         content=load_conversation_content(),
-        latency_sink=sink,
+        services=SERVICES,
+        prices=load_price_table(),
+        trace_sinks=[sink],
     )
-    transport = EventfulLoopbackTransport()
+    transport = LoopbackTransport()
     session = build_twilio_session("CA-runner", "+584120000000", "+13055550100")
     audio = AudioFormat(input_sample_rate_hz=8000, output_sample_rate_hz=8000)
 
     conversation = asyncio.create_task(runner.run(transport, session, audio))
     # Wait for the pipeline itself, not a fixed delay: under coverage it starts slower.
-    await asyncio.wait_for(transport.started_input.started.wait(), timeout=10)
-    await transport.fire("on_client_connected")
-    await transport.fire("on_client_disconnected")
+    await transport.wait_until_ready(timeout_s=10)
+    await transport.connect()
+    await transport.hang_up()
     await asyncio.wait_for(conversation, timeout=10)
 
-    [record] = sink.records
-    assert record.call_id == "CA-runner"
-    assert record.channel_label == "twilio"
+    [trace] = sink.records
+    assert trace.call_id == "CA-runner"
+    assert trace.channel_label == "twilio"
+    assert not trace.identity_verified
+    assert trace.outcome is CallOutcome.ABANDONED  # The caller hung up without speaking.
+    assert trace.services.prompt_version == SERVICES.prompt_version
+    assert trace.services.llm_model == SERVICES.llm_model
+    assert not trace.real_failure
+    assert trace.cost.price_table_version == load_price_table().version
