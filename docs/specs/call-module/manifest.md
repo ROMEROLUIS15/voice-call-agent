@@ -1,6 +1,6 @@
 # 📋 Domain Manifest: Call Agent (WhatsApp + Phone Line)
 
-Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md`, the architecture decisions in `../../adr/`, the threat model in `../../security/threat-model.md` and the golden dataset in `../../evals/golden-dataset.md`.
+Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md`, the architecture decisions in `../../adr/`, the threat model in `../../security/threat-model.md`, the golden dataset in `../../evals/golden-dataset.md` and the AI engineering practices in `../../ai-engineering.md`.
 
 ## 1. Purpose
 
@@ -169,7 +169,7 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 *   **AC-5 · Unresolved business (WhatsApp).** If the sender has no session and is not a client of any business, the agent asks for the business and does not book until it is confirmed.
 *   **AC-6 · Unknown number (Twilio).** A call to a number without a business → fixed message, hang up, trace recorded.
 *   **AC-7 · Identity on the phone line.** Cancelling from Twilio without the correct name and date does **not** cancel; a message is taken. On WhatsApp it is not required.
-*   **AC-8 · Interruption.** The agent goes silent in less than 300 ms when the caller interrupts.
+*   **AC-8 · Interruption.** The agent goes silent in less than 300 ms when the caller interrupts. *To be refined in phase 4 with the false-interruption filter: silent in under 300 ms on a real interruption, and keeps speaking through coughs, noise and fillers.*
 *   **AC-9 · Cronix down.** The agent confirms nothing and offers to take a message.
 *   **AC-10 · Latency.** 20 real calls per channel meet §6.
 *   **AC-11 · Safe retry.** The same idempotency key does not create a second appointment.
@@ -186,12 +186,22 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 | 5 · Evals in CI | Simulated callers, end-to-end calls with recorded audio, judge calibration against human labels, sampled evaluation of production calls | CI blocks on regressions. Reference conversations and model evals against a baseline exist from phase 0 (ADR 0010). |
 | 6 · Bilingual | English and language switching | Own criteria |
 
+### 9.1 Registered work per phase (not implemented)
+
+Registered on 2026-10-19; what each item solves and how it applies here is in [`docs/ai-engineering.md`](../../ai-engineering.md).
+
+*   **Phase 0:** measure speech-to-text on real phone audio (names, numbers, national ID numbers, fillers); a measured results section in `README.md` (latency p50/p95 per segment, golden dataset success, cost per call, capacity per instance), updated with every measurement.
+*   **Phase 2:** property-based tests (Hypothesis) proving there is never a write without confirmation; redaction patterns for identity documents.
+*   **Phase 4:** a deadline on the language model's first token with a retry on the fallback model **before speaking**, never in the middle of a reply; a false-interruption filter (coughs, fillers) that refines AC-8; provider fault injection; load tests and capacity per instance; Redis for replay protection and rate limits before a second instance runs.
+*   **Phase 5:** inspectable language model traces (self-hosted Langfuse, or a hosted tracer with redaction beforehand, decided in an ADR); SLOs with an error budget; runbooks and a postmortems folder.
+*   **Deployment:** a multi-stage Dockerfile on Debian slim, **not Alpine**: musl breaks onnxruntime (needed by Silero VAD, which ships no musl wheels nor sources) and other native dependencies.
+
 ## 10. Known risks
 
 *   **Meta's requirement for calls.** The Cloud API Calling documentation requires a messaging limit of at least 2,000 daily recipients; test accounts and public test numbers are exempt. Cronix does not reach that level today. **Plan:** in phase 0, test with a Meta test number; if the real number cannot enable "Calls", the phone entry (Twilio) is the main path until the level rises.
 *   **Meta test numbers:** they last 90 days and have restrictions on contacting some countries; verify in phase 0 that a call started from outside the US arrives.
 *   **Testing the Twilio number from outside the US:** it is a US number, so test calls from abroad need an international call or a VoIP app. To serve callers in Venezuela, Twilio offers Venezuelan numbers (+58 800 with a letter of authorization; local ones with documents and a local address), with paperwork.
-*   **8 kHz audio** on the phone line: measure how names and numbers are transcribed.
+*   **8 kHz audio** on the phone line: measure how names, numbers, national ID numbers and fillers are transcribed (§9.1, phase 0).
 *   **Edge Function cold start:** preload the business context at the start if it breaks the budget.
 *   **Costs:** record the real cost per call and per channel from phase 0.
 *   **One webhook callback per Meta app** (phase 0 finding, to verify): Cronix's message webhook (`process-whatsapp`) and this service's call webhook compete for the same URL. Options: a separate Meta app for the test number, a callback override per account or per number, or the Edge Function forwarding the `calls` field. The service already acknowledges any field other than `calls` with `200`, so it supports all three.
@@ -266,3 +276,5 @@ Observability and quality (stage 1):
 | Other (no owner) | the rest, e.g. `pipeline` |
 
 **Pending to close phase 0** (needs accounts and real calls): Twilio number and Meta test app/number configured; 20 measured calls per channel; choose the LLM and the TTS voice with that data; cost per minute per channel; verify whether the real Cronix number can enable *Calling* and how it coexists with the message webhook (§10); verify the multi-instance `terminate` risk (§10).
+
+**Next:** stage 2 (AI engineering foundations; its plan is presented before any implementation). The next big task after it is phase 0's **first real call, measured per segment**.
