@@ -18,13 +18,21 @@ class CallTerminator(Protocol):
 class TwilioCallTerminator:
     """Sets the call to `completed`. Failures are logged, never raised: the call is over anyway."""
 
-    def __init__(self, account_sid: str, auth_token: SecretStr, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        account_sid: str,
+        auth_token: SecretStr,
+        timeout_seconds: float,
+        *,
+        api_base_url: str = _TWILIO_API,
+    ) -> None:
         self._account_sid = account_sid
+        self._api_base_url = api_base_url
         self._auth_token = auth_token
         self._timeout = aiohttp.ClientTimeout(total=timeout_seconds)
 
     async def end_call(self, call_sid: str) -> None:
-        url = f"{_TWILIO_API}/Accounts/{self._account_sid}/Calls/{call_sid}.json"
+        url = f"{self._api_base_url}/Accounts/{self._account_sid}/Calls/{call_sid}.json"
         auth = aiohttp.BasicAuth(self._account_sid, self._auth_token.get_secret_value())
         log = logger.bind(call_id=call_sid)
         try:

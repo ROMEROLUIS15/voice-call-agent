@@ -21,3 +21,10 @@ def reject_busy_twiml() -> str:
     response = VoiceResponse()
     response.reject(reason="busy")
     return str(response)
+
+
+def reject_call_twiml() -> str:
+    """`<Reject reason="rejected">`: Twilio does not answer the call."""
+    response = VoiceResponse()
+    response.reject(reason="rejected")
+    return str(response)

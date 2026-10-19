@@ -19,6 +19,8 @@ def make_service_settings(**overrides: object) -> ServiceSettings:
         "whatsapp_phone_number_id": "123456789",
         "whatsapp_app_secret": META_APP_SECRET,
         "whatsapp_verify_token": META_VERIFY_TOKEN,
+        # FastAPI's TestClient sends `Host: testserver`.
+        "allowed_hosts": "testserver",
     }
     values.update(overrides)
     # `model_validate` skips the environment and `.env` sources: only these values count.

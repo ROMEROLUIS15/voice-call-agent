@@ -18,6 +18,8 @@ On the agent, this contract is implemented **only** by `src/voice_call_agent/ada
 | `POST /v1/messages` (§4.6) | `SchedulingBackend.leave_message` |
 | `POST /v1/calls/{call_sid}/end` (§4.7) | `SchedulingBackend.close_call` |
 
+**Tenant boundary:** the adapter sends `call_sid`, never `business_id` (§4); `tests/architecture/test_tenant_boundary.py` fails if a request model or a port method gains a tenant field, and request models reject unknown fields, so a business id proposed by the LLM never reaches a request.
+
 Ports: `scheduling_backend/scheduling_port.py`, `call_session/business_resolution.py`. Models: `scheduling_backend/scheduling_models.py`. Business error codes (`SLOT_CONFLICT`, `IDENTITY_MISMATCH`, …) map to typed results (`WriteRejectionReason`); HTTP failures map to `scheduling_backend/scheduling_errors.py` (§6).
 
 ## 1. Principles
@@ -162,3 +164,15 @@ The agent retries **only** `429` and `503`, with the same `Idempotency-Key`, and
 
 *   Reads: 1.5 s. Writes: 3 s. Configured in the adapter's settings (phase 1).
 *   If a write times out, the agent assumes **neither** success nor failure: it calls `GET /v1/my-appointments` to check the real state before saying anything.
+
+## 8. Definition of done for changes in Cronix
+
+Applies to every change on the Cronix side of this contract, from phase 1 on. A change is not done, and is not merged, unless **the same change** brings:
+
+*   **Migration** for every new table or column.
+*   **RLS enabled** on every new table, with its **policies**: `service_role` for the Edge Function, read-only access for owners through `current_business_id()` where the table is visible in the dashboard.
+*   **Indexes:** the unique ones the contract relies on (`voice_lines.phone_e164`, `phone_idempotency.key`) and one by `business_id` on every tenant-scoped table.
+*   **pgTAP tests of isolation between businesses:** a request scoped to business A never reads or writes rows of business B, plus the uniqueness constraints.
+*   The endpoint derives the business from `call_sid` (`phone_calls`), never from the request body.
+
+No "RLS later": a table without RLS, policies and isolation tests is a defect, not a follow-up.

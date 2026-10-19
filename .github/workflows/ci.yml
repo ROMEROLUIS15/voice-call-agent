@@ -1,15 +1,46 @@
 name: CI
 
+# Every job runs the hooks of .pre-commit-config.yaml: the same commands developers run with
+#   uv run pre-commit run --all-files --hook-stage manual
+# All jobs are blocking: mark them as required checks in the branch protection of `main`.
+
 on:
   push:
-    branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  checks:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pre-commit run ruff-check --all-files --hook-stage manual
+      - run: uv run pre-commit run ruff-format --all-files --hook-stage manual
+      - run: uv run pre-commit run mypy --all-files --hook-stage manual
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      # Unit, integration, architecture and negative security tests, with the coverage threshold.
+      - run: uv run pre-commit run pytest --all-files --hook-stage manual
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # gitleaks scans the whole history, not only the last commit.
       - name: No tracked .env files
         run: |
           if git ls-files | grep -E '(^|/)\.env$'; then
@@ -19,8 +50,11 @@ jobs:
       - uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
       - run: uv sync --locked
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run mypy
-      - run: uv run pytest
+      - run: uv run pre-commit run bandit --all-files --hook-stage manual
+      - run: uv run pre-commit run pip-audit --all-files --hook-stage manual
+      - run: uv run pre-commit run gitleaks-history --all-files --hook-stage manual

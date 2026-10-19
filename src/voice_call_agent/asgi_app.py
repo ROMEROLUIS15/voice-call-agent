@@ -1,24 +1,31 @@
 """ASGI application: mounts the configured call entries over one speech engine."""
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 
 from fastapi import FastAPI, Response, status
 from fastapi.responses import JSONResponse
+from limits.aio.strategies import MovingWindowRateLimiter
 from loguru import logger
+from starlette.types import ASGIApp
 
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
+from voice_call_agent.call_transports.replay_guard import ReplayGuard
 from voice_call_agent.call_transports.twilio_media_streams.call_termination import (
     CallTerminator,
 )
 from voice_call_agent.call_transports.twilio_media_streams.webhook_routes import (
+    INCOMING_CALL_PATH,
+    MEDIA_STREAM_PATH,
     build_twilio_router,
 )
 from voice_call_agent.call_transports.whatsapp_calling.call_acceptance import CallAcceptor
 from voice_call_agent.call_transports.whatsapp_calling.webhook_routes import (
+    WEBHOOK_PATH,
     build_whatsapp_router,
 )
+from voice_call_agent.http_hardening.app_hardening import harden_app
 from voice_call_agent.settings.service_settings import ServiceSettings
 from voice_call_agent.speech_pipeline.conversation_runner import ConversationRunner
 
@@ -33,16 +40,40 @@ class ServiceComponents:
     """Present when the phone-line entry is configured."""
     call_acceptor: CallAcceptor | None
     """Present when the WhatsApp entry is configured."""
+    replay_guard: ReplayGuard
+    rate_limiter: MovingWindowRateLimiter
     shutdown_grace_seconds: float
 
 
-def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> FastAPI:
-    """Create the application with the entries whose settings are complete."""
-    supervisor = components.supervisor
-    acceptor = components.call_acceptor
+def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> ASGIApp:
+    """Create the hardened application with the entries whose settings are complete."""
+    http = settings.http_hardening()
+    # No interactive documentation in production: it maps the attack surface for free.
+    documented = not http.is_production
+    app = FastAPI(
+        title="Voice Call Agent",
+        lifespan=_lifespan(components),
+        docs_url="/docs" if documented else None,
+        redoc_url="/redoc" if documented else None,
+        openapi_url="/openapi.json" if documented else None,
+    )
+    _add_health_routes(app, components.supervisor)
+    rate_limited_paths = _mount_call_entries(app, settings, components)
+    return harden_app(
+        app,
+        http=http,
+        webhooks=settings.webhook_protection(),
+        rate_limiter=components.rate_limiter,
+        rate_limited_paths=rate_limited_paths,
+    )
 
+
+def _lifespan(
+    components: ServiceComponents,
+) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        acceptor = components.call_acceptor
         if acceptor is not None:
             await acceptor.start()
         try:
@@ -50,30 +81,48 @@ def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> 
         finally:
             # Under `GracefulHttpServer` the calls are already drained; under any other server
             # this is where they get their grace period.
-            await supervisor.drain(components.shutdown_grace_seconds)
+            await components.supervisor.drain(components.shutdown_grace_seconds)
             if acceptor is not None:
                 await acceptor.stop()
 
-    app = FastAPI(title="Voice Call Agent", lifespan=lifespan)
-    _add_health_routes(app, supervisor)
+    return lifespan
 
+
+def _mount_call_entries(
+    app: FastAPI, settings: ServiceSettings, components: ServiceComponents
+) -> frozenset[str]:
+    """Mount the configured entries; return their paths, which are rate limited."""
+    paths: set[str] = set()
     twilio = settings.twilio_media_streams()
     if twilio is not None and components.call_terminator is not None:
         app.include_router(
             build_twilio_router(
-                twilio, supervisor, components.conversation_runner, components.call_terminator
+                twilio,
+                components.supervisor,
+                components.conversation_runner,
+                components.call_terminator,
+                components.replay_guard,
             )
         )
+        paths |= {INCOMING_CALL_PATH, MEDIA_STREAM_PATH}
         logger.info("phone-line entry enabled")
     whatsapp = settings.whatsapp_calling()
-    if whatsapp is not None and acceptor is not None:
+    if whatsapp is not None and components.call_acceptor is not None:
         app.include_router(
-            build_whatsapp_router(whatsapp, acceptor, supervisor, components.conversation_runner)
+            build_whatsapp_router(
+                whatsapp,
+                components.call_acceptor,
+                components.supervisor,
+                components.conversation_runner,
+                components.replay_guard,
+                settings.webhook_protection().connect_event_max_age_seconds,
+            )
         )
+        paths.add(WEBHOOK_PATH)
         logger.info("WhatsApp entry enabled")
-    if twilio is None and whatsapp is None:
+    if not paths:
         logger.warning("no call entry configured; check the phone-line and WhatsApp variables")
-    return app
+    return frozenset(paths)
 
 
 def _add_health_routes(app: FastAPI, supervisor: CallSupervisor) -> None:

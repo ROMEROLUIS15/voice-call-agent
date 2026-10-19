@@ -1,6 +1,6 @@
 # 📋 Domain Manifest: Call Agent (WhatsApp + Phone Line)
 
-Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md` and the architecture decisions in `../../adr/`.
+Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md`, the architecture decisions in `../../adr/` and the threat model in `../../security/threat-model.md`.
 
 ## 1. Purpose
 
@@ -78,8 +78,9 @@ There are **two entries** to one voice engine:
 
 | Module | Responsibility |
 |---|---|
-| `call_transports/whatsapp_calling/` | Meta `calls` webhook: validate the signature (`X-Hub-Signature-256` with the app secret) over the raw body, keep only `calls` events, admit or reject the call against the concurrency limit, accept it and open the WebRTC session. |
-| `call_transports/twilio_media_streams/` | Incoming-call webhook: validate the Twilio signature, answer TwiML `<Connect><Stream>` (or `<Reject reason="busy">` when full) with a stream admission token, open the WebSocket, end the call through the REST API with a timeout. |
+| `call_transports/whatsapp_calling/` | Meta `calls` webhook: validate the signature (`X-Hub-Signature-256` with the app secret) over the raw body, keep only `calls` events, drop repeated events and stale `connect` events (replay protection), admit or reject the call against the concurrency limit, accept it and open the WebRTC session. |
+| `call_transports/twilio_media_streams/` | Incoming-call webhook: validate the Twilio signature, reject repeated deliveries, answer TwiML `<Connect><Stream>` (or `<Reject reason="busy">` when full) with a stream admission token, admit one Media Stream per call, end the call through the REST API with a timeout. |
+| `call_transports/replay_guard.py` | `ReplayGuard` port and its in-memory implementation: remembers event ids for a window to reject repeats. |
 | `call_session/` | Build the `CallSession`: channel, `business_id`, caller phone, `identity_verified` (derived from the channel). Defines the `BusinessResolver` port. |
 | `call_supervision/` | Per-instance call slots: concurrency limit, supervised call tasks, graceful drain on shutdown. |
 | `speech_pipeline/` | Pipecat pipeline (turns, STT, LLM, TTS, interruptions), common to both channels. Receives provider factories; knows no vendor. |
@@ -92,6 +93,7 @@ There are **two entries** to one voice engine:
 | `adapters/deepgram_speech/` | Flux STT and Aura-2 TTS factories. |
 | `adapters/language_model_providers/` | Groq, Google and OpenAI LLM factories with explicit request timeouts. |
 | `observability/` | Per-call traces and per-segment latency; structured logging; redaction of personal data. |
+| `http_hardening/` | Security headers (ADR 0007), generic error responses, rate limits per client address and route, trusted hosts, body size limit, closed CORS (constitution §15). |
 | `settings/` | Typed configuration from environment variables; each component receives only its section. |
 | `service_composition.py`, `asgi_app.py`, `__main__.py`, `graceful_http_server.py` | Composition root and process entry: wire the components, mount the entries, run uvicorn with a graceful drain. |
 
@@ -195,6 +197,7 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 *   **Network calls owned by libraries without a configurable timeout** (known limitation): Deepgram's STT/TTS WebSocket connect uses the `websockets` library default open timeout (10 s); WebRTC/ICE negotiation is managed by aiortc. Every network call the agent's own code makes or configures has an explicit timeout (Graph API session, Twilio REST, LLM clients, Media Stream handshake).
 *   **uvicorn closes every WebSocket on shutdown** (code 1012) before waiting for anything; without mitigation a restart cuts every phone-line call. Mitigated by `GracefulHttpServer`, which drains calls on the first signal.
 *   **Pipecat logs conversation content at `DEBUG`** (transcripts, which may include names): production runs at `INFO` or higher (constitution §12).
+*   **Replay and rate-limit state per instance** (accepted risk R-01 of `docs/security/threat-model.md`): with several instances, a repeat or a flood split across them is not seen as a whole. A shared store is a configuration change (`RATE_LIMIT_STORAGE_URI`, a shared `ReplayGuard`).
 
 ## 11. Recorded trade-offs
 
@@ -222,9 +225,16 @@ Server lifecycle and provider calls:
 *   **Own Twilio hang-up instead of Pipecat's `auto_hang_up`**, which calls the REST API through an aiohttp session without an explicit timeout.
 *   **Readiness reports `503` when the instance is full**, not only while draining, so a load balancer sends calls to another instance.
 
+Security hardening:
+
+*   **Replay protection that fails closed.** Twilio: a repeated delivery (`I-Twilio-Idempotency-Token`, or the `CallSid`) gets `<Reject>`, and one Media Stream per `CallSid`; a genuine retry whose first answer was lost is rejected too (threat model R-03). Meta: repeated `{call id}:{event}` and `connect` events older than 60 s are acknowledged with `200` and never processed (Meta allows ~30–60 s to accept a call; its `timestamp` is Unix seconds).
+*   **Rate limits with `limits` and an own middleware**, per client address and route, in memory per instance, over `slowapi`: covers the WebSocket handshake too and needs no per-endpoint decorators.
+*   **Production is the default environment**: HSTS on and API documentation off unless `ENVIRONMENT=development`.
+*   **Coverage threshold 85 %**, measured with branches; it rises with the dialog (phase 2) and is never lowered to make a change pass.
+
 ## 12. Phase 0 status
 
-**Done (2026-10-18):** skeleton with the structure of §3 (uv, FastAPI, `pipecat-ai==1.12.0`, pytest, `mypy --strict`, ruff, CI); phone entry (signature, TwiML `<Connect><Stream>`, stream admission token, handshake timeout, μ-law 8 kHz transport, busy rejection when full, own hang-up with timeout); WhatsApp entry (subscription check, `X-Hub-Signature-256` over the raw body, `calls` filtering, admission against the concurrency limit with Graph API `reject`, WebRTC acceptance with Pipecat's `WhatsAppClient`); common Flux → LLM → Aura-2 pipeline with a fixed greeting; test prompt that confirms no appointment and invents no data; `SchedulingBackend` and `BusinessResolver` ports with their domain models; concurrency limit, readiness and graceful drain; structured JSON logging with redaction; per-turn, per-segment latency stored in `var/latency.jsonl` and summarized against §6 (`python -m voice_call_agent.observability.latency_budget_report`). `dialog_state/`, `intent_understanding/`, `write_guards/` and `adapters/cronix_scheduling_api/` exist empty until their phases.
+**Done (2026-10-18):** skeleton with the structure of §3 (uv, FastAPI, `pipecat-ai==1.12.0`, pytest, `mypy --strict`, ruff, CI); phone entry (signature, TwiML `<Connect><Stream>`, stream admission token, handshake timeout, μ-law 8 kHz transport, busy rejection when full, own hang-up with timeout); WhatsApp entry (subscription check, `X-Hub-Signature-256` over the raw body, `calls` filtering, admission against the concurrency limit with Graph API `reject`, WebRTC acceptance with Pipecat's `WhatsAppClient`); common Flux → LLM → Aura-2 pipeline with a fixed greeting; test prompt that confirms no appointment and invents no data; `SchedulingBackend` and `BusinessResolver` ports with their domain models; concurrency limit, readiness and graceful drain; HTTP hardening (security headers, closed CORS, trusted hosts, body limit, generic errors, no documentation in production), replay protection and rate limits on both entries, tenant boundary tests; security checks (bandit, pip-audit, gitleaks) shared by pre-commit and CI; structured JSON logging with redaction; per-turn, per-segment latency stored in `var/latency.jsonl` and summarized against §6 (`python -m voice_call_agent.observability.latency_budget_report`). `dialog_state/`, `intent_understanding/`, `write_guards/` and `adapters/cronix_scheduling_api/` exist empty until their phases.
 
 **§6 segments from Pipecat's contributions** (`LatencyBreakdown.contributions[].key`):
 

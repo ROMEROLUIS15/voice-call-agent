@@ -10,6 +10,8 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 | [0004](0004-two-call-entries-over-one-engine.md) | Two call entries over one engine | Accepted |
 | [0005](0005-english-repository-with-localized-caller-content.md) | English repository with localized caller content | Accepted |
 | [0006](0006-names-by-function-and-ports-for-external-systems.md) | Names by function and ports for external systems | Accepted |
+| [0007](0007-own-security-headers-middleware.md) | Own security headers middleware | Accepted |
+| [0008](0008-security-checks-shared-by-developers-and-ci.md) | Security checks shared by developers and CI | Accepted |
 
 ## Process
 

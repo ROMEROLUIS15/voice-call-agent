@@ -112,3 +112,12 @@ Documentation is updated as part of the change, not afterwards. **Before every c
 *   The repository describes only the product and its technical decisions. It never references third-party organizations, clients, employers, job opportunities or the personal motivations of its maintainers. External context, if any, stays outside the repository.
 *   This applies to every file, comment, test, commit message and pull request description.
 *   Technology providers the product integrates with (Meta, Twilio, Deepgram, language model providers) are technical dependencies, not external context.
+
+## 15. Security and tenancy are built per feature
+
+*   No feature is done without, in the same change: its **security tests, positive and negative** (missing, invalid or altered signatures, repeated events, oversized input, floods), its **impact on the threat model** (`docs/security/threat-model.md`), and, if it touches data, its **tenant isolation tested** (a call of business A never reaches business B).
+*   **The business comes only from the `CallSession`** resolved at the start of the call: never from what the caller says nor from what the LLM proposes. Requests to the scheduling backend carry `call_sid`, never `business_id` (contract §4).
+*   If this service ever stores data of its own, every table is born with a tenant column, its index and isolation tests in the same change. On the Cronix side, contract §8 applies.
+*   **HTTP surface:** security headers on every response (ADR 0007); no `Server` header; **CORS closed** by default, opened only by configuration to explicit origins, never `*`; trusted hosts by configuration; `X-Forwarded-*` trusted only from configured proxies; request body size limited; no interactive API documentation in production; error responses never reveal traces, internal paths, input values or settings.
+*   **Webhooks:** signatures validated in constant time before parsing; replays rejected by event id and, when the provider allows it, by age; rate limits per client address and route. Every failure path fails closed.
+*   **Checks:** bandit, pip-audit and gitleaks run with lint, types and tests, the same hooks locally and in CI (ADR 0008); every CI job is blocking.

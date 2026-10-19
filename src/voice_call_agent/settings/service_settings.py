@@ -7,11 +7,14 @@ partial group is a startup error, not an entry that fails on its first call.
 from pathlib import Path
 from typing import Self
 
+from limits import parse
 from pydantic import HttpUrl, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from voice_call_agent.settings.sections import (
     CallSupervisionSettings,
+    DeploymentEnvironment,
+    HttpHardeningSettings,
     LanguageModelProvider,
     LanguageModelSettings,
     LatencyLogSettings,
@@ -20,9 +23,10 @@ from voice_call_agent.settings.sections import (
     ServerSettings,
     SpeechSettings,
     TwilioMediaStreamsSettings,
+    WebhookProtectionSettings,
     WhatsAppCallingSettings,
 )
-from voice_call_agent.settings.settings_errors import IncompleteSettingsError
+from voice_call_agent.settings.settings_errors import IncompleteSettingsError, UnsafeSettingsError
 
 
 class ServiceSettings(BaseSettings):
@@ -65,6 +69,18 @@ class ServiceSettings(BaseSettings):
     max_concurrent_calls: int = 10
     shutdown_grace_seconds: float = 300.0
 
+    environment: DeploymentEnvironment = DeploymentEnvironment.PRODUCTION
+    allowed_hosts: str = "localhost,127.0.0.1"
+    trusted_proxy_addresses: str = "127.0.0.1"
+    cors_allowed_origins: str = ""
+    max_request_body_bytes: int = 65_536
+    max_websocket_message_bytes: int = 65_536
+
+    webhook_rate_limit: str = "60/minute"
+    rate_limit_storage_uri: str = "async+memory://"
+    replay_window_seconds: float = 300.0
+    meta_connect_max_age_seconds: float = 60.0
+
     latency_log_path: Path = Path("var/latency.jsonl")
     log_level: str = "INFO"
     log_format: LogFormat = LogFormat.JSON
@@ -86,6 +102,12 @@ class ServiceSettings(BaseSettings):
             self.whatsapp_app_secret,
             self.whatsapp_verify_token,
         )
+        if "*" in _comma_separated(self.cors_allowed_origins):
+            raise UnsafeSettingsError("CORS_ALLOWED_ORIGINS must list explicit origins, never '*'")
+        try:
+            parse(self.webhook_rate_limit)
+        except ValueError as error:
+            raise UnsafeSettingsError("WEBHOOK_RATE_LIMIT is not a valid rate limit") from error
         return self
 
     def server(self) -> ServerSettings:
@@ -144,6 +166,27 @@ class ServiceSettings(BaseSettings):
             shutdown_grace_seconds=self.shutdown_grace_seconds,
         )
 
+    def http_hardening(self) -> HttpHardeningSettings:
+        hosts = _comma_separated(self.allowed_hosts)
+        if self.public_base_url is not None and self.public_base_url.host:
+            hosts = (*hosts, self.public_base_url.host)
+        return HttpHardeningSettings(
+            environment=self.environment,
+            allowed_hosts=tuple(dict.fromkeys(hosts)),
+            trusted_proxy_addresses=self.trusted_proxy_addresses,
+            cors_allowed_origins=_comma_separated(self.cors_allowed_origins),
+            max_request_body_bytes=self.max_request_body_bytes,
+            max_websocket_message_bytes=self.max_websocket_message_bytes,
+        )
+
+    def webhook_protection(self) -> WebhookProtectionSettings:
+        return WebhookProtectionSettings(
+            rate_limit=self.webhook_rate_limit,
+            rate_limit_storage_uri=self.rate_limit_storage_uri,
+            replay_window_seconds=self.replay_window_seconds,
+            connect_event_max_age_seconds=self.meta_connect_max_age_seconds,
+        )
+
     def latency_log(self) -> LatencyLogSettings:
         return LatencyLogSettings(path=self.latency_log_path)
 
@@ -163,3 +206,7 @@ def _require_complete_group(group: str, *values: object) -> None:
     present = [value is not None for value in values]
     if any(present) and not all(present):
         raise IncompleteSettingsError(f"Incomplete {group} settings: set all of them or none")
+
+
+def _comma_separated(value: str) -> tuple[str, ...]:
+    return tuple(item.strip() for item in value.split(",") if item.strip())

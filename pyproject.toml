@@ -23,6 +23,8 @@ dependencies = [
     "pydantic-settings>=2.16",
     "python-multipart>=0.0.32",
     "uvicorn[standard]>=0.54",
+    # Rate limiting of the call entries (exact pin: security relevant).
+    "limits==5.8.0",
 ]
 
 [project.scripts]
@@ -34,9 +36,13 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "bandit==1.9.4",
     "mypy>=2.4",
+    "pip-audit==2.10.1",
+    "pre-commit==4.6.2",
     "pytest>=9.1",
     "pytest-asyncio>=1.4",
+    "pytest-cov==7.1.0",
     "ruff>=0.17",
 ]
 
@@ -69,3 +75,16 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+branch = true
+source = ["voice_call_agent"]
+
+[tool.coverage.report]
+# Constitution §15. Raise it when the dialog lands (phase 2); never lower it to make a change pass.
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.bandit]
+exclude_dirs = [".venv", "tests"]

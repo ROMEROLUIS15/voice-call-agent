@@ -6,7 +6,13 @@ __pycache__/
 .ruff_cache/
 dist/
 
-# Secretos y datos de llamadas
+# Secrets and call data
 .env
 var/
 *.wav
+
+# Coverage data
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml

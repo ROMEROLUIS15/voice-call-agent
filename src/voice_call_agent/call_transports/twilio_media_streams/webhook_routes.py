@@ -8,6 +8,7 @@ from loguru import logger
 
 from voice_call_agent.call_session.session_builders import build_twilio_session
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
+from voice_call_agent.call_transports.replay_guard import ReplayGuard
 from voice_call_agent.call_transports.twilio_media_streams.call_termination import (
     CallTerminator,
 )
@@ -31,6 +32,7 @@ from voice_call_agent.call_transports.twilio_media_streams.stream_handshake impo
 from voice_call_agent.call_transports.twilio_media_streams.twiml_responses import (
     connect_stream_twiml,
     reject_busy_twiml,
+    reject_call_twiml,
 )
 from voice_call_agent.settings.sections import TwilioMediaStreamsSettings
 from voice_call_agent.speech_pipeline.conversation_runner import ConversationRunner
@@ -38,6 +40,8 @@ from voice_call_agent.speech_pipeline.conversation_runner import ConversationRun
 INCOMING_CALL_PATH = "/twilio/voice"
 MEDIA_STREAM_PATH = "/twilio/stream"
 _TRY_AGAIN_LATER = 1013
+# Twilio sends it on every webhook; a retry of the same delivery repeats it.
+_DELIVERY_ID_HEADER = "I-Twilio-Idempotency-Token"
 
 
 def build_twilio_router(
@@ -45,10 +49,11 @@ def build_twilio_router(
     supervisor: CallSupervisor,
     conversation_runner: ConversationRunner,
     call_terminator: CallTerminator,
+    replay_guard: ReplayGuard,
 ) -> APIRouter:
     """Router of the phone-line entry."""
     endpoints = TwilioMediaStreamsEndpoints(
-        settings, supervisor, conversation_runner, call_terminator
+        settings, supervisor, conversation_runner, call_terminator, replay_guard
     )
     router = APIRouter()
     router.add_api_route(INCOMING_CALL_PATH, endpoints.answer_incoming_call, methods=["POST"])
@@ -65,8 +70,10 @@ class TwilioMediaStreamsEndpoints:
         supervisor: CallSupervisor,
         conversation_runner: ConversationRunner,
         call_terminator: CallTerminator,
+        replay_guard: ReplayGuard,
     ) -> None:
         self._settings = settings
+        self._replay_guard = replay_guard
         self._supervisor = supervisor
         self._conversation_runner = conversation_runner
         self._call_terminator = call_terminator
@@ -87,6 +94,11 @@ class TwilioMediaStreamsEndpoints:
         call_sid = params.get("CallSid")
         if not call_sid:
             return Response(status_code=status.HTTP_400_BAD_REQUEST)
+        delivery_id = request.headers.get(_DELIVERY_ID_HEADER) or call_sid
+        if not await self._replay_guard.first_seen(f"twilio-voice:{delivery_id}"):
+            # Fail closed: a repeated delivery never gets a fresh stream admission token.
+            logger.bind(call_id=call_sid).warning("repeated Twilio webhook delivery rejected")
+            return Response(content=reject_call_twiml(), media_type="application/xml")
         if not self._supervisor.can_accept_call():
             logger.bind(call_id=call_sid).warning("instance full; rejecting call as busy")
             return Response(content=reject_busy_twiml(), media_type="application/xml")
@@ -104,7 +116,10 @@ class TwilioMediaStreamsEndpoints:
         """Run the call over its Media Stream once it is admitted and a call slot is held."""
         await websocket.accept()
         start = await _admit_stream(
-            websocket, self._token_key, self._settings.handshake_timeout_seconds
+            websocket,
+            self._token_key,
+            self._settings.handshake_timeout_seconds,
+            self._replay_guard,
         )
         if start is None:
             return
@@ -125,9 +140,16 @@ class TwilioMediaStreamsEndpoints:
 
 
 async def _admit_stream(
-    websocket: WebSocket, token_key: bytes, handshake_timeout_seconds: float
+    websocket: WebSocket,
+    token_key: bytes,
+    handshake_timeout_seconds: float,
+    replay_guard: ReplayGuard,
 ) -> StreamStartEvent | None:
-    """The stream's `start` event if its admission token is valid; otherwise close the socket."""
+    """The stream's `start` event if it is admitted; otherwise the socket is closed.
+
+    Admitted means a valid admission token and the first stream of that call: a token replayed
+    within its validity cannot open a second conversation.
+    """
     try:
         start = await read_stream_start(websocket, handshake_timeout_seconds)
     except StreamHandshakeError as error:
@@ -137,6 +159,12 @@ async def _admit_stream(
     token = start.custom_parameters.get("token")
     if not verify_stream_token(token_key, start.call_sid, token, time.time()):
         logger.bind(call_id=start.call_sid).warning("Media Stream with an invalid admission token")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return None
+    if not await replay_guard.first_seen(f"twilio-stream:{start.call_sid}"):
+        logger.bind(call_id=start.call_sid).warning(
+            "second Media Stream for the same call rejected"
+        )
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return None
     return start

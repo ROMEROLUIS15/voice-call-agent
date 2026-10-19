@@ -5,8 +5,10 @@ import socket
 from types import FrameType
 
 import uvicorn
+from starlette.types import ASGIApp
 
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
+from voice_call_agent.settings.sections import HttpHardeningSettings, ServerSettings
 
 
 class GracefulHttpServer(uvicorn.Server):
@@ -49,3 +51,19 @@ class GracefulHttpServer(uvicorn.Server):
             await self._supervisor.drain(self._grace_seconds)
         finally:
             self.should_exit = True
+
+
+def server_config(
+    app: ASGIApp, server: ServerSettings, http: HttpHardeningSettings
+) -> uvicorn.Config:
+    """uvicorn settings of the service, hardened (constitution §15)."""
+    return uvicorn.Config(
+        app,
+        host=server.host,
+        port=server.port,
+        log_config=None,  # uvicorn's records go through the single structured sink.
+        server_header=False,  # Never announce the stack.
+        proxy_headers=True,
+        forwarded_allow_ips=http.trusted_proxy_addresses,  # X-Forwarded-* from these only.
+        ws_max_size=http.max_websocket_message_bytes,
+    )

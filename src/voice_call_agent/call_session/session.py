@@ -14,6 +14,10 @@ class CallChannel(StrEnum):
     TWILIO = "twilio"
 
 
+class TenantAlreadyResolvedError(Exception):
+    """The call's business was already resolved and cannot change (INV-1)."""
+
+
 class CallSession(BaseModel):
     """An in-progress call, neutral to its channel (INV-8)."""
 
@@ -33,6 +37,16 @@ class CallSession(BaseModel):
     def identity_verified(self) -> bool:
         """Meta verifies the WhatsApp number; a phone caller ID can be spoofed (INV-4)."""
         return self.channel is CallChannel.WHATSAPP
+
+    def resolve_business(self, business_id: str) -> "CallSession":
+        """The session with its business, resolved by the backend at the start of the call.
+
+        The business never comes from what the caller says or what the LLM proposes, and once
+        set it cannot change (INV-1).
+        """
+        if self.business_id is not None and self.business_id != business_id:
+            raise TenantAlreadyResolvedError(f"call {self.call_id} already has its business")
+        return self.model_copy(update={"business_id": business_id})
 
     def trace_context(self) -> CallTraceContext:
         """Labels of the call for traces, logs and metrics."""

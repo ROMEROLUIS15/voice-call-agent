@@ -14,7 +14,9 @@ from pydantic import BaseModel, ConfigDict
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    # `extra="forbid"`: a tenant field smuggled into a request (by the LLM's tool arguments,
+    # for instance) fails validation instead of being silently carried.
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
 
 class ServiceOffering(_Model):
@@ -68,7 +70,13 @@ class ClosedDay(_Model):
     kind: Literal["closed_day"] = "closed_day"
 
 
-AvailabilityResult = AvailableSlots | ClosedDay
+class InvalidAvailabilityRequest(_Model):
+    """`INVALID_ARGS`: for instance, a service that is not in the call's business catalog."""
+
+    kind: Literal["invalid_request"] = "invalid_request"
+
+
+AvailabilityResult = AvailableSlots | ClosedDay | InvalidAvailabilityRequest
 
 
 class Appointment(_Model):

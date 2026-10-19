@@ -6,8 +6,8 @@ Real-time voice agent that answers calls over **WhatsApp** (Cloud API Calling, W
 
 Before touching code: [`CLAUDE.md`](CLAUDE.md), [constitution](docs/specs/constitution.md),
 [manifest](docs/specs/call-module/manifest.md),
-[Cronix contract](docs/specs/cronix-phone-api-contract.md) and
-[architecture decisions](docs/adr/README.md).
+[Cronix contract](docs/specs/cronix-phone-api-contract.md),
+[architecture decisions](docs/adr/README.md) and [threat model](docs/security/threat-model.md).
 
 **Status: phase 0** (technical test, without Cronix). The agent talks in Spanish and measures
 latency per segment and per channel; it does not book yet.
@@ -16,7 +16,8 @@ latency per segment and per channel; it does not book yet.
 
 ```bash
 uv sync
-cp .env.example .env         # fill in the keys
+uv run pre-commit install    # ruff and gitleaks on every commit
+cp .env.example .env         # fill in the keys; ENVIRONMENT=development enables /docs locally
 uv run voice-call-agent      # http://127.0.0.1:8000/health/ready
 ```
 
@@ -47,6 +48,14 @@ that URL in `PUBLIC_BASE_URL`.
 *   Logs are structured JSON on stderr (`LOG_FORMAT=text` for development). Keep `LOG_LEVEL` at
     `INFO` or higher in production: Pipecat logs conversation content at `DEBUG`.
 
+## Security
+
+*   Webhook signatures (Twilio, Meta) validated in constant time; repeated or stale events are rejected; one Media Stream per call, behind an admission token.
+*   Rate limits per client address and route on the call entries; request bodies and WebSocket messages limited to 64 KiB.
+*   Security headers on every response, no `Server` header, CORS closed, trusted hosts only, no API documentation in production, error responses that reveal nothing.
+*   Behind a proxy, set `TRUSTED_PROXY_ADDRESSES` and `ALLOWED_HOSTS`; with several instances, a shared `RATE_LIMIT_STORAGE_URI`.
+*   Details, threats and accepted risks: [threat model](docs/security/threat-model.md).
+
 ## Latency
 
 Each call appends a line to `var/latency.jsonl` (STT, LLM, TTS and total segments per turn, plus
@@ -58,8 +67,10 @@ uv run python -m voice_call_agent.observability.latency_budget_report var/latenc
 
 ## Quality gate
 
+The same hooks run locally and in CI (ADR 0008):
+
 ```bash
-uv run ruff check . && uv run ruff format --check .
-uv run mypy          # strict
-uv run pytest        # unit, integration and architecture tests
+uv run pre-commit run --all-files --hook-stage manual
+# ruff check · ruff format --check · mypy --strict · pytest --cov (≥ 85 %)
+# bandit · pip-audit · gitleaks over the whole history
 ```

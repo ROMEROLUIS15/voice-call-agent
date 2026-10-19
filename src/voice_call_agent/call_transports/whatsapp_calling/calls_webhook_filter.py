@@ -4,6 +4,7 @@ from loguru import logger
 from pipecat.transports.whatsapp.api import (
     WhatsAppConnectCall,
     WhatsAppConnectCallValue,
+    WhatsAppTerminateCallValue,
     WhatsAppWebhookRequest,
 )
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -16,6 +17,8 @@ class CallEvents(BaseModel):
 
     webhook: WhatsAppWebhookRequest
     connect_calls: list[WhatsAppConnectCall]
+    event_ids: list[str]
+    """`{call id}:{event}` of every call event in the webhook, for replay detection."""
 
 
 class _Change(BaseModel):
@@ -52,7 +55,9 @@ def extract_call_events(raw_body: bytes) -> CallEvents | None:
     except ValidationError:
         logger.info("`calls` event without connect/terminate; ignored")
         return None
-    return CallEvents(webhook=webhook, connect_calls=_connect_calls(webhook))
+    return CallEvents(
+        webhook=webhook, connect_calls=_connect_calls(webhook), event_ids=_event_ids(webhook)
+    )
 
 
 def _connect_calls(webhook: WhatsAppWebhookRequest) -> list[WhatsAppConnectCall]:
@@ -64,3 +69,12 @@ def _connect_calls(webhook: WhatsAppWebhookRequest) -> list[WhatsAppConnectCall]
         for call in change.value.calls
         if call.event == "connect"
     ]
+
+
+def _event_ids(webhook: WhatsAppWebhookRequest) -> list[str]:
+    ids = []
+    for entry in webhook.entry:
+        for change in entry.changes:
+            if isinstance(change.value, WhatsAppConnectCallValue | WhatsAppTerminateCallValue):
+                ids += [f"{call.id}:{call.event}" for call in change.value.calls]
+    return ids

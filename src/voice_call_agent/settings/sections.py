@@ -95,3 +95,41 @@ class LogSettings(_Section):
 
     level: str
     output_format: LogFormat
+
+
+class DeploymentEnvironment(StrEnum):
+    """Where the service runs. Production is the default: secure unless told otherwise."""
+
+    PRODUCTION = "production"
+    DEVELOPMENT = "development"
+
+
+class HttpHardeningSettings(_Section):
+    """HTTP surface of the service (constitution §15)."""
+
+    environment: DeploymentEnvironment
+    allowed_hosts: tuple[str, ...]
+    """`Host` values the service answers to; anything else gets `400`."""
+    trusted_proxy_addresses: str
+    """Proxies whose `X-Forwarded-*` headers are trusted (uvicorn `forwarded_allow_ips`)."""
+    cors_allowed_origins: tuple[str, ...]
+    """Empty: CORS stays closed. Never `*`."""
+    max_request_body_bytes: int = Field(gt=0)
+    max_websocket_message_bytes: int = Field(gt=0)
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment is DeploymentEnvironment.PRODUCTION
+
+
+class WebhookProtectionSettings(_Section):
+    """Rate limiting and replay protection of the call entries."""
+
+    rate_limit: str
+    """Per client address and route, in `limits` syntax (`60/minute`)."""
+    rate_limit_storage_uri: str
+    """`async+memory://` per instance; a shared store (`async+redis://…`) for several instances."""
+    replay_window_seconds: float = Field(gt=0)
+    """How long an event id is remembered to reject repeats."""
+    connect_event_max_age_seconds: float = Field(gt=0)
+    """Older WhatsApp `connect` events are dropped: Meta allows ~30-60 s to accept a call."""
