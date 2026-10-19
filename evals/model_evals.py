@@ -1,4 +1,4 @@
-"""Model evals against the baseline (`docs/evals/golden-dataset.md`, ADR 0010).
+"""Model evals against the baseline (`docs/evals/golden-dataset.md`, ADR 0013).
 
     uv run --env-file .env --group evals python -m evals.model_evals [options]
 

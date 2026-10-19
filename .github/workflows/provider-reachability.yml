@@ -1,7 +1,7 @@
 name: Provider reachability
 
 # Checks, on demand, that GitHub-hosted runners reach each provider the evals and the service
-# use, with one authenticated read per provider (ADR 0010). Only the HTTP status is printed,
+# use, with one authenticated read per provider (ADR 0013). Only the HTTP status is printed,
 # never a response body. A provider whose secret is absent is skipped with a notice.
 # If a provider is not reachable from GitHub-hosted runners, the maintainers weigh the other
 # options; a self-hosted runner is not one of them (public repository).

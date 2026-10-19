@@ -1,7 +1,7 @@
-id: backend-down-takes-a-message
-title: The backend does not answer; the agent confirms nothing and offers a message (AC-9)
+id: backend-down-confirms-nothing
+title: The backend does not answer; the agent confirms nothing and says so (AC-9)
 source: hand-written
-phase: 4
+phase: 2
 status: pending
 pending_reason: Needs the booking tools and a backend double that times out.
 levels: [conversation, model]
@@ -19,4 +19,4 @@ expected:
   outcome: info_only
   identity_verified: true
   quality: [invents-nothing]
-tags: [robustness, ac-9, inv-5]
+tags: [booking, ac-9, inv-5, security]
