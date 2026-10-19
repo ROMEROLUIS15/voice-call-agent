@@ -11,7 +11,8 @@ Before touching code: [`CLAUDE.md`](CLAUDE.md), [constitution](docs/specs/consti
 [golden dataset](docs/evals/golden-dataset.md).
 
 **Status: phase 0** (technical test, without Cronix). The agent talks in Spanish and measures
-latency per segment and per channel; it does not book yet.
+latency per segment and per channel; it does not book yet. v1 books appointments; checking,
+rescheduling and cancelling follow in v1.1 (manifest §2).
 
 ## Getting started
 
@@ -81,19 +82,21 @@ uv run pytest tests/evals tests/snapshots                         # reference co
 uv run --env-file .env --group evals python -m evals.model_evals  # real model + judge vs the baseline
 ```
 
-A change to the prompt, phrases, model or scoring changes the behaviour fingerprint: run the model
-evals with `--write-baseline` to store the new baseline. Details: [golden dataset](docs/evals/golden-dataset.md).
+A change to the prompt, phrases, model or scoring changes the behaviour fingerprint. The first
+baseline is measured with the booking prompt of phase 2 (ADR 0013): until then `--record-fingerprint`
+records the new inputs; from then on `--write-baseline` stores new measurements. Details:
+[golden dataset](docs/evals/golden-dataset.md).
 
 ## Quality gate
 
-The same hooks run locally and in CI (ADR 0008):
+The same hooks run locally and in CI; `.pre-commit-config.yaml` is their only list (ADR 0008):
 
 ```bash
 uv run pre-commit run --all-files --hook-stage manual
-# ruff check · ruff format --check · mypy --strict · pytest --cov (≥ 85 %)
-# bandit · pip-audit · gitleaks over the whole history
 ```
 
+Changes reach `main` through pull requests; CI's jobs are required checks (ADR 0012).
 `.github/workflows/evals.yml` runs the model evals when what shapes the agent's replies changes
-(skipped without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets);
-`.github/workflows/provider-reachability.yml` checks on demand that the runners reach every provider.
+(skipped without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets); its check is not required, but a
+pull request is not merged with it failing. `.github/workflows/provider-reachability.yml` checks
+on demand that the runners reach every provider.
