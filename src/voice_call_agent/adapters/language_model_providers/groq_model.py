@@ -49,7 +49,12 @@ def groq_model_factory(settings: LanguageModelSettings) -> Callable[[str], AISer
     def create(system_prompt: str) -> AIService:
         model_settings = GroqLLMSettings(system_instruction=system_prompt)
         if settings.model:
+            # Groq's default effort for another model: non-reasoning models reject the parameter.
             model_settings.model = settings.model
+        else:
+            # The default model thinks before its first token; low effort keeps that first token
+            # within the latency budget (manifest §7).
+            model_settings.reasoning_effort = "low"
         return TimeBoundGroqLLMService(
             api_key=api_key,
             settings=model_settings,

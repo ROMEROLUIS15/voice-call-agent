@@ -155,7 +155,7 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 | Provider SDKs | Pinned exactly: `deepgram-sdk==7.13.0`, `groq==1.7.0`, `google-genai==2.31.0`, `openai==3.35.1`, `twilio==9.12.0` | The ecosystem changes every few weeks; `uv.lock` is committed. |
 | Server | FastAPI + uvicorn in a container, behind `GracefulHttpServer` | Persistent connection per call; drains calls on shutdown. |
 | STT | Deepgram Flux **`flux-general-multi` with `language_hint=es`** (built-in turn detection) | Already used in Cronix. `flux-general-en` only understands English and rejects `language_hint`. **Validate quality on 8 kHz phone audio.** |
-| LLM | Chosen by measuring in phase 0 (Groq, Gemini or OpenAI); `LLM_PROVIDER` / `LLM_MODEL` | Swappable (`adapters/language_model_providers/`). |
+| LLM | Groq `openai/gpt-oss-120b` with reasoning effort `low`, chosen by measuring in phase 0; `LLM_PROVIDER` / `LLM_MODEL` | The only configuration measured within §6: first token in p50 375 ms, p95 571 ms (Groq's default effort: 544 / 976 ms; DeepSeek `deepseek-flash`: 776 / 937 ms, with longer answers and personal data stored in China under its privacy policy). Measured results in `README.md`. Swappable (`adapters/language_model_providers/`). |
 | TTS | Deepgram Aura-2 in Spanish over WebSocket; `aura-2-selena-es` (Latin American) by default | Already known; alternatives Cartesia or ElevenLabs. Flux TTS (`/v2/speak`) is left out for now: Spanish voices were not verified (Pipecat's examples only use `-en` voices). |
 | Testing | pytest, pytest-asyncio, strict mypy, reference conversations, syrupy snapshots | Constitution §7. |
 | Error tracking and traces | Sentry (`sentry-sdk==2.71.0`), project `voice-call-agent` | ADR 0009. |
@@ -205,6 +205,7 @@ Registered on 2026-10-19; what each item solves and how it applies here is in [`
 *   **Meta's requirement for calls.** The Cloud API Calling documentation requires a messaging limit of at least 2,000 daily recipients; test accounts and public test numbers are exempt. Cronix does not reach that level today. **Plan:** in phase 0, test with a Meta test number; if the real number cannot enable "Calls", the phone entry (Twilio) is the main path until the level rises.
 *   **Meta test numbers:** they last 90 days and have restrictions on contacting some countries; verify in phase 0 that a call started from outside the US arrives.
 *   **Testing the Twilio number from outside the US:** it is a US number, so test calls from abroad need an international call or a VoIP app. To serve callers in Venezuela, Twilio offers Venezuelan numbers (+58 800 with a letter of authorization; local ones with documents and a local address), with paperwork.
+*   **Groq rejects some networks** (phase 0 finding, 2026-10-19): it answers `403` to VPN exits and to IP ranges it flags (sanctioned countries, some cloud regions, according to its staff on Groq's community forum). GitHub-hosted runners reach it (`provider-reachability.yml`); the server's host and region are checked the same way before deploying, and the provider fallback of phase 4 covers a block in production.
 *   **8 kHz audio** on the phone line: measure how names, numbers, national ID numbers and fillers are transcribed (§9.1, phase 0).
 *   **Edge Function cold start:** preload the business context at the start if it breaks the budget.
 *   **Costs:** record the real cost per call and per channel from phase 0.
@@ -284,8 +285,10 @@ Observability and quality (stage 1):
 | First token → first audio | `sentence_aggregation`, `speech_synthesis`, `output_transport` |
 | Other (no owner) | the rest, e.g. `pipeline` |
 
-**Pending to close phase 0** (needs accounts and real calls): Twilio number and Meta test app/number configured; 20 measured calls per channel; choose the LLM and the TTS voice with that data; cost per minute per channel; verify whether the real Cronix number can enable *Calling* and how it coexists with the message webhook (§10); verify the multi-instance `terminate` risk (§10).
+**Pending to close phase 0** (needs accounts and real calls): Twilio number and Meta test app/number configured; 20 measured calls per channel; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute per channel; verify whether the real Cronix number can enable *Calling* and how it coexists with the message webhook (§10); verify the multi-instance `terminate` risk (§10).
 
 **Changed (2026-10-19), balance between the agent and the code:** v1 narrowed to booking (§2); writes validated by code and confirmed by the caller, with the yes judged by the model (INV-2, INV-3, ADR 0011), without mention guards nor a call state machine; `dialog_state/` removed and `intent_understanding/` renamed `agent_tools/`; AC-9 without a message; on the phone line no name and no appointments without the second factor (INV-4); changes reach `main` through pull requests (ADR 0012); the evals fingerprint covers only what the model evals exercise, and the first baseline waits for the booking prompt (ADR 0013).
+
+**Measured (2026-10-19), language model:** time to the first token of Groq `openai/gpt-oss-120b` (default and low reasoning effort) and DeepSeek `deepseek-flash` from a GitHub-hosted runner; low effort is the only configuration within §6 and is now the default (§7, `README.md` "Measured results").
 
 **Next:** phase 0's **first real call, measured per segment**. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).

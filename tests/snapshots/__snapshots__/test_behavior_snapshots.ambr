@@ -31,7 +31,7 @@
     'model': 'openai/gpt-oss-120b',
     'presence_penalty': 'NOT_GIVEN',
     'provider': 'groq',
-    'reasoning_effort': 'None',
+    'reasoning_effort': 'low',
     'request_timeout_seconds': '10.0',
     'seed': 'NOT_GIVEN',
     'temperature': 'NOT_GIVEN',

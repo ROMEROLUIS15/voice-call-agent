@@ -9,7 +9,7 @@ This document starts with work registered on 2026-10-19 and not implemented yet.
 | Practice | What it solves | How it applies here | Status |
 |---|---|---|---|
 | Speech-to-text measured on real phone audio | Flux's accuracy on 8 kHz phone audio is unknown for exactly what the agent must get right before it writes anything | Calls from test speakers on both channels, recorded with their consent and kept outside the repository with a stated retention. Measure exact-match accuracy on person names, numbers (dates, times, phone numbers), national ID numbers, and how filler words are transcribed or dropped. The results decide whether the Twilio audio is resampled to 16 kHz (manifest §10) | Pending |
-| Measured results in the README | Claims about latency, quality, cost and capacity need numbers anyone can check | A "Measured results" section in `README.md`: latency p50/p95 per segment and channel, success on the golden dataset, cost per call, capacity per instance. Each figure states its date and what it was measured with (commit, prompt version, model); a figure not measured yet says so. Updated with every measurement, starting with the first real calls | Pending |
+| Measured results in the README | Claims about latency, quality, cost and capacity need numbers anyone can check | A "Measured results" section in `README.md`: latency p50/p95 per segment and channel, success on the golden dataset, cost per call, capacity per instance. Each figure states its date and what it was measured with (commit, prompt version, model); a figure not measured yet says so. Updated with every measurement, starting with the first real calls | Partial: the section exists with the language model latency (2026-10-19) |
 
 ## Phase 2 · Booking
 
