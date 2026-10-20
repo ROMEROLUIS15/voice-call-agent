@@ -87,6 +87,19 @@ baseline is measured with the booking prompt of phase 2 (ADR 0013): until then `
 records the new inputs; from then on `--write-baseline` stores new measurements. Details:
 [golden dataset](docs/evals/golden-dataset.md).
 
+## Measured results
+
+Each figure states its date and what it was measured with; what is not measured yet says so.
+
+| What | Result | Measured with |
+|---|---|---|
+| Language model, time to the first token (API only; on a call the segment of manifest §6 also includes turn detection) | Groq `openai/gpt-oss-120b` with reasoning effort `low`: p50 375 ms, p95 571 ms. With Groq's default effort: 544 / 976 ms. DeepSeek `deepseek-flash`, thinking off: 776 / 937 ms | 2026-10-19; 20 streamed answers per configuration to five caller turns with fictitious data; conversation content `es-c3d0810115bd`; from a GitHub-hosted runner (pull request #3, closed without merging) |
+| Latency per segment and channel on real calls | Not measured yet | |
+| Speech-to-text on phone audio | Not measured yet | |
+| Golden dataset success | Not measured yet: the first baseline uses the booking prompt (ADR 0013) | |
+| Cost per call | Not measured yet; every call trace carries its estimate | |
+| Capacity per instance | Not measured yet (phase 4) | |
+
 ## Quality gate
 
 The same hooks run locally and in CI; `.pre-commit-config.yaml` is their only list (ADR 0008):

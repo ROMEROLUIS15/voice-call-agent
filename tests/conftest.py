@@ -15,6 +15,8 @@ def _isolated_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Tests never read the `.env` file or the machine's variables."""
     for name in ServiceSettings.model_fields:
         monkeypatch.delenv(name.upper(), raising=False)
+    # Even `model_validate` reads the `.env` file of the working directory.
+    monkeypatch.setitem(ServiceSettings.model_config, "env_file", None)
     yield
 
 

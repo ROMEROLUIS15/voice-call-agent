@@ -23,5 +23,6 @@ def make_service_settings(**overrides: object) -> ServiceSettings:
         "allowed_hosts": "testserver",
     }
     values.update(overrides)
-    # `model_validate` skips the environment and `.env` sources: only these values count.
+    # The autouse `_isolated_environment` fixture keeps the machine's variables and the `.env`
+    # file out: only these values count.
     return ServiceSettings.model_validate(values)
