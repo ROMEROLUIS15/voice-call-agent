@@ -1,8 +1,20 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from tests.settings_factory import make_service_settings
 from voice_call_agent.settings.sections import LanguageModelProvider, LogFormat
+
+
+def test_a_local_env_file_does_not_reach_the_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text("ENVIRONMENT=development\nLOG_FORMAT=text\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    settings = make_service_settings()
+    assert settings.http_hardening().is_production
+    assert settings.log_format is LogFormat.JSON
 
 
 def test_complete_settings_enable_both_entries() -> None:
