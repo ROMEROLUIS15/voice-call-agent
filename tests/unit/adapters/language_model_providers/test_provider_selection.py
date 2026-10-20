@@ -2,7 +2,7 @@ from typing import cast
 
 import pytest
 from pipecat.services.google.llm import GoogleLLMService
-from pipecat.services.groq.llm import GroqLLMService
+from pipecat.services.groq.llm import GroqLLMService, GroqLLMSettings
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.settings import LLMSettings
 from pydantic import SecretStr
@@ -55,6 +55,16 @@ def test_google_client_has_an_explicit_timeout() -> None:
 def test_explicit_model_overrides_the_default() -> None:
     service = language_model_factory(_settings(LanguageModelProvider.GROQ, "test-model"))("p")
     assert cast(LLMSettings, service._settings).model == "test-model"
+
+
+def test_default_groq_model_reasons_with_low_effort() -> None:
+    service = language_model_factory(_settings(LanguageModelProvider.GROQ))("p")
+    assert cast(GroqLLMSettings, service._settings).reasoning_effort == "low"
+
+
+def test_another_groq_model_keeps_groqs_default_effort() -> None:
+    service = language_model_factory(_settings(LanguageModelProvider.GROQ, "test-model"))("p")
+    assert cast(GroqLLMSettings, service._settings).reasoning_effort is None  # Not sent.
 
 
 def test_selection_resolves_the_default_model_for_traces() -> None:
