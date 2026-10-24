@@ -29,7 +29,10 @@ that URL in `PUBLIC_BASE_URL`.
 
 ### Phone-line entry (Twilio)
 
-1. Get a Venezuelan number with voice (manifest §10).
+One Venezuelan number serves every business: the agent asks which business the caller wants
+(ADR 0014).
+
+1. Get the Venezuelan number with voice (manifest §10).
 2. On the number, *A call comes in* → Webhook `POST {PUBLIC_BASE_URL}/twilio/voice`.
 3. Call it. The webhook validates `X-Twilio-Signature`, answers `<Connect><Stream>` with an
    admission token and the audio arrives over `wss://…/twilio/stream`.

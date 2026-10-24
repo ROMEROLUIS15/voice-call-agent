@@ -1,10 +1,10 @@
 {
-  "fingerprint": "32d6a1a69c1ca737",
+  "fingerprint": "9719fbf763318dd1",
   "inputs": {
     "conversation_content": "es-c3d0810115bd",
     "language_model": "groq openai/gpt-oss-120b",
     "generation_settings": "830ed76e7584e77a",
-    "golden_dataset": "00f63ba79c83",
+    "golden_dataset": "1a79ab6dfad1",
     "scoring": "657d494f3125e1d1",
     "judge_model": "gemini-3.6-flash"
   },
