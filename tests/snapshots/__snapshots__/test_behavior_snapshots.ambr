@@ -437,7 +437,7 @@
   dict({
     '$defs': dict({
       'BusinessChoiceNeeded': dict({
-        'description': 'WhatsApp only: no session or client record decides; the agent asks for the business.',
+        'description': 'The agent asks for the business: every phone-line call, and WhatsApp when routing cannot.',
         'properties': dict({
           'kind': dict({
             'const': 'choice_needed',
@@ -589,7 +589,7 @@
         'type': 'object',
       }),
       'UnknownLine': dict({
-        'description': 'Phone line only: the dialed number belongs to no business. Fixed message and hang up.',
+        'description': 'Phone line only: the dialed number is not a service line. Fixed message and hang up.',
         'properties': dict({
           'kind': dict({
             'const': 'unknown_line',
