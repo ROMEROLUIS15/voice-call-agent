@@ -23,8 +23,8 @@ Non-negotiable rules for all code in this repository, a real-time Python voice s
 
 ## 3. Multi-tenant
 
-*   The business is resolved by **the scheduling backend**, never by the LLM. One number serves every business on each entry (ADR 0014 for the phone line). On WhatsApp the existing routing (session or the client's phone) decides first; on the phone line, and on WhatsApp when routing is not enough, the business comes from the name the caller says, matched and confirmed by the backend. The phone line's caller ID never picks or suggests a business.
-*   If it cannot be resolved safely, **the tenant is not guessed**: a call to a number that is not a line of the service ends with a fixed message; otherwise the agent asks.
+*   The business is resolved by **the scheduling backend**, never by the LLM: on the phone line by the dialed number; on WhatsApp by the existing routing (session or the client's phone) and, when that is not enough, by the name the caller says, matched and confirmed by the backend.
+*   If it cannot be resolved safely, **the tenant is not guessed**: on the phone line the call ends with a fixed message; on WhatsApp the agent asks.
 *   The call's channel (WhatsApp or Twilio) exists only in `call_transports/` and `call_session/`. The rest of the code works with a neutral `CallSession`.
 *   Every request to the backend carries the `business_id` resolved at the start of the call; the backend validates it again on its side (defense in depth).
 
