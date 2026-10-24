@@ -15,7 +15,7 @@ There are **two entries** to one voice engine:
 | Caller identity | **Verified by Meta** | Caller ID **not verified** |
 | Business resolution | Routing by session / client phone; if not possible, the agent asks (§4.1) | Dialed number |
 | Transport | WebRTC (Cloud API Calling) | Twilio Media Streams (μ-law 8 kHz) |
-| What it is for | Real clients in Venezuela, free for them | Calls to a traditional phone number (PSTN), with US and other countries' numbers |
+| What it is for | Real clients in Venezuela, free for them. **Paused** until Meta enables *Calling* on the number (§10) | Calls to a traditional phone number (PSTN) with Venezuelan numbers. **The main path** while the WhatsApp entry is paused |
 
 **Difference with Cronix's existing channels:**
 
@@ -149,8 +149,8 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 
 | Layer | Choice | Reason |
 |---|---|---|
-| WhatsApp entry | WhatsApp Cloud API Calling + Pipecat's WebRTC transport | Uses the number Cronix already has; free for the caller. |
-| Phone entry | Twilio Programmable Voice + Media Streams | Native connector in Pipecat; US numbers. |
+| WhatsApp entry | WhatsApp Cloud API Calling + Pipecat's WebRTC transport | Uses the number Cronix already has; free for the caller. Paused (§10). |
+| Phone entry | Twilio Programmable Voice + Media Streams | Native connector in Pipecat; Venezuelan numbers (§10). |
 | Orchestration | Pipecat (Python), self-hosted. **`pipecat-ai==1.14.0`, pinned exactly** (API: `PipelineWorker` + `WorkerRunner`; `PipelineTask`/`PipelineRunner` are deprecated since 1.3) | Both call transports, Flux turn detection and latency metrics built in (ADR 0002). |
 | Provider SDKs | Pinned exactly: `deepgram-sdk==7.13.0`, `groq==1.7.0`, `google-genai==2.31.0`, `openai==3.35.1`, `twilio==9.12.0` | The ecosystem changes every few weeks; `uv.lock` is committed. |
 | Server | FastAPI + uvicorn in a container, behind `GracefulHttpServer` | Persistent connection per call; drains calls on shutdown. |
@@ -174,14 +174,14 @@ v1 is accepted with AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10 and AC-11, plus AC
 *   **AC-7 · Identity on the phone line (v1.1).** Cancelling from Twilio without the correct name and date does **not** cancel; a message is taken. Without the second factor no appointment is read either. On WhatsApp it is not required.
 *   **AC-8 · Interruption.** The agent goes silent in less than 300 ms when the caller interrupts. *To be refined in phase 4 with the false-interruption filter: silent in under 300 ms on a real interruption, and keeps speaking through coughs, noise and fillers.*
 *   **AC-9 · Backend down.** The agent confirms nothing, says so and suggests calling back or writing over WhatsApp. It takes no message: the message would be stored in the backend that is down.
-*   **AC-10 · Latency.** 20 real calls per channel meet §6.
+*   **AC-10 · Latency.** 20 real calls per channel meet §6. *Over WhatsApp, once Meta enables Calling on the real number.*
 *   **AC-11 · Safe retry.** The same idempotency key does not create a second appointment.
 
 ## 9. Phases
 
 | Phase | Deliverable | Done when |
 |---|---|---|
-| 0 · Technical test | Pipecat conversing through **both entries**, without Cronix | It is known whether the Cronix number can receive WhatsApp calls (§10); latency measured per segment and channel; LLM and TTS chosen |
+| 0 · Technical test | Pipecat conversing through **both entries**, without Cronix | It is known whether the Cronix number can receive WhatsApp calls (§10: not yet, the entry is paused); latency measured per segment on the phone line, and over WhatsApp once it is enabled; LLM and TTS chosen |
 | 1 · Cronix contract | Edge Function `phone-agent-api` with reads and tests; `adapters/cronix_scheduling_api/` | Reads pass against a local Cronix |
 | 2 · Booking (v1) | Booking with proposals validated by code and confirmed by the caller (ADR 0011) | AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10, AC-11; AC-1 and AC-5 once Meta enables *Calling* on the real number |
 | 3 · v1.1 | Check appointments, reschedule and cancel with identity per channel; take a message | AC-7 |
@@ -202,9 +202,9 @@ Registered on 2026-10-19; what each item solves and how it applies here is in [`
 
 ## 10. Known risks
 
-*   **Meta's requirement for calls.** The Cloud API Calling documentation requires a messaging limit of at least 2,000 daily recipients; test accounts and public test numbers are exempt. Cronix does not reach that level today. **Plan:** in phase 0, test with a Meta test number; if the real number cannot enable "Calls", the phone entry (Twilio) is the main path until the level rises.
-*   **Meta test numbers:** they last 90 days and have restrictions on contacting some countries; verify in phase 0 that a call started from outside the US arrives.
-*   **Testing the Twilio number from outside the US:** it is a US number, so test calls from abroad need an international call or a VoIP app. To serve callers in Venezuela, Twilio offers Venezuelan numbers (+58 800 with a letter of authorization; local ones with documents and a local address), with paperwork.
+*   **Meta's requirement for calls: the WhatsApp entry is paused** (phase 0 finding, 2026-10-20). The Cloud API Calling documentation requires a messaging limit of at least 2,000 daily recipients; test accounts and public test numbers are exempt. The real number's limit is 250, and raising it takes a verified business or sustained template message volume, neither available today. **Decision:** the phone line is the main path. The WhatsApp entry keeps its code and tests and is not configured in deployment: an entry is mounted only when its variable group is complete, so its webhook is not exposed. It resumes when the number's limit reaches 2,000, after a check with a Meta test number; the WhatsApp risks below (test numbers, one webhook callback per Meta app, Meta's `terminate` with several instances) wait until then.
+*   **Meta test numbers:** they last 90 days and have restrictions on contacting some countries; verify that a call started from outside the US arrives.
+*   **Venezuelan numbers for the phone line** (phase 0 decision, 2026-10-20): the phone line uses only Venezuelan numbers, so callers dial a local number and no test depends on an international call. Twilio publishes no voice prices for Venezuela; its regulatory guidelines list +58 800 numbers (with a letter of authorization) and local ones (with documents and a local address). Their availability is checked in the Twilio console. If Twilio has none, a Venezuelan carrier's number delivered to Twilio over SIP is the alternative; `To` and `From` then arrive as SIP URIs, and business resolution by dialed number (§4.1) normalizes them.
 *   **Groq rejects some networks** (phase 0 finding, 2026-10-19): it answers `403` to VPN exits and to IP ranges it flags (sanctioned countries, some cloud regions, according to its staff on Groq's community forum). GitHub-hosted runners reach it (`provider-reachability.yml`); the server's host and region are checked the same way before deploying, and the provider fallback of phase 4 covers a block in production.
 *   **8 kHz audio** on the phone line: measure how names, numbers, national ID numbers and fillers are transcribed (§9.1, phase 0).
 *   **Edge Function cold start:** preload the business context at the start if it breaks the budget.
@@ -285,12 +285,14 @@ Observability and quality (stage 1):
 | First token → first audio | `sentence_aggregation`, `speech_synthesis`, `output_transport` |
 | Other (no owner) | the rest, e.g. `pipeline` |
 
-**Pending to close phase 0** (needs accounts and real calls): Twilio number and Meta test app/number configured; 20 measured calls per channel; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute per channel; verify whether the real Cronix number can enable *Calling* and how it coexists with the message webhook (§10); verify the multi-instance `terminate` risk (§10).
+**Pending to close phase 0** (needs accounts and real calls): a Venezuelan number on the phone line (§10); 20 measured calls on the phone line; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute on the phone line. The WhatsApp entry is paused (§10): its measured calls, how it coexists with the message webhook and the multi-instance `terminate` risk wait until Meta enables *Calling* on the number.
 
 **Changed (2026-10-19), balance between the agent and the code:** v1 narrowed to booking (§2); writes validated by code and confirmed by the caller, with the yes judged by the model (INV-2, INV-3, ADR 0011), without mention guards nor a call state machine; `dialog_state/` removed and `intent_understanding/` renamed `agent_tools/`; AC-9 without a message; on the phone line no name and no appointments without the second factor (INV-4); changes reach `main` through pull requests (ADR 0012); the evals fingerprint covers only what the model evals exercise, and the first baseline waits for the booking prompt (ADR 0013).
 
 **Measured (2026-10-19), language model:** time to the first token of Groq `openai/gpt-oss-120b` (default and low reasoning effort) and DeepSeek `deepseek-flash` from a GitHub-hosted runner; low effort is the only configuration within §6 and is now the default (§7, `README.md` "Measured results").
 
+**Found (2026-10-20), WhatsApp number:** its messaging limit is 250 daily recipients and *Calling* needs 2,000; the WhatsApp entry is paused and the phone line, with Venezuelan numbers, is the main path (§10).
+
 **Changed (2026-10-23), dependencies:** `pipecat-ai` 1.12.0 → 1.14.0, the first release that accepts Pillow 13, which fixes Pillow's advisories (the service decodes no images, but pip-audit blocks them); `certifi` 2026.10.23 drops CA certificates with compromised keys, and `setuptools` 84.2.1 fixes an advisory. Pipecat 1.14 also keeps what the caller said when a Flux connection drops mid-turn (the turn ends with the transcript so far) and masks credentials in its error frames. It adds `use_provider_thinking_default`: with Google as the provider, Pipecat now sends the model's lowest thinking setting (`minimal` for its default `gemini-3.6-flash`); Groq is unaffected, its effort stays explicit (§7). Snapshots regenerated and fingerprint recorded (ADR 0013).
 
-**Next:** phase 0's **first real call, measured per segment**. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).
+**Next:** phase 0's **first real call over the phone line, measured per segment**, once it has a Venezuelan number. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).

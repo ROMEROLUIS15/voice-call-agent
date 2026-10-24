@@ -52,6 +52,8 @@ Living document: every change that touches an attack surface updates it in the s
 | S11 | Error tracking (Sentry) | Outbound error events, call transactions and metrics |
 | S12 | Model evals in CI | Provider secrets in GitHub Actions; golden conversations sent to the model under test and the judge |
 
+S3 and S4 exist only when the WhatsApp variable group is complete. While the WhatsApp entry is paused (manifest §10) it is not configured in deployment, so they are not exposed; their mitigations and tests stay.
+
 ## 4. Threats and mitigations
 
 Status: **M** mitigated and tested · **P** partial · **F** future phase.

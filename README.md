@@ -12,7 +12,8 @@ Before touching code: [`CLAUDE.md`](CLAUDE.md), [constitution](docs/specs/consti
 
 **Status: phase 0** (technical test, without Cronix). The agent talks in Spanish and measures
 latency per segment and per channel; it does not book yet. v1 books appointments; checking,
-rescheduling and cancelling follow in v1.1 (manifest §2).
+rescheduling and cancelling follow in v1.1 (manifest §2). The phone line is the main path: the
+WhatsApp entry is paused until Meta enables *Calling* on the number (manifest §10).
 
 ## Getting started
 
@@ -28,12 +29,16 @@ that URL in `PUBLIC_BASE_URL`.
 
 ### Phone-line entry (Twilio)
 
-1. Buy a test number with voice.
+1. Get a Venezuelan number with voice (manifest §10).
 2. On the number, *A call comes in* → Webhook `POST {PUBLIC_BASE_URL}/twilio/voice`.
 3. Call it. The webhook validates `X-Twilio-Signature`, answers `<Connect><Stream>` with an
    admission token and the audio arrives over `wss://…/twilio/stream`.
 
 ### WhatsApp entry
+
+Paused: Meta enables *Calling* only on numbers with a messaging limit of at least 2,000 daily
+recipients, and the number is below it (manifest §10). With the `WHATSAPP_*` group empty the entry is
+not mounted. To resume it:
 
 1. In the Meta app, webhook `{PUBLIC_BASE_URL}/whatsapp/webhook` with `WHATSAPP_VERIFY_TOKEN`.
 2. Subscribe the **`calls`** field and enable *Calling* on the number (or use a Meta test number).
