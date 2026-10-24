@@ -60,7 +60,7 @@ No task is finished without updating the manifest if a contract, invariant or fl
 
 ## Verified facts that shape the design
 
-*   **WhatsApp Cloud API Calling:** user-initiated calls are available in every country with the Cloud API and are free for the caller. Pipecat supports them with a WebRTC transport (subscribe the webhook to the `calls` field). **Risk:** Meta requires a messaging limit of ≥ 2,000 daily recipients (test accounts and numbers are exempt); Cronix does not reach it today. That is why the Twilio entry exists as a fallback.
+*   **WhatsApp Cloud API Calling:** user-initiated calls are available in every country with the Cloud API and are free for the caller. Pipecat supports them with a WebRTC transport (subscribe the webhook to the `calls` field). **Risk:** Meta requires a messaging limit of ≥ 2,000 daily recipients (test accounts and numbers are exempt); the real number's limit is 250 (2026-10-20), so the WhatsApp entry is paused and the phone line (Twilio, Venezuelan numbers) is the main path (manifest §10).
 *   **Cronix's WhatsApp number is shared by every business** (routing by `#slug`, session or the client's phone). A call has no slug: if the business cannot be resolved, the agent asks for it.
 *   **Identity:** Meta verifies the number on WhatsApp; the phone line's caller ID can be spoofed → reading appointments, rescheduling or cancelling over Twilio requires a second factor, and the caller is greeted by name only on WhatsApp.
 *   **Cronix's booking logic** creates the client if missing and checks conflicts atomically, but reports a conflict as free text; the contract's endpoint translates it to `SLOT_CONFLICT`.
