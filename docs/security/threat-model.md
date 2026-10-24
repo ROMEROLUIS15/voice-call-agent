@@ -52,6 +52,8 @@ Living document: every change that touches an attack surface updates it in the s
 | S11 | Error tracking (Sentry) | Outbound error events, call transactions and metrics |
 | S12 | Model evals in CI | Provider secrets in GitHub Actions; golden conversations sent to the model under test and the judge |
 
+S3 and S4 exist only when the WhatsApp variable group is complete. While the WhatsApp entry is paused (manifest §10) it is not configured in deployment, so they are not exposed; their mitigations and tests stay.
+
 ## 4. Threats and mitigations
 
 Status: **M** mitigated and tested · **P** partial · **F** future phase.
@@ -143,3 +145,4 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-19 | R-01: Redis recorded as the planned shared store for replay and rate-limit state | S1–S3 |
 | 2026-10-19 | Error tracking and call traces (Sentry) as a data destination; model evals in CI with provider secrets; T-22 measured by evals; R-07 | S5, S9, S11, S12 |
 | 2026-10-19 | Balance between the agent and the code: write proposals validated by code and confirmed by the caller (T-19, T-20, T-21, R-08); T-35, what a spoofed caller ID must not reveal; T-36, branch protection of `main`; R-07 until the booking prompt | S1, S5, S7, S10 |
+| 2026-10-20 | WhatsApp entry paused: S3 and S4 not exposed while it is not configured | S3, S4 |
