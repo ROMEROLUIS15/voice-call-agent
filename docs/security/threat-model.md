@@ -91,7 +91,6 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | T-17 | The LLM or the caller injects a business id into a request (S5) | Request models forbid unknown fields; port methods take no tenant argument | `test_a_tenant_proposed_by_the_llm_never_reaches_a_request` | M |
 | T-18 | Spoofed caller ID reschedules or cancels someone's appointment (S1) | Second factor on the phone line (INV-4); otherwise a message is taken | `CallSession.identity_verified` tests | P (phase 3) |
 | T-35 | Spoofed caller ID reveals whose number it is or their appointments (S1, S7) | Without verified identity Cronix sends no client name and reads appointments only with the second factor (constitution §4, contract §4.1 and §4.3); the agent greets by name only on verified calls | `no-personal-data-without-identity-on-the-phone-line` (pending golden case) | F (phases 2–3) |
-| T-37 | On the shared phone line, a spoofed caller ID learns which businesses a number is a client of, or lands in a business the caller did not name (S1, S7) | The caller ID never picks or suggests a business: every phone-line call answers `needs_business_choice`, and the caller names the business, matched by the backend and confirmed (ADR 0014, contract §4.1 and §4.1b) | `unresolved-business-on-the-phone-line` (pending golden case) | F (phases 1–2) |
 | T-19 | Duplicate appointment on retries (S7) | The confirmed proposal id is the idempotency key (contract §5, ADR 0011) | — | F (phases 1–2) |
 | T-20 | A write executes without confirmation (S5) | The code executes only a pending, unchanged proposal of this call, confirmed after a caller turn that followed its read-back (INV-2, ADR 0011); whether that turn was a yes is the model's judgement, measured with margin 0 (R-08) | — | F (phase 2) |
 
@@ -138,8 +137,6 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | R-07 | Until the first measured baseline, a prompt or model change is gated only by re-recording the behaviour fingerprint, not by measured evals | The phase 0 prompt is provisional and cannot write anything; the first baseline is measured with the booking prompt of phase 2 (ADR 0013), and from then on the fingerprint changes only with new measurements | Phase 2, with `GROQ_API_KEY` and `GOOGLE_API_KEY` as repository secrets |
 | R-08 | Whether the caller's answer is a yes is the language model's judgement: an ambiguous answer could be taken as a confirmation | Rules in code that classify the caller's words grow with every case and block legitimate bookings (ADR 0011). The code still requires the same unchanged proposal and a caller turn after its read-back; golden cases measure it with margin 0; the call trace records the answer and the decision | If a trace shows a write the caller did not confirm |
 
-| R-09 | On the shared line, a caller can learn the names of the service's businesses through the name match (`AMBIGUOUS` lists up to 3 candidates) | Business names are public: each business advertises its own. At most 3 names per attempt, under the per-`call_sid` rate limit (contract §2) | If the business list becomes sensitive |
-
 ## 6. Review log
 
 | Date | Change | Surfaces |
@@ -148,5 +145,3 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-19 | R-01: Redis recorded as the planned shared store for replay and rate-limit state | S1–S3 |
 | 2026-10-19 | Error tracking and call traces (Sentry) as a data destination; model evals in CI with provider secrets; T-22 measured by evals; R-07 | S5, S9, S11, S12 |
 | 2026-10-19 | Balance between the agent and the code: write proposals validated by code and confirmed by the caller (T-19, T-20, T-21, R-08); T-35, what a spoofed caller ID must not reveal; T-36, branch protection of `main`; R-07 until the booking prompt | S1, S5, S7, S10 |
-| 2026-10-20 | WhatsApp entry paused: S3 and S4 not exposed while it is not configured | S3, S4 |
-| 2026-10-24 | One phone number shared by every business (ADR 0014): T-37, the caller ID never picks a business; R-09, business names learnable through the name match | S1, S7 |

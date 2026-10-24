@@ -39,7 +39,7 @@ Ports: `scheduling_backend/scheduling_port.py`, `call_session/business_resolutio
 
 ## 3. Call record
 
-Cronix keeps a record per call (business, channel, caller phone, whether the identity is verified, outcome) and the stored response of each idempotency key, for 7 days. The phone line's number is shared by every business (ADR 0014): the call's business is set once, from the WhatsApp routing or from the name the caller says (§4.1b). The endpoints read the business and the identity from the call record, never from a request body. The tables, row-level security and isolation tests behind it are defined in the Cronix repository (§8).
+Cronix keeps a record per call (business, channel, caller phone, whether the identity is verified, outcome) and the stored response of each idempotency key, for 7 days. A dialed number belongs to one business only. The endpoints read the business and the identity from the call record, never from a request body. The tables, row-level security and isolation tests behind it are defined in the Cronix repository (§8).
 
 ## 4. Endpoints
 
@@ -51,7 +51,7 @@ Resolves the business and returns the call context. `call_sid` is the call's ide
 ```json
 // request
 { "call_sid": "CA…", "channel": "twilio" | "whatsapp",
-  "to": "+582125550100", "from": "+584121234567" }
+  "to": "+13055550100", "from": "+584121234567" }
 
 // response
 {
@@ -63,13 +63,13 @@ Resolves the business and returns the call context. `call_sid` is the call's ide
   "known_client": { "first_name": "Ana" }   // or null
 }
 ```
-*   `channel = "twilio"`: the dialed number `to` must be a line of the service (errors: `UNKNOWN_LINE`). The line is shared by every business, so the answer is always `{ "success": true, "business": null, "needs_business_choice": true }` and the agent asks for the business (see 4.1b). `from` never picks or suggests a business: a spoofed caller ID must not reveal which businesses a number is a client of (constitution §4).
+*   `channel = "twilio"`: the business is the one whose voice line is the dialed number `to`. Errors: `UNKNOWN_LINE`.
 *   `channel = "whatsapp"`: the business comes from the WhatsApp routing without slug (the sender's active session, then the client's phone). If it cannot be decided, it answers `{ "success": true, "business": null, "needs_business_choice": true }` and the agent asks for the business (see 4.1b).
 *   `known_client` returns **only the first name**, and only when the call's identity is verified (`channel = "whatsapp"`); on the phone line it is `null`, because a spoofed caller ID must not reveal whose number it is (constitution §4).
 *   Cronix stores `identity_verified = (channel == "whatsapp")` in the call record; the appointment endpoints (§4.3, §4.5) read it from there, **never** from the request body.
 
 ### 4.1b `POST /v1/calls/{call_sid}/business`
-For a call without a resolved business: every phone-line call, and the WhatsApp calls that routing does not decide. Receives the name the caller said, compares it with the active businesses and, if there is a reliable match, sets the call's `business_id` (once) and returns the same context as 4.1.
+Only for WhatsApp without a resolved business. Receives the name the caller said, compares it with the active businesses and, if there is a reliable match, sets the call's `business_id` (once) and returns the same context as 4.1.
 ```json
 { "spoken_name": "barbería de ana" }
 ```

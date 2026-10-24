@@ -1,8 +1,7 @@
 """`BusinessResolver`: which business a call is for. The LLM never decides it (constitution §3).
 
-Both entries share one number among every business (ADR 0014 for the phone line). On WhatsApp the
-backend's routing decides first; on the phone line, and on WhatsApp when routing cannot decide,
-the caller names the business and the backend matches it.
+On the phone line the dialed number decides; on WhatsApp the backend's routing decides and, when
+it cannot, the caller names the business and the backend matches it.
 """
 
 from typing import Literal, Protocol
@@ -24,13 +23,13 @@ class BusinessResolved(_Result):
 
 
 class BusinessChoiceNeeded(_Result):
-    """The agent asks for the business: every phone-line call, and WhatsApp when routing cannot."""
+    """WhatsApp only: no session or client record decides; the agent asks for the business."""
 
     kind: Literal["choice_needed"] = "choice_needed"
 
 
 class UnknownLine(_Result):
-    """Phone line only: the dialed number is not a service line. Fixed message and hang up."""
+    """Phone line only: the dialed number belongs to no business. Fixed message and hang up."""
 
     kind: Literal["unknown_line"] = "unknown_line"
 

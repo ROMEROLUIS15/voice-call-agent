@@ -11,9 +11,9 @@ There are **two entries** to one voice engine:
 | | WhatsApp call | Phone line (Twilio) |
 |---|---|---|
 | How the person calls | Call icon in the Cronix WhatsApp chat | Dials a phone number |
-| Number | Cronix's WhatsApp number (shared by every business) | One Venezuelan number shared by every business |
+| Number | Cronix's WhatsApp number (shared by every business) | One number per business |
 | Caller identity | **Verified by Meta** | Caller ID **not verified** |
-| Business resolution | Routing by session / client phone; if not possible, the agent asks (§4.1) | The agent asks; never from the caller ID (§4.1) |
+| Business resolution | Routing by session / client phone; if not possible, the agent asks (§4.1) | Dialed number |
 | Transport | WebRTC (Cloud API Calling) | Twilio Media Streams (μ-law 8 kHz) |
 | What it is for | Real clients in Venezuela, free for them. **Paused** until Meta enables *Calling* on the number (§10) | Calls to a traditional phone number (PSTN) with Venezuelan numbers. **The main path** while the WhatsApp entry is paused |
 
@@ -103,17 +103,15 @@ There are **two entries** to one voice engine:
 ## 4. Flow of a call
 
 ### 4.1 Business resolution per channel
-Both entries use one number shared by every business (ADR 0014 for the phone line); once the business is resolved it does not change (INV-1).
-
-*   **Phone line:** the dialed number (`To`) must be a line of the service; otherwise fixed message and hang up. The agent always **asks** "Which business do you want to book with?" and the name is resolved as in level 3 below. The caller ID never picks or suggests a business: it can be spoofed, and suggesting one would reveal which businesses that number is a client of.
-*   **WhatsApp:** a call has no `#slug`. The same levels as Cronix's message routing apply, without the first one:
+*   **Twilio:** the backend looks up the dialed number (`To`) among its voice lines. No match → fixed message and hang up.
+*   **WhatsApp:** the Cronix number is shared, and a call has no `#slug`. The same levels as Cronix's message routing apply, without the first one:
     1. the sender's active WhatsApp session;
     2. the business that has the sender as a client (if several, the one of their next active appointment);
-    3. if it cannot be decided: the agent **asks** "Which business do you want to book with?" and resolves the name against the active businesses (fuzzy match; up to 3 candidates to ask about when ambiguous; confirmation). **Never guess.**
+    3. if it cannot be decided: the agent **asks** "Which business do you want to book with?" and resolves the name against the active businesses (fuzzy match with confirmation). **Never guess.**
 
 ### 4.2 Steps
 1.  **Entry.** The transport validates the webhook signature and asks the backend for the call context through `BusinessResolver.resolve_call_business` (`POST /v1/calls/start` with the `channel`).
-2.  **Greeting.** The business's greeting, or Cronix's generic greeting while the business is not resolved: always on the phone line, and on WhatsApp when routing does not decide. Recording notice if recording is enabled.
+2.  **Greeting.** The business's greeting (or Cronix's generic greeting if the business is not yet resolved on WhatsApp). Recording notice if recording is enabled.
 3.  **Client identification.** If the identity is verified (WhatsApp) and the phone belongs to a known client, greet them by first name. On the phone line the backend sends no name (constitution §4).
 4.  **Conversation.** Turn by turn: end of turn → final transcript → the language model, with the agent's tools → TTS. The model converses and asks for what is missing; questions are answered with the business context and reads from the backend.
 5.  **Proposal and confirmation.** The agent proposes the write with a tool. The code validates it (INV-3) and returns a proposal id and a summary that the agent reads aloud: service, day, time and name. The model judges whether the caller's answer is a yes; if it is, it confirms that proposal id. The code executes only the same unchanged proposal of this call, after a caller turn that followed its read-back (INV-2, ADR 0011).
@@ -165,14 +163,14 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 
 ## 8. v1 acceptance criteria
 
-v1 is accepted with AC-2, AC-3, AC-4, AC-5 on the phone line, AC-6, AC-8, AC-9, AC-10 and AC-11, plus AC-1 and AC-5 over WhatsApp once Meta enables *Calling* on the real number (§10). AC-7 belongs to v1.1.
+v1 is accepted with AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10 and AC-11, plus AC-1 and AC-5 once Meta enables *Calling* on the real number (§10). AC-7 belongs to v1.1.
 
 *   **AC-1 · Booking over WhatsApp.** A WhatsApp call books an appointment; it shows on the dashboard and the owner gets the notification. *Counts for v1 once Meta enables Calling on the real number.*
-*   **AC-2 · Booking over the phone line.** The same from a call to the shared phone number.
+*   **AC-2 · Booking over the phone line.** The same from a call to a Twilio number.
 *   **AC-3 · No write without confirmation.** "No" or an ambiguous answer creates nothing.
 *   **AC-4 · Slot taken.** If the slot is taken between proposal and confirmation, the backend returns `SLOT_CONFLICT` and the agent offers another one; there is no duplicate.
-*   **AC-5 · Unresolved business.** On every phone-line call, and on WhatsApp when the sender has no session and is not a client of any business, the agent asks for the business and does not book until it is confirmed; on the phone line it never names a business the caller did not say. *Over WhatsApp, counts for v1 once Meta enables Calling on the real number.*
-*   **AC-6 · Unknown number (phone line).** A call to a number that is not a line of the service → fixed message, hang up, trace recorded.
+*   **AC-5 · Unresolved business (WhatsApp).** If the sender has no session and is not a client of any business, the agent asks for the business and does not book until it is confirmed. *Counts for v1 once Meta enables Calling on the real number.*
+*   **AC-6 · Unknown number (Twilio).** A call to a number without a business → fixed message, hang up, trace recorded.
 *   **AC-7 · Identity on the phone line (v1.1).** Cancelling from Twilio without the correct name and date does **not** cancel; a message is taken. Without the second factor no appointment is read either. On WhatsApp it is not required.
 *   **AC-8 · Interruption.** The agent goes silent in less than 300 ms when the caller interrupts. *To be refined in phase 4 with the false-interruption filter: silent in under 300 ms on a real interruption, and keeps speaking through coughs, noise and fillers.*
 *   **AC-9 · Backend down.** The agent confirms nothing, says so and suggests calling back or writing over WhatsApp. It takes no message: the message would be stored in the backend that is down.
@@ -185,7 +183,7 @@ v1 is accepted with AC-2, AC-3, AC-4, AC-5 on the phone line, AC-6, AC-8, AC-9, 
 |---|---|---|
 | 0 · Technical test | Pipecat conversing through **both entries**, without Cronix | It is known whether the Cronix number can receive WhatsApp calls (§10: not yet, the entry is paused); latency measured per segment on the phone line, and over WhatsApp once it is enabled; LLM and TTS chosen |
 | 1 · Cronix contract | Edge Function `phone-agent-api` with reads and tests; `adapters/cronix_scheduling_api/` | Reads pass against a local Cronix |
-| 2 · Booking (v1) | Booking with proposals validated by code and confirmed by the caller (ADR 0011) | AC-2, AC-3, AC-4, AC-5 on the phone line, AC-6, AC-8, AC-9, AC-10, AC-11; AC-1 and AC-5 over WhatsApp once Meta enables *Calling* on the real number |
+| 2 · Booking (v1) | Booking with proposals validated by code and confirmed by the caller (ADR 0011) | AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10, AC-11; AC-1 and AC-5 once Meta enables *Calling* on the real number |
 | 3 · v1.1 | Check appointments, reschedule and cancel with identity per channel; take a message | AC-7 |
 | 4 · Robustness | What real usage shows it needs: holding phrases, false-interruption filter, provider fallback, fault injection, load tests | AC-8 refined (false interruptions); the rest from measured calls |
 | 5 · Evals in CI | Simulated callers, end-to-end calls with recorded audio, judge calibration against human labels, sampled evaluation of production calls | CI blocks on regressions. Reference conversations and model evals against a baseline exist from phase 0 (ADR 0010). |
@@ -206,9 +204,9 @@ Registered on 2026-10-19; what each item solves and how it applies here is in [`
 
 *   **Meta's requirement for calls: the WhatsApp entry is paused** (phase 0 finding, 2026-10-20). The Cloud API Calling documentation requires a messaging limit of at least 2,000 daily recipients; test accounts and public test numbers are exempt. The real number's limit is 250, and raising it takes a verified business or sustained template message volume, neither available today. **Decision:** the phone line is the main path. The WhatsApp entry keeps its code and tests and is not configured in deployment: an entry is mounted only when its variable group is complete, so its webhook is not exposed. It resumes when the number's limit reaches 2,000, after a check with a Meta test number; the WhatsApp risks below (test numbers, one webhook callback per Meta app, Meta's `terminate` with several instances) wait until then.
 *   **Meta test numbers:** they last 90 days and have restrictions on contacting some countries; verify that a call started from outside the US arrives.
-*   **A Venezuelan number for the phone line** (phase 0 decision 2026-10-20, findings 2026-10-23): the phone line uses one Venezuelan number shared by every business (§4.1), so callers dial a local number. Neither Twilio nor Telnyx sells Venezuelan numbers: Twilio's API offers numbers in 53 countries, not Venezuela, and Telnyx's number search finds no coverage there, although both publish Venezuelan requirements (local numbers with an ID and a local address; +58 800 with a letter of authorization). Paths: a +58 800 number requested from Twilio support, free for the caller; or a Venezuelan number from a number provider delivered to Twilio over SIP, whose extra hop is measured before callers use it (`To` and `From` then arrive as SIP URIs and are normalized).
+*   **Venezuelan numbers for the phone line** (phase 0 decision, 2026-10-20): the phone line uses only Venezuelan numbers, so callers dial a local number and no test depends on an international call. Twilio publishes no voice prices for Venezuela; its regulatory guidelines list +58 800 numbers (with a letter of authorization) and local ones (with documents and a local address). Their availability is checked in the Twilio console. If Twilio has none, a Venezuelan carrier's number delivered to Twilio over SIP is the alternative; `To` and `From` then arrive as SIP URIs, and business resolution by dialed number (§4.1) normalizes them.
 *   **Groq rejects some networks** (phase 0 finding, 2026-10-19): it answers `403` to VPN exits and to IP ranges it flags (sanctioned countries, some cloud regions, according to its staff on Groq's community forum). GitHub-hosted runners reach it (`provider-reachability.yml`); the server's host and region are checked the same way before deploying, and the provider fallback of phase 4 covers a block in production.
-*   **8 kHz audio** on the phone line: measure how names, business names (the shared line depends on them), numbers, national ID numbers and fillers are transcribed (§9.1, phase 0).
+*   **8 kHz audio** on the phone line: measure how names, numbers, national ID numbers and fillers are transcribed (§9.1, phase 0).
 *   **Edge Function cold start:** preload the business context at the start if it breaks the budget.
 *   **Costs:** record the real cost per call and per channel from phase 0.
 *   **One webhook callback per Meta app** (phase 0 finding, to verify): Cronix's message webhook (`process-whatsapp`) and this service's call webhook compete for the same URL. Options: a separate Meta app for the test number, a callback override per account or per number, or the Edge Function forwarding the `calls` field. The service already acknowledges any field other than `calls` with `200`, so it supports all three.
@@ -237,7 +235,6 @@ Cross-cutting decisions are ADRs in `docs/adr/`:
 *   [ADR 0011](../../adr/0011-write-proposals-validated-by-code.md) · Write proposals validated by code; the model judges the caller's confirmation.
 *   [ADR 0012](../../adr/0012-pull-requests-with-required-checks.md) · Changes reach `main` through pull requests with required checks.
 *   [ADR 0013](../../adr/0013-evals-fingerprint-of-what-the-evals-measure.md) · Evals fingerprint of what the evals measure, and the first baseline with the booking prompt (amends ADR 0010).
-*   [ADR 0014](../../adr/0014-one-phone-number-shared-by-every-business.md) · One phone number shared by every business.
 
 Decisions local to this module:
 
@@ -288,7 +285,7 @@ Observability and quality (stage 1):
 | First token → first audio | `sentence_aggregation`, `speech_synthesis`, `output_transport` |
 | Other (no owner) | the rest, e.g. `pipeline` |
 
-**Pending to close phase 0** (needs accounts and real calls): the shared Venezuelan number of the phone line (§10); 20 measured calls on the phone line; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute on the phone line. The WhatsApp entry is paused (§10): its measured calls, how it coexists with the message webhook and the multi-instance `terminate` risk wait until Meta enables *Calling* on the number.
+**Pending to close phase 0** (needs accounts and real calls): a Venezuelan number on the phone line (§10); 20 measured calls on the phone line; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute on the phone line. The WhatsApp entry is paused (§10): its measured calls, how it coexists with the message webhook and the multi-instance `terminate` risk wait until Meta enables *Calling* on the number.
 
 **Changed (2026-10-19), balance between the agent and the code:** v1 narrowed to booking (§2); writes validated by code and confirmed by the caller, with the yes judged by the model (INV-2, INV-3, ADR 0011), without mention guards nor a call state machine; `dialog_state/` removed and `intent_understanding/` renamed `agent_tools/`; AC-9 without a message; on the phone line no name and no appointments without the second factor (INV-4); changes reach `main` through pull requests (ADR 0012); the evals fingerprint covers only what the model evals exercise, and the first baseline waits for the booking prompt (ADR 0013).
 
@@ -297,9 +294,5 @@ Observability and quality (stage 1):
 **Found (2026-10-20), WhatsApp number:** its messaging limit is 250 daily recipients and *Calling* needs 2,000; the WhatsApp entry is paused and the phone line, with Venezuelan numbers, is the main path (§10).
 
 **Changed (2026-10-23), dependencies:** `pipecat-ai` 1.12.0 → 1.14.0, the first release that accepts Pillow 13, which fixes Pillow's advisories (the service decodes no images, but pip-audit blocks them); `certifi` 2026.10.23 drops CA certificates with compromised keys, and `setuptools` 84.2.1 and `virtualenv` 21.14.13 fix advisories. Pipecat 1.14 also keeps what the caller said when a Flux connection drops mid-turn (the turn ends with the transcript so far) and masks credentials in its error frames. It adds `use_provider_thinking_default`: with Google as the provider, Pipecat now sends the model's lowest thinking setting (`minimal` for its default `gemini-3.6-flash`); Groq is unaffected, its effort stays explicit (§7). Snapshots regenerated and fingerprint recorded (ADR 0013).
-
-**Found (2026-10-23), Venezuelan numbers:** neither Twilio nor Telnyx sells them; the paths left are a +58 800 number requested from Twilio support or a number provider's Venezuelan number delivered over SIP (§10).
-
-**Changed (2026-10-24), shared phone number:** one Venezuelan number for every business; on the phone line the agent always asks for the business, never infers it from the caller ID (ADR 0014; §4.1, AC-5, AC-6, contract §4.1b).
 
 **Next:** phase 0's **first real call over the phone line, measured per segment**, once it has a Venezuelan number. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).
