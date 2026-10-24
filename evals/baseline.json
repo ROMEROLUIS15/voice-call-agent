@@ -1,9 +1,9 @@
 {
-  "fingerprint": "82bca7f789801c86",
+  "fingerprint": "32d6a1a69c1ca737",
   "inputs": {
     "conversation_content": "es-c3d0810115bd",
     "language_model": "groq openai/gpt-oss-120b",
-    "generation_settings": "38eb9933cbaf6267",
+    "generation_settings": "830ed76e7584e77a",
     "golden_dataset": "00f63ba79c83",
     "scoring": "657d494f3125e1d1",
     "judge_model": "gemini-3.6-flash"
