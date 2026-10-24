@@ -50,7 +50,7 @@ There are **two entries** to one voice engine:
         │ Meta "calls" webhook                   │ Twilio webhook
         ▼                                        ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│ Agent server: voice_call_agent (Python · FastAPI · Pipecat 1.12.0)│  ── outside Supabase
+│ Agent server: voice_call_agent (Python · FastAPI · Pipecat 1.14.0)│  ── outside Supabase
 │                                                                   │
 │  call_transports/whatsapp_calling   call_transports/twilio_media_streams
 │              └──────────────┬──────────────┘   ← inbound entries  │
@@ -151,7 +151,7 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 |---|---|---|
 | WhatsApp entry | WhatsApp Cloud API Calling + Pipecat's WebRTC transport | Uses the number Cronix already has; free for the caller. |
 | Phone entry | Twilio Programmable Voice + Media Streams | Native connector in Pipecat; US numbers. |
-| Orchestration | Pipecat (Python), self-hosted. **`pipecat-ai==1.12.0`, pinned exactly** (API: `PipelineWorker` + `WorkerRunner`; `PipelineTask`/`PipelineRunner` are deprecated since 1.3) | Both call transports, Flux turn detection and latency metrics built in (ADR 0002). |
+| Orchestration | Pipecat (Python), self-hosted. **`pipecat-ai==1.14.0`, pinned exactly** (API: `PipelineWorker` + `WorkerRunner`; `PipelineTask`/`PipelineRunner` are deprecated since 1.3) | Both call transports, Flux turn detection and latency metrics built in (ADR 0002). |
 | Provider SDKs | Pinned exactly: `deepgram-sdk==7.13.0`, `groq==1.7.0`, `google-genai==2.31.0`, `openai==3.35.1`, `twilio==9.12.0` | The ecosystem changes every few weeks; `uv.lock` is committed. |
 | Server | FastAPI + uvicorn in a container, behind `GracefulHttpServer` | Persistent connection per call; drains calls on shutdown. |
 | STT | Deepgram Flux **`flux-general-multi` with `language_hint=es`** (built-in turn detection) | Already used in Cronix. `flux-general-en` only understands English and rejects `language_hint`. **Validate quality on 8 kHz phone audio.** |
@@ -290,5 +290,7 @@ Observability and quality (stage 1):
 **Changed (2026-10-19), balance between the agent and the code:** v1 narrowed to booking (§2); writes validated by code and confirmed by the caller, with the yes judged by the model (INV-2, INV-3, ADR 0011), without mention guards nor a call state machine; `dialog_state/` removed and `intent_understanding/` renamed `agent_tools/`; AC-9 without a message; on the phone line no name and no appointments without the second factor (INV-4); changes reach `main` through pull requests (ADR 0012); the evals fingerprint covers only what the model evals exercise, and the first baseline waits for the booking prompt (ADR 0013).
 
 **Measured (2026-10-19), language model:** time to the first token of Groq `openai/gpt-oss-120b` (default and low reasoning effort) and DeepSeek `deepseek-flash` from a GitHub-hosted runner; low effort is the only configuration within §6 and is now the default (§7, `README.md` "Measured results").
+
+**Changed (2026-10-23), dependencies:** `pipecat-ai` 1.12.0 → 1.14.0, the first release that accepts Pillow 13, which fixes Pillow's advisories (the service decodes no images, but pip-audit blocks them); `certifi` 2026.10.23 drops CA certificates with compromised keys, and `setuptools` 84.2.1 and `virtualenv` 21.14.13 fix advisories. Pipecat 1.14 also keeps what the caller said when a Flux connection drops mid-turn (the turn ends with the transcript so far) and masks credentials in its error frames. It adds `use_provider_thinking_default`: with Google as the provider, Pipecat now sends the model's lowest thinking setting (`minimal` for its default `gemini-3.6-flash`); Groq is unaffected, its effort stays explicit (§7). Snapshots regenerated and fingerprint recorded (ADR 0013).
 
 **Next:** phase 0's **first real call, measured per segment**. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).
