@@ -19,6 +19,7 @@
     'thinking': 'None',
     'top_k': 'None',
     'top_p': 'None',
+    'use_provider_thinking_default': 'False',
     'user_turn_completion_config': 'None',
   })
 # ---
@@ -37,6 +38,7 @@
     'temperature': 'NOT_GIVEN',
     'top_k': 'None',
     'top_p': 'NOT_GIVEN',
+    'use_provider_thinking_default': 'False',
     'user_turn_completion_config': 'None',
   })
 # ---
@@ -54,6 +56,7 @@
     'temperature': 'NOT_GIVEN',
     'top_k': 'None',
     'top_p': 'NOT_GIVEN',
+    'use_provider_thinking_default': 'False',
     'user_turn_completion_config': 'None',
   })
 # ---
