@@ -92,7 +92,7 @@ There are **two entries** to one voice engine:
 | `write_guards/` | Validates a write proposal (the call's business, a service of the catalog, a slot the backend offers at that moment) and its confirmation (the same unchanged proposal of this call, after a caller turn that followed its read-back, executed at most once); identity requirement (v1.1). The only call state it keeps: pending proposals, writes done and the identity factor (ADR 0011). (Phase 2.) |
 | `scheduling_backend/` | `SchedulingBackend` port with its domain models (typed results) and infrastructure errors. |
 | `adapters/cronix_scheduling_api/` | **Only place that knows Cronix:** implements `SchedulingBackend` and `BusinessResolver` over the contract: HMAC signature, timeouts, idempotency, error mapping. (Phase 1.) |
-| `adapters/deepgram_speech/` | Flux STT and Aura-2 TTS factories. |
+| `adapters/deepgram_speech/` | Flux STT and Aura-2 TTS factories; Aura-2 reports the characters it sends, for the cost estimate. |
 | `adapters/language_model_providers/` | Groq, Google and OpenAI LLM factories with explicit request timeouts. |
 | `observability/` | Error taxonomy and `report_error` (log, metric, issue for real failures, call trace); one `CallTrace` per call (versions, per-segment latency, usage, estimated cost, errors) published to a JSON-lines file and to Sentry; structured logging; redaction of personal data (ADR 0009). |
 | `http_hardening/` | Security headers (ADR 0007), generic error responses, rate limits per client address and route, trusted hosts, body size limit, closed CORS (constitution §15). |
@@ -252,6 +252,7 @@ Decisions local to this module:
 Server lifecycle and provider calls:
 
 *   **`GracefulHttpServer`.** uvicorn closes every WebSocket at the start of its shutdown, so the first SIGINT/SIGTERM is intercepted: it drains calls (stop accepting, wait up to `SHUTDOWN_GRACE_SECONDS`, cancel the rest) and only then lets uvicorn shut down. A second signal falls back to uvicorn's behaviour.
+*   **Aura-2's characters counted by the adapter.** Pipecat 1.14's WebSocket text-to-speech service reports no usage (only its HTTP variant does), so the cost estimate left the voice out while marking itself complete. The adapter reports the characters of every text it sends, as Deepgram bills them, spoken or interrupted; a test fails if Pipecat starts reporting them too.
 *   **Explicit LLM client timeouts with at most one retry**, by overriding Pipecat's `create_client` (Groq, OpenAI): Pipecat builds these clients with the SDK defaults (600 s, 2 retries) and exposes no parameter. Google uses Pipecat's `http_options` and `stream_idle_timeout_secs`. The timeout values are reviewed with the phase 0 measurements.
 *   **Own Twilio hang-up instead of Pipecat's `auto_hang_up`**, which calls the REST API through an aiohttp session without an explicit timeout.
 *   **Readiness reports `503` when the instance is full**, not only while draining, so a load balancer sends calls to another instance.
@@ -298,5 +299,7 @@ Observability and quality (stage 1):
 **Changed (2026-10-23), dependencies:** `pipecat-ai` 1.12.0 → 1.14.0, the first release that accepts Pillow 13, which fixes Pillow's advisories (the service decodes no images, but pip-audit blocks them); `certifi` 2026.10.23 drops CA certificates with compromised keys, and `setuptools` 84.2.1 and `virtualenv` 21.14.13 fix advisories. Pipecat 1.14 also keeps what the caller said when a Flux connection drops mid-turn (the turn ends with the transcript so far) and masks credentials in its error frames. It adds `use_provider_thinking_default`: with Google as the provider, Pipecat now sends the model's lowest thinking setting (`minimal` for its default `gemini-3.6-flash`); Groq is unaffected, its effort stays explicit (§7). Snapshots regenerated and fingerprint recorded (ADR 0013).
 
 **Found (2026-10-23), Venezuelan numbers:** neither Twilio nor Telnyx sells them; the paths left are a +58 800 number requested from Twilio support or a number provider's Venezuelan number delivered over SIP, one per business (§10). A business can keep its published number by forwarding it, once Venezuelan carriers confirm it works (§10).
+
+**Fixed (2026-10-26), cost of the voice:** the first practice call's trace showed `tts_characters: 0` although the agent spoke: Pipecat's WebSocket Aura-2 service reports no usage. The Deepgram adapter now reports the characters it sends (§11). Call traces written before this fix leave the voice out of their estimated cost.
 
 **Next:** phase 0's **first real call over the phone line, measured per segment**, once it has a Venezuelan number. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).
