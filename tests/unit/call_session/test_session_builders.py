@@ -1,4 +1,5 @@
 from voice_call_agent.call_session.session_builders import (
+    build_browser_session,
     build_twilio_session,
     build_whatsapp_session,
 )
@@ -24,3 +25,10 @@ def test_trace_context_carries_the_channel_as_a_label() -> None:
     context = build_twilio_session("CA1", None, None).trace_context()
     assert context.call_id == "CA1"
     assert context.channel_label == "twilio"
+
+
+def test_browser_practice_call_has_no_numbers_and_no_verified_identity() -> None:
+    session = build_browser_session("practice-1")
+    assert (session.caller_phone, session.dialed_phone) == (None, None)
+    assert not session.identity_verified
+    assert session.trace_context().channel_label == "browser"

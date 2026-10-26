@@ -6,7 +6,7 @@ from pathlib import Path
 from tests.architecture.source_tree import is_composition_root, python_modules, relative_parts
 
 CHANNEL_AWARE_PACKAGES = frozenset({"call_transports", "call_session", "settings"})
-CHANNEL_NAMES = frozenset({"twilio", "whatsapp"})
+CHANNEL_NAMES = frozenset({"twilio", "whatsapp", "browser"})
 
 
 def channel_leaks(source: str) -> list[str]:
@@ -49,4 +49,5 @@ def test_checker_catches_each_kind_of_leak() -> None:
     assert channel_leaks("from voice_call_agent.call_session.session import CallChannel")
     assert channel_leaks("label = 'whatsapp'")
     assert channel_leaks("label = 'Twilio'")
+    assert channel_leaks("label = 'browser'")
     assert channel_leaks('"""A docstring that mentions Twilio in a sentence."""') == []

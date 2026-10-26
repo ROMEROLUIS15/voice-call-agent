@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.unit.http_hardening.hardened_test_app import hardened_test_app
+from tests.unit.http_hardening.hardened_test_app import PAGE_PATH, PAGE_POLICY, hardened_test_app
 from voice_call_agent.settings.sections import DeploymentEnvironment
 
 EXPECTED = {
@@ -34,3 +34,13 @@ def test_application_cannot_weaken_or_reveal_headers() -> None:
     response = TestClient(hardened_test_app()).get("/sets-server-header")
     assert "server" not in response.headers
     assert response.headers.get_list("x-frame-options") == ["DENY"]
+
+
+def test_a_page_gets_its_own_policy_and_keeps_the_other_headers() -> None:
+    client = TestClient(hardened_test_app())
+    page = client.get(PAGE_PATH)
+    assert page.headers["content-security-policy"] == PAGE_POLICY.decode()
+    assert page.headers["x-frame-options"] == "DENY"
+    # Exact paths only: nothing under the page inherits its policy.
+    nearby = client.get(PAGE_PATH + "/other")
+    assert nearby.headers["content-security-policy"] == EXPECTED["content-security-policy"]

@@ -9,7 +9,7 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 TEXT_SUFFIXES = frozenset(
-    {".md", ".py", ".toml", ".yml", ".yaml", ".example", ".txt", ".json", ".ambr"}
+    {".md", ".py", ".toml", ".yml", ".yaml", ".example", ".txt", ".json", ".ambr", ".html", ".js"}
 )
 SKIPPED_DIRECTORIES = frozenset({".venv", ".git", "__pycache__", ".mypy_cache", ".ruff_cache"})
 ALLOWED_CONTROL_CHARACTERS = frozenset({"\t", "\n"})

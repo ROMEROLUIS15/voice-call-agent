@@ -52,6 +52,16 @@ def test_language_model_section_carries_the_selected_key() -> None:
     assert section.api_key.get_secret_value() == "g-key"
 
 
+def test_openrouter_needs_its_own_key() -> None:
+    with pytest.raises(ValidationError, match="openrouter"):
+        make_service_settings(llm_provider="openrouter")
+    section = make_service_settings(
+        llm_provider="openrouter", openrouter_api_key="or-key"
+    ).language_model()
+    assert section.provider is LanguageModelProvider.OPENROUTER
+    assert section.api_key.get_secret_value() == "or-key"
+
+
 def test_validation_errors_do_not_echo_the_input() -> None:
     with pytest.raises(ValidationError) as error:
         make_service_settings(port="token-pasted-in-the-wrong-variable")
