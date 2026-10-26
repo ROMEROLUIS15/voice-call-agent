@@ -1,0 +1,11 @@
+# Replies the agent could give on a call, used to compare text-to-speech voices.
+# Fictitious data only. The greeting of the conversation content is spoken first.
+# One reply keeps digits on purpose: how each voice reads numbers, dates and times matters.
+
+replies = [
+    "Claro. Para el corte de cabello tengo disponible el jueves a las nueve y media de la mañana o a las tres de la tarde. ¿Cuál prefieres?",
+    "¿Me dices tu nombre y apellido, por favor?",
+    "Perfecto. Te confirmo: corte de cabello el jueves veintidós de octubre a las tres de la tarde, a nombre de Ana Pérez. ¿Está bien así?",
+    "Listo, tu cita quedó reservada para el 22/10 a las 3:00 p. m. Cuesta $10 y dura unos 30 minutos.",
+    "Disculpa, no te escuché bien. ¿Me lo repites?",
+]
