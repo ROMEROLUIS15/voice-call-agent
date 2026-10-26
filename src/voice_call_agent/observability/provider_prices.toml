@@ -2,7 +2,7 @@
 # provider changes its prices, update the values and bump `version`.
 # A model, voice or channel missing here makes the estimate incomplete, never invented.
 
-version = "2026-10-19"
+version = "2026-10-26"
 
 [stt_usd_per_minute]
 # https://deepgram.com/pricing (pay as you go): Flux Multilingual
@@ -13,6 +13,8 @@ version = "2026-10-19"
 [tts_usd_per_1k_characters]
 # https://deepgram.com/pricing (pay as you go): every Aura-2 voice
 "aura-2" = 0.030
+# Every Flux TTS voice (`flux-*`), consulted on 2026-10-26
+"flux-" = 0.045
 
 [llm."groq/openai/gpt-oss-120b"]
 # https://console.groq.com/docs/model/openai/gpt-oss-120b

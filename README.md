@@ -92,6 +92,13 @@ baseline is measured with the booking prompt of phase 2 (ADR 0013): until then `
 records the new inputs; from then on `--write-baseline` stores new measurements. Details:
 [golden dataset](docs/evals/golden-dataset.md).
 
+Text-to-speech voices are compared on the "first token → first audio" segment of manifest §6,
+with phone-quality samples of every voice to choose it by ear (manifest §12):
+
+```bash
+uv run --env-file .env python -m evals.text_to_speech_comparison  # report and samples in var/
+```
+
 ## Measured results
 
 Each figure states its date and what it was measured with; what is not measured yet says so.
@@ -117,4 +124,6 @@ Changes reach `main` through pull requests; CI's jobs are required checks (ADR 0
 `.github/workflows/evals.yml` runs the model evals when what shapes the agent's replies changes
 (skipped without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets); its check is not required, but a
 pull request is not merged with it failing. `.github/workflows/provider-reachability.yml` checks
-on demand that the runners reach every provider.
+on demand that the runners reach every provider. `.github/workflows/text-to-speech-comparison.yml`
+runs the voice comparison on demand and when the comparison changes (skipped without the
+`DEEPGRAM_API_KEY` secret); the samples are the run's artifact.
