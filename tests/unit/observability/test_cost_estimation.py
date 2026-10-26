@@ -2,7 +2,11 @@ import pytest
 
 from tests.call_trace_factory import SERVICES
 from voice_call_agent.observability.call_trace import ProviderUsage
-from voice_call_agent.observability.cost_estimation import estimate_cost, load_price_table
+from voice_call_agent.observability.cost_estimation import (
+    estimate_cost,
+    load_price_table,
+    voice_price_per_1k_characters,
+)
 
 PRICES = load_price_table()
 USAGE = ProviderUsage(llm_input_tokens=10_000, llm_output_tokens=2_000, tts_characters=1_000)
@@ -35,3 +39,11 @@ def test_unknown_model_is_left_out() -> None:
         usage=USAGE, services=services, duration_s=60, channel_label="twilio", prices=PRICES
     )
     assert not cost.complete
+
+
+@pytest.mark.parametrize(
+    ("voice", "price"),
+    [("aura-2-selena-es", 0.030), ("flux-carmen-es", 0.045), ("unpriced-voice", None)],
+)
+def test_voice_price_comes_from_its_family(voice: str, price: float | None) -> None:
+    assert voice_price_per_1k_characters(PRICES, voice) == price

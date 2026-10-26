@@ -50,7 +50,7 @@ Living document: every change that touches an attack surface updates it in the s
 | S9 | Logs and traces | Everything the service writes |
 | S10 | Supply chain and repository | Dependencies, CI, git history |
 | S11 | Error tracking (Sentry) | Outbound error events, call transactions and metrics |
-| S12 | Model evals in CI | Provider secrets in GitHub Actions; golden conversations sent to the model under test and the judge |
+| S12 | Model evals and measurements in CI | Provider secrets in GitHub Actions; golden conversations sent to the model under test and the judge; fixed replies sent to the text-to-speech voices, their samples kept as run artifacts |
 
 S3 and S4 exist only when the WhatsApp variable group is complete. While the WhatsApp entry is paused (manifest §10) it is not configured in deployment, so they are not exposed; their mitigations and tests stay.
 
@@ -119,7 +119,7 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | T-29 | Vulnerable or malicious dependency (S10) | Exact pins for the engine and security tools, committed `uv.lock`, pip-audit in CI; third-party GitHub Actions pinned by commit SHA | `pip-audit` hook | P (no automated update PRs yet) |
 | T-30 | Insecure code patterns (S10) | bandit and ruff `S` rules in CI | `bandit` hook | M |
 | T-31 | Personal data or secrets reach the error tracking provider (S11) | No default personal data, no local variables, no request bodies, no auto-enabled integrations; `before_send` drops request, user and server data and redacts phone-like digit runs; error attributes are identifiers and categories; DSN only from the environment (ADR 0009) | `test_scrub_removes_request_and_user_and_redacts_phones`, `test_configured_client_scrubs_what_it_sends`, `test_stack_frames_carry_no_local_variables`, `test_a_logged_error_is_never_a_second_event`, `test_dsn_comes_from_settings_as_a_secret` | M |
-| T-32 | Provider secrets leak from the evals workflows (S12) | Secrets only in the steps that use them; the evals never run on `pull_request_target`, so pull requests from forks get no secrets and are skipped; the reachability check prints only HTTP status codes; GitHub-hosted runners only, no self-hosted runner; workflows checked with actionlint | Workflow review | P (no automated test) |
+| T-32 | Provider secrets leak from the evals and measurement workflows (S12) | Secrets only in the steps that use them; these workflows never run on `pull_request_target`, so pull requests from forks get no secrets and are skipped; artifacts hold only synthetic replies with fictitious data; the reachability check prints only HTTP status codes; GitHub-hosted runners only, no self-hosted runner; workflows checked with actionlint | Workflow review | P (no automated test) |
 | T-33 | Personal data in the golden dataset reaches the judge provider or the CI logs (S12) | Cases hold invented content only; the harness uses fictitious phone numbers | `test_no_case_holds_a_phone_number` | M |
 | T-34 | Attacks or failures go unnoticed (S9, S11) | Every error has a code and a kind and is reported through one function; security events are flagged and counted; no handler silences an error; alerts on failure rate, latency, provider errors and security spikes (`docs/observability/alerts.md`) | `test_no_handler_silences_an_error`, `test_error_reporting.py` | P (alert rules pending the Sentry project) |
 | T-36 | A change reaches `main` without passing the checks (S10) | Branch protection: pull requests only, CI's jobs as required checks, branch up to date, applied to administrators too, no force pushes nor deletion (ADR 0012) | Branch protection settings of `main` | P (configuration, no automated test) |
@@ -146,3 +146,4 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-19 | Error tracking and call traces (Sentry) as a data destination; model evals in CI with provider secrets; T-22 measured by evals; R-07 | S5, S9, S11, S12 |
 | 2026-10-19 | Balance between the agent and the code: write proposals validated by code and confirmed by the caller (T-19, T-20, T-21, R-08); T-35, what a spoofed caller ID must not reveal; T-36, branch protection of `main`; R-07 until the booking prompt | S1, S5, S7, S10 |
 | 2026-10-20 | WhatsApp entry paused: S3 and S4 not exposed while it is not configured | S3, S4 |
+| 2026-10-26 | Text-to-speech comparison workflow with the Deepgram secret; T-32 covers it | S12 |
