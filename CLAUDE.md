@@ -35,7 +35,7 @@ If a secret was ever tracked: `git rm --cached <file>` and rotate the secret.
 
 ## What this repository is
 
-The **Cronix call agent**: a Python service (Pipecat + FastAPI) that answers calls over **WhatsApp** and over a **phone line (Twilio)** and books appointments in Cronix by talking, in real time (v1); checking, rescheduling and cancelling follow in v1.1. The Python package is agnostic (`voice_call_agent`); Cronix is one scheduling backend behind a port.
+The **Cronix call agent**: a Python service (Pipecat + FastAPI) that answers calls over **WhatsApp** and over a **phone line (Twilio)** and books appointments in Cronix by talking, in real time (v1); checking, rescheduling and cancelling follow in v1.1. For development, a browser practice entry lets a developer talk to the agent from their own machine (ADR 0015). The Python package is agnostic (`voice_call_agent`); Cronix is one scheduling backend behind a port.
 
 ## Before writing code
 
@@ -54,7 +54,7 @@ No task is finished without updating the manifest if a contract, invariant or fl
 | Voice engine language | Python + Pipecat (self-hosted) |
 | Repository | New, separate from Cronix. Cronix is a destination over HTTP. |
 | First case | Booking in Cronix by phone, reusing its booking logic through a minimal HTTP contract |
-| Entries | **Two**: WhatsApp call (Cronix's number, Cloud API Calling, WebRTC) and phone line (Twilio Media Streams). Same engine; the channel lives only in `call_transports/` and `call_session/`. |
+| Entries | **Two**: WhatsApp call (Cronix's number, Cloud API Calling, WebRTC) and phone line (Twilio Media Streams). Same engine; the channel lives only in `call_transports/` and `call_session/`. Plus a development-only browser practice entry (ADR 0015). |
 | Voice architecture | Cascaded (STT → LLM → TTS), not speech-to-speech: better for auditable writes and tool calling. |
 | Repository language and naming | English repository, Spanish caller-facing content in resource files; names by function, agnostic package, "Cronix" only in its adapter. |
 

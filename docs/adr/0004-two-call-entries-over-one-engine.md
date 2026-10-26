@@ -1,6 +1,6 @@
 # ADR 0004: Two call entries over one engine
 
-*   **Status:** Accepted
+*   **Status:** Accepted, amended by 0015
 *   **Date:** 2026-10-18
 
 ## Context

@@ -7,7 +7,7 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 | [0001](0001-separate-service-from-the-scheduling-backend.md) | Separate service from the scheduling backend | Accepted |
 | [0002](0002-python-and-pipecat-for-the-voice-engine.md) | Python and Pipecat for the voice engine | Accepted |
 | [0003](0003-cascaded-speech-architecture.md) | Cascaded speech architecture (STT → LLM → TTS) | Accepted |
-| [0004](0004-two-call-entries-over-one-engine.md) | Two call entries over one engine | Accepted |
+| [0004](0004-two-call-entries-over-one-engine.md) | Two call entries over one engine | Accepted, amended by 0015 |
 | [0006](0006-names-by-function-and-ports-for-external-systems.md) | Names by function and ports for external systems | Accepted |
 | [0007](0007-own-security-headers-middleware.md) | Own security headers middleware | Accepted |
 | [0008](0008-security-checks-shared-by-developers-and-ci.md) | Security checks shared by developers and CI | Accepted |
@@ -16,6 +16,7 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 | [0011](0011-write-proposals-validated-by-code.md) | Write proposals validated by code; the model judges the caller's confirmation | Accepted |
 | [0012](0012-pull-requests-with-required-checks.md) | Changes reach main through pull requests with required checks | Accepted |
 | [0013](0013-evals-fingerprint-of-what-the-evals-measure.md) | Evals fingerprint of what the evals measure, and the first baseline with the booking prompt | Accepted |
+| [0015](0015-browser-practice-entry-for-development.md) | Browser practice entry for development | Accepted |
 
 ## Process
 

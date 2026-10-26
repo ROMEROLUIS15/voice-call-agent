@@ -31,6 +31,8 @@ class LanguageModelProvider(StrEnum):
     GROQ = "groq"
     GOOGLE = "google"
     OPENAI = "openai"
+    OPENROUTER = "openrouter"
+    """Groq's model through OpenRouter, for networks Groq refuses (manifest §10)."""
 
 
 class LanguageModelSettings(_Section):

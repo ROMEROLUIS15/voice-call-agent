@@ -12,6 +12,7 @@ Living document: every change that touches an attack surface updates it in the s
     *   [4.4 Language model](#44-language-model)
     *   [4.5 Providers and availability](#45-providers-and-availability)
     *   [4.6 Secrets, logs and supply chain](#46-secrets-logs-and-supply-chain)
+    *   [4.7 Browser practice entry](#47-browser-practice-entry)
 *   [5. Accepted risks](#5-accepted-risks)
 *   [6. Review log](#6-review-log)
 
@@ -44,15 +45,16 @@ Living document: every change that touches an attack surface updates it in the s
 | S3 | Meta `calls` webhook and its subscription check | `GET`/`POST /whatsapp/webhook` |
 | S4 | WhatsApp WebRTC media | Negotiated by the Graph API |
 | S5 | Language model | Everything the caller says reaches the prompt |
-| S6 | Providers: Deepgram, LLM, Twilio REST, Graph API | Outbound calls |
+| S6 | Providers: Deepgram, LLM (Groq, directly or through OpenRouter), Twilio REST, Graph API | Outbound calls |
 | S7 | Scheduling backend (Cronix `phone-agent-api`) | Outbound signed HTTP (phase 1) |
 | S8 | HTTP surface in general | Health endpoints, errors, headers, hosts |
 | S9 | Logs and traces | Everything the service writes |
 | S10 | Supply chain and repository | Dependencies, CI, git history |
 | S11 | Error tracking (Sentry) | Outbound error events, call transactions and metrics |
 | S12 | Model evals and measurements in CI | Provider secrets in GitHub Actions; golden conversations sent to the model under test and the judge; fixed replies sent to the text-to-speech voices, their samples kept as run artifacts |
+| S13 | Browser practice entry (development only, ADR 0015) | `GET /practice`, `GET /practice/call.js`, `POST /practice/offer` and the WebRTC media it negotiates |
 
-S3 and S4 exist only when the WhatsApp variable group is complete. While the WhatsApp entry is paused (manifest §10) it is not configured in deployment, so they are not exposed; their mitigations and tests stay.
+S3 and S4 exist only when the WhatsApp variable group is complete. While the WhatsApp entry is paused (manifest §10) it is not configured in deployment, so they are not exposed; their mitigations and tests stay. S13 exists only with `BROWSER_PRACTICE_ENABLED=true`, which the service refuses at startup unless `ENVIRONMENT=development`.
 
 ## 4. Threats and mitigations
 
@@ -124,6 +126,16 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | T-34 | Attacks or failures go unnoticed (S9, S11) | Every error has a code and a kind and is reported through one function; security events are flagged and counted; no handler silences an error; alerts on failure rate, latency, provider errors and security spikes (`docs/observability/alerts.md`) | `test_no_handler_silences_an_error`, `test_error_reporting.py` | P (alert rules pending the Sentry project) |
 | T-36 | A change reaches `main` without passing the checks (S10) | Branch protection: pull requests only, CI's jobs as required checks, branch up to date, applied to administrators too, no force pushes nor deletion (ADR 0012) | Branch protection settings of `main` | P (configuration, no automated test) |
 
+### 4.7 Browser practice entry
+
+| Id | Threat | Mitigation | Proof | Status |
+|---|---|---|---|---|
+| T-37 | Anyone who reaches the service starts practice calls and spends on providers (S13) | Off by default; refused at startup outside development; offers only from a loopback address, read after uvicorn applies the forwarded client of trusted proxies (`403`, `PRACTICE_CLIENT_NOT_LOCAL`, a security event) | `test_browser_practice_is_refused_in_production`, `test_the_entry_is_not_mounted_unless_enabled`, `test_an_offer_from_another_machine_is_refused`, `test_a_client_without_an_address_is_refused` | M (R-09) |
+| T-38 | Offers that never connect hold call slots (S13) | Offers without an audio section refused (`400`); the call ends if the browser does not connect within 20 s (`PRACTICE_CALL_NOT_CONNECTED`); the peer is closed once and a close that does not finish within 5 s is given up and reported (`WEBRTC_CLOSE_TIMED_OUT`), so its slot is always released | `test_an_offer_without_audio_is_refused_and_frees_its_slot`, `test_a_browser_that_never_connects_ends_the_call_and_frees_its_slot`, `test_a_peer_closed_by_pipecats_connecting_timeout_is_not_closed_again`, `test_a_close_that_never_finishes_is_reported_and_given_up` | M |
+| T-39 | Malformed or oversized offers (S13) | Typed body: only an offer, SDP up to 32 KiB, unknown fields refused; generic `422`; request body ≤ 64 KiB | `test_a_malformed_offer_is_refused_without_details` | M |
+| T-40 | Offer floods (S13) | The offer path is rate limited like the call entries | `test_offers_are_rate_limited` | M |
+| T-41 | Script injection into or framing of the practice page (S13) | The page's content security policy allows only its own script and its request to the service; no inline script; framing denied; `nosniff` | `test_the_page_and_its_script_are_served_with_the_page_policy`, `test_a_page_gets_its_own_policy_and_keeps_the_other_headers` | M |
+
 ## 5. Accepted risks
 
 | Id | Risk | Why it is accepted | Revisit |
@@ -136,6 +148,7 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | R-06 | The `I-Twilio-Idempotency-Token` header is assumed to be sent on every webhook, as Twilio documents; if missing, the `CallSid` is the key | Documented behaviour | Phase 0 real calls |
 | R-07 | Until the first measured baseline, a prompt or model change is gated only by re-recording the behaviour fingerprint, not by measured evals | The phase 0 prompt is provisional and cannot write anything; the first baseline is measured with the booking prompt of phase 2 (ADR 0013), and from then on the fingerprint changes only with new measurements | Phase 2, with `GROQ_API_KEY` and `GOOGLE_API_KEY` as repository secrets |
 | R-08 | Whether the caller's answer is a yes is the language model's judgement: an ambiguous answer could be taken as a confirmation | Rules in code that classify the caller's words grow with every case and block legitimate bookings (ADR 0011). The code still requires the same unchanged proposal and a caller turn after its read-back; golden cases measure it with margin 0; the call trace records the answer and the decision | If a trace shows a write the caller did not confirm |
+| R-09 | A local tunnel or proxy that forwards requests without `X-Forwarded-For` makes remote clients look local to the practice entry (T-37) | Development only and refused in production; the entry stays off whenever the development service is exposed through a tunnel (README) | When a tunnel exposes the development service (WhatsApp test number) |
 
 ## 6. Review log
 
@@ -147,3 +160,4 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-19 | Balance between the agent and the code: write proposals validated by code and confirmed by the caller (T-19, T-20, T-21, R-08); T-35, what a spoofed caller ID must not reveal; T-36, branch protection of `main`; R-07 until the booking prompt | S1, S5, S7, S10 |
 | 2026-10-20 | WhatsApp entry paused: S3 and S4 not exposed while it is not configured | S3, S4 |
 | 2026-10-26 | Text-to-speech comparison workflow with the Deepgram secret; T-32 covers it | S12 |
+| 2026-10-26 | Browser practice entry for development (S13, T-37 to T-41, R-09); Groq reachable through OpenRouter, restricted to Groq | S6, S13 |
