@@ -17,6 +17,8 @@ There are **two entries** to one voice engine:
 | Transport | WebRTC (Cloud API Calling) | Twilio Media Streams (μ-law 8 kHz) |
 | What it is for | Real clients in Venezuela, free for them. **Paused** until Meta enables *Calling* on the number (§10) | Calls to a traditional phone number (PSTN) with Venezuelan numbers. **The main path** while the WhatsApp entry is paused |
 
+**For development only**, a third entry lets a developer talk to the agent from a browser tab on their own machine, over WebRTC, with the same engine (ADR 0015). It has no caller number and no verified identity, and the service refuses it in production.
+
 **Difference with Cronix's existing channels:**
 
 | | WhatsApp messages | Dashboard assistant | **Calls (this module)** |
@@ -75,7 +77,7 @@ There are **two entries** to one voice engine:
    reuses the booking logic and notifications of its WhatsApp channel
 ```
 
-**Design rule:** everything that depends on the channel lives in `call_transports/` and is summarized in a `CallSession`. From the pipeline inwards the concepts "WhatsApp" and "Twilio" **do not exist**; only `session.identity_verified` and `session.business_id`. Likewise, nothing outside `adapters/cronix_scheduling_api/` (and the composition root that wires it) knows that the backend is Cronix.
+**Design rule:** everything that depends on the channel lives in `call_transports/` and is summarized in a `CallSession`. From the pipeline inwards the concepts "WhatsApp", "Twilio" and "browser" **do not exist**; only `session.identity_verified` and `session.business_id`. Likewise, nothing outside `adapters/cronix_scheduling_api/` (and the composition root that wires it) knows that the backend is Cronix.
 
 ### Components
 
@@ -83,6 +85,8 @@ There are **two entries** to one voice engine:
 |---|---|
 | `call_transports/whatsapp_calling/` | Meta `calls` webhook: validate the signature (`X-Hub-Signature-256` with the app secret) over the raw body, keep only `calls` events, drop repeated events and stale `connect` events (replay protection), admit or reject the call against the concurrency limit, accept it and open the WebRTC session. |
 | `call_transports/twilio_media_streams/` | Incoming-call webhook: validate the Twilio signature, reject repeated deliveries, answer TwiML `<Connect><Stream>` (or `<Reject reason="busy">` when full) with a stream admission token, admit one Media Stream per call, end the call through the REST API with a timeout. |
+| `call_transports/browser_webrtc/` | Practice entry for development (ADR 0015): serves `/practice` and its script, answers the browser's WebRTC offer (only from a loopback address, only with audio), ends the call if the browser does not connect within 20 s and closes its peer once. |
+| `call_transports/pipecat_webrtc_transport.py` | Pipecat's WebRTC transport and the audio format, shared by the WhatsApp and practice entries. |
 | `call_transports/replay_guard.py` | `ReplayGuard` port and its in-memory implementation: remembers event ids for a window to reject repeats. |
 | `call_session/` | Build the `CallSession`: channel, `business_id`, caller phone, `identity_verified` (derived from the channel). Defines the `BusinessResolver` port. |
 | `call_supervision/` | Per-instance call slots: concurrency limit, supervised call tasks, graceful drain on shutdown. |
@@ -93,9 +97,9 @@ There are **two entries** to one voice engine:
 | `scheduling_backend/` | `SchedulingBackend` port with its domain models (typed results) and infrastructure errors. |
 | `adapters/cronix_scheduling_api/` | **Only place that knows Cronix:** implements `SchedulingBackend` and `BusinessResolver` over the contract: HMAC signature, timeouts, idempotency, error mapping. (Phase 1.) |
 | `adapters/deepgram_speech/` | Flux STT and Aura-2 TTS factories; Aura-2 reports the characters it sends, for the cost estimate. |
-| `adapters/language_model_providers/` | Groq, Google and OpenAI LLM factories with explicit request timeouts. |
+| `adapters/language_model_providers/` | Groq, Google, OpenAI and OpenRouter LLM factories with explicit request timeouts; OpenRouter sends Groq's model to Groq only (§10). |
 | `observability/` | Error taxonomy and `report_error` (log, metric, issue for real failures, call trace); one `CallTrace` per call (versions, per-segment latency, usage, estimated cost, errors) published to a JSON-lines file and to Sentry; structured logging; redaction of personal data (ADR 0009). |
-| `http_hardening/` | Security headers (ADR 0007), generic error responses, rate limits per client address and route, trusted hosts, body size limit, closed CORS (constitution §15). |
+| `http_hardening/` | Security headers (ADR 0007), with its own content security policy for the practice page, generic error responses, rate limits per client address and route, trusted hosts, body size limit, closed CORS (constitution §15). |
 | `settings/` | Typed configuration from environment variables; each component receives only its section. |
 | `service_composition.py`, `asgi_app.py`, `__main__.py`, `graceful_http_server.py` | Composition root and process entry: wire the components, mount the entries, run uvicorn with a graceful drain. |
 | `evals/` (repository root, not shipped) | Golden dataset (`golden_dataset/*.yaml`), conversation harness (scripted providers and a loopback transport over the real runner), task metrics, judge scoring, baseline and model evals runner (ADR 0010). |
@@ -129,7 +133,7 @@ There are **two entries** to one voice engine:
 *   **INV-7 · Interruptions.** If the caller speaks while the agent is speaking, the audio stops. Exception: a write in progress is not cancelled; its result is reported when it ends.
 *   **INV-8 · Isolated channel.** No module outside `call_transports/` and `call_session/` checks which channel the call came from.
 
-**Where they are enforced (phase 0):** INV-4 → `CallSession.identity_verified` is a property derived from the channel, not an assignable field. INV-8 → `tests/architecture/test_channel_isolation.py` walks the AST and fails if `.channel`, the `CallChannel` enum or a channel literal appears outside `call_transports/` and `call_session/`; `settings/` and the composition root are exempt (they configure and mount the entries, they decide nothing per call). **Phase 1 note:** the contract's `calls/start` needs the `channel`; the Cronix adapter will serialize it and needs an explicit, recorded exemption.
+**Where they are enforced (phase 0):** INV-4 → `CallSession.identity_verified` is a property derived from the channel, not an assignable field. INV-8 → `tests/architecture/test_channel_isolation.py` walks the AST and fails if `.channel`, the `CallChannel` enum or a channel literal appears outside `call_transports/` and `call_session/`; `settings/` and the composition root are exempt (they configure and mount the entries, they decide nothing per call). **Phase 1 note:** the contract's `calls/start` needs the `channel`; the Cronix adapter will serialize it and needs an explicit, recorded exemption. Practice calls (`browser`, ADR 0015) are not a channel of the contract, which accepts `twilio` and `whatsapp`: which business and which scheduling backend a practice call uses is decided with the agent's tools (phase 2).
 
 ## 6. Latency budget
 
@@ -151,12 +155,13 @@ If a backend query may exceed 1 s, the agent says a short holding phrase instead
 |---|---|---|
 | WhatsApp entry | WhatsApp Cloud API Calling + Pipecat's WebRTC transport | Uses the number Cronix already has; free for the caller. Paused (§10). |
 | Phone entry | Twilio Programmable Voice + Media Streams | Native connector in Pipecat; Venezuelan numbers (§10). |
+| Practice entry (development) | Browser WebRTC over Pipecat's SmallWebRTC transport, with the repository's own page | The engine heard and tuned before any number exists (ADR 0015). |
 | Orchestration | Pipecat (Python), self-hosted. **`pipecat-ai==1.14.0`, pinned exactly** (API: `PipelineWorker` + `WorkerRunner`; `PipelineTask`/`PipelineRunner` are deprecated since 1.3) | Both call transports, Flux turn detection and latency metrics built in (ADR 0002). |
 | Provider SDKs | Pinned exactly: `deepgram-sdk==7.13.0`, `groq==1.7.0`, `google-genai==2.31.0`, `openai==3.35.1`, `twilio==9.12.0` | The ecosystem changes every few weeks; `uv.lock` is committed. |
 | Server | FastAPI + uvicorn in a container, behind `GracefulHttpServer` | Persistent connection per call; drains calls on shutdown. |
 | STT | Deepgram Flux **`flux-general-multi` with `language_hint=es`** (built-in turn detection) | Already used in Cronix. `flux-general-en` only understands English and rejects `language_hint`. **Validate quality on 8 kHz phone audio.** |
-| LLM | Groq `openai/gpt-oss-120b` with reasoning effort `low`, chosen by measuring in phase 0; `LLM_PROVIDER` / `LLM_MODEL` | The only configuration measured within §6: first token in p50 375 ms, p95 571 ms (Groq's default effort: 544 / 976 ms; DeepSeek `deepseek-flash`: 776 / 937 ms, with longer answers and personal data stored in China under its privacy policy). Measured results in `README.md`. Swappable (`adapters/language_model_providers/`). |
-| TTS | Deepgram Aura-2 in Spanish over WebSocket; `aura-2-selena-es` (Latin American) by default | Already known; alternatives Cartesia or ElevenLabs. Flux TTS (`/v2/speak`) is left out for now: Spanish voices were not verified (Pipecat's examples only use `-en` voices). |
+| LLM | Groq `openai/gpt-oss-120b` with reasoning effort `low`, chosen by measuring in phase 0; `LLM_PROVIDER` / `LLM_MODEL` | The only configuration measured within §6: first token in p50 375 ms, p95 571 ms (Groq's default effort: 544 / 976 ms; DeepSeek `deepseek-flash`: 776 / 937 ms, with longer answers and personal data stored in China under its privacy policy). Measured results in `README.md`. Swappable (`adapters/language_model_providers/`); through OpenRouter, restricted to Groq, where Groq refuses the network (§10). |
+| TTS | Deepgram Aura-2 in Spanish over WebSocket; `aura-2-selena-es` (Latin American) by default. **To choose in phase 0** against Flux TTS | Already known; alternatives Cartesia or ElevenLabs. Deepgram calls Aura-2 its previous generation and recommends Flux TTS (`/v2/speak`, 19 Spanish voices, no accent published; $0.045 per 1k characters against Aura-2's $0.030, 2026-10-26); Pipecat 1.14 has `DeepgramFluxTTSService`, which streams the model's tokens instead of sentences. Compared with `evals/text_to_speech_comparison/` (§12). |
 | Testing | pytest, pytest-asyncio, strict mypy, reference conversations, syrupy snapshots | Constitution §7. |
 | Error tracking and traces | Sentry (`sentry-sdk==2.71.0`), project `voice-call-agent` | ADR 0009. |
 | Evals | DeepEval `4.2.8` (dependency group `evals`, telemetry off), judge `gemini-3.6-flash`, GitHub-hosted runners | ADR 0010, amended by ADR 0013. |
@@ -206,12 +211,13 @@ Registered on 2026-10-19; what each item solves and how it applies here is in [`
 *   **Meta test numbers:** they last 90 days and have restrictions on contacting some countries; verify that a call started from outside the US arrives.
 *   **Venezuelan numbers for the phone line** (phase 0 decision 2026-10-20, findings 2026-10-23): the phone line uses only Venezuelan numbers, one per business (§4.1), so callers dial a local number and no test depends on an international call. Neither Twilio nor Telnyx sells Venezuelan numbers: Twilio's API offers numbers in 53 countries, not Venezuela, and Telnyx's number search finds no coverage there, although both publish Venezuelan requirements (local numbers with an ID and a local address; +58 800 with a letter of authorization). Paths, each priced per number and with its lead time before the first business uses it: a +58 800 number requested from Twilio support, free for the caller; or a Venezuelan number from a number provider delivered to Twilio over SIP, whose extra hop is measured before callers use it (`To` and `From` then arrive as SIP URIs, and business resolution by dialed number normalizes them).
 *   **Call forwarding from a business's existing line** (to verify before it is offered): the business keeps the number its clients know and forwards it to its own service number. To verify with each Venezuelan carrier (Movistar, Digitel, Movilnet, CANTV): whether it allows forwarding to that kind of number (+58 800 or a number provider's local number), in which modes (always, when busy, when unanswered), what the business pays per forwarded minute, how many forwarded calls can run at once, and whether the caller's number still arrives as `From` (bookings use it as the client's phone, contract §4.4).
-*   **Groq rejects some networks** (phase 0 finding, 2026-10-19): it answers `403` to VPN exits and to IP ranges it flags (sanctioned countries, some cloud regions, according to its staff on Groq's community forum). GitHub-hosted runners reach it (`provider-reachability.yml`); the server's host and region are checked the same way before deploying, and the provider fallback of phase 4 covers a block in production.
+*   **Groq rejects some networks** (phase 0 finding, 2026-10-19): it answers `403` to VPN exits and to IP ranges it flags (sanctioned countries, some cloud regions, according to its staff on Groq's community forum). GitHub-hosted runners reach it (`provider-reachability.yml`); the server's host and region are checked the same way before deploying, and the provider fallback of phase 4 covers a block in production. From a developer machine whose network Groq refuses, `LLM_PROVIDER=openrouter` sends the same model to Groq through OpenRouter: Groq as the only provider, no fallback, the same low reasoning effort (verified 2026-10-26: the answers came from Groq). The route adds a hop (first token 500–1,078 ms in three requests from a local machine behind a VPN, not representative); latency is measured on the server, calling Groq directly.
+*   **A WebRTC peer that never connects** (found 2026-10-26, Pipecat 1.14, aiortc 1.15): Pipecat's `SmallWebRTCConnection` closes it after 60 s, and closing it again afterwards never returns. Closing a peer that is still connecting sometimes does not return either: aioice waits for a UDP socket to report that it closed (1 close in 20 on a Windows machine; not checked on Linux). The practice entry ends such a call after its own 20 s, closes a peer only if it is not closed yet and gives up on a close after 5 s, reported as `WEBRTC_CLOSE_TIMED_OUT` (its sockets may stay open until the process ends). The WhatsApp entry leaves its peers to Pipecat's `WhatsAppClient`: verify with the test number that a call whose peer never connects releases its call slot.
 *   **8 kHz audio** on the phone line: measure how names, numbers, national ID numbers and fillers are transcribed (§9.1, phase 0).
 *   **Edge Function cold start:** preload the business context at the start if it breaks the budget.
 *   **Costs:** record the real cost per call and per channel from phase 0.
 *   **One webhook callback per Meta app** (phase 0 finding, to verify): Cronix's message webhook (`process-whatsapp`) and this service's call webhook compete for the same URL. Options: a separate Meta app for the test number, a callback override per account or per number, or the Edge Function forwarding the `calls` field. The service already acknowledges any field other than `calls` with `200`, so it supports all three.
-*   **Flux at 8 kHz:** the Flux reference does not list the accepted sample rates for `linear16`. Audio is sent at 8 kHz without resampling (`TWILIO_AUDIO_FORMAT`); if transcription or turn detection degrade, resample to 16 kHz in the Twilio serializer.
+*   **Flux at 8 kHz:** Flux accepts raw `linear16`, `mulaw` and `alaw` at 8,000 Hz, and Deepgram recommends 16,000 Hz (Flux documentation, verified 2026-10-26). Audio is sent at 8 kHz without resampling (`TWILIO_AUDIO_FORMAT`); if transcription or turn detection degrade on the phase 0 measurements, resample to 16 kHz in the Twilio serializer.
 *   **Several instances and Meta's `terminate` event** (to verify in phase 0): Meta delivers each webhook to whichever instance the load balancer picks, so the `terminate` of a call may reach an instance that does not hold its WebRTC connection; that instance only logs it. The call must still end when the caller's peer connection closes; verify that it does, and that its call slot is released.
 *   **Network calls owned by libraries without a configurable timeout** (known limitation): Deepgram's STT/TTS WebSocket connect uses the `websockets` library default open timeout (10 s); WebRTC/ICE negotiation is managed by aiortc. Every network call the agent's own code makes or configures has an explicit timeout (Graph API session, Twilio REST, LLM clients, Media Stream handshake).
 *   **uvicorn closes every WebSocket on shutdown** (code 1012) before waiting for anything; without mitigation a restart cuts every phone-line call. Mitigated by `GracefulHttpServer`, which drains calls on the first signal.
@@ -227,7 +233,7 @@ Cross-cutting decisions are ADRs in `docs/adr/`:
 *   [ADR 0001](../../adr/0001-separate-service-from-the-scheduling-backend.md) · Separate service from the scheduling backend.
 *   [ADR 0002](../../adr/0002-python-and-pipecat-for-the-voice-engine.md) · Python and Pipecat for the voice engine.
 *   [ADR 0003](../../adr/0003-cascaded-speech-architecture.md) · Cascaded speech architecture (STT → LLM → TTS).
-*   [ADR 0004](../../adr/0004-two-call-entries-over-one-engine.md) · Two call entries over one engine.
+*   [ADR 0004](../../adr/0004-two-call-entries-over-one-engine.md) · Two call entries over one engine. *Amended by ADR 0015.*
 *   [ADR 0006](../../adr/0006-names-by-function-and-ports-for-external-systems.md) · Names by function and ports for external systems.
 *   [ADR 0007](../../adr/0007-own-security-headers-middleware.md) · Own security headers middleware.
 *   [ADR 0008](../../adr/0008-security-checks-shared-by-developers-and-ci.md) · Security checks shared by developers and CI.
@@ -236,6 +242,7 @@ Cross-cutting decisions are ADRs in `docs/adr/`:
 *   [ADR 0011](../../adr/0011-write-proposals-validated-by-code.md) · Write proposals validated by code; the model judges the caller's confirmation.
 *   [ADR 0012](../../adr/0012-pull-requests-with-required-checks.md) · Changes reach `main` through pull requests with required checks.
 *   [ADR 0013](../../adr/0013-evals-fingerprint-of-what-the-evals-measure.md) · Evals fingerprint of what the evals measure, and the first baseline with the booking prompt (amends ADR 0010).
+*   [ADR 0015](../../adr/0015-browser-practice-entry-for-development.md) · Browser practice entry for development (amends ADR 0004).
 
 Decisions local to this module:
 
@@ -247,6 +254,7 @@ Decisions local to this module:
 *   **Stream admission token on Twilio Media Streams**. The `/twilio/stream` WebSocket is public; without control anyone could open an STT + LLM + TTS session at our expense. The signed webhook issues an HMAC token bound to the `CallSid`, valid for 60 s, inside the TwiML; the WebSocket requires it in the `start` event. The key is derived from the Twilio auth token: no new secret. Stateless, so any instance can verify it. Rejected alternative: validating `X-Twilio-Signature` on the WebSocket handshake, a Twilio behaviour not verified in its documentation.
 *   **Answer `200` to Meta immediately, even if accepting the call fails**. A retried `connect` is useless (its SDP offer has expired); the failure stays in the log instead of producing retries.
 *   **Nearest-rank percentile** in the latency report: with 20 calls per channel it does not interpolate values that were never measured.
+*   **Text-to-speech compared on "first token → first audio" with a scripted token stream.** Fixed replies reach each voice as a language model service delivers them, at the 500 tokens per second Groq documents for the model in use, one word per token; so the time includes each service's own aggregation (sentences for Aura-2, tokens for Flux TTS). Words are longer than tokens, so sentences arrive sooner than from the model: conservative for Aura-2. No language model in the loop, so it runs from any network that reaches Deepgram.
 *   **Local VAD (Silero) next to Flux — PENDING** until phase 0 data exists. Flux decides the turn, but Pipecat's `UserBotLatencyObserver` measures from the `VADUserStoppedSpeakingFrame`, which only a local VAD emits; without it there is no per-turn measurement. Cost: some CPU per call and ~150 ms to build the analyzer (done in a thread).
 
 Server lifecycle and provider calls:
@@ -256,6 +264,8 @@ Server lifecycle and provider calls:
 *   **Explicit LLM client timeouts with at most one retry**, by overriding Pipecat's `create_client` (Groq, OpenAI): Pipecat builds these clients with the SDK defaults (600 s, 2 retries) and exposes no parameter. Google uses Pipecat's `http_options` and `stream_idle_timeout_secs`. The timeout values are reviewed with the phase 0 measurements.
 *   **Own Twilio hang-up instead of Pipecat's `auto_hang_up`**, which calls the REST API through an aiohttp session without an explicit timeout.
 *   **Readiness reports `503` when the instance is full**, not only while draining, so a load balancer sends calls to another instance.
+*   **Practice entry: one offer after ICE gathering, an own connect deadline, a bounded close.** The page sends its offer with every candidate, so the entry needs no route for later candidates; the browser runs on the same machine, where host candidates are enough. The 20 s deadline is shorter than Pipecat's 60 s connecting timeout, whose close leaves the peer unable to close again (§10).
+*   **OpenRouter only as a route to Groq.** Requests allow Groq alone, without fallback: another provider would answer with another latency, another quantization and other data terms, and the measurements of §7 would stop describing what answers.
 
 Security hardening:
 
@@ -300,6 +310,10 @@ Observability and quality (stage 1):
 
 **Found (2026-10-23), Venezuelan numbers:** neither Twilio nor Telnyx sells them; the paths left are a +58 800 number requested from Twilio support or a number provider's Venezuelan number delivered over SIP, one per business (§10). A business can keep its published number by forwarding it, once Venezuelan carriers confirm it works (§10).
 
+**Added (2026-10-26), text-to-speech comparison:** `evals/text_to_speech_comparison/` times every Spanish voice of Aura-2 and Flux TTS on the "first token → first audio" segment of §6 and keeps phone-quality samples (μ-law at 8 kHz) of fixed replies, to choose the voice by ear; `.github/workflows/text-to-speech-comparison.yml` runs it from a GitHub-hosted runner. The price table gains Flux TTS. The engine is measured without a phone number while the Venezuelan one is obtained; the 20 calls on the real route stay pending.
+
+**Added (2026-10-26), browser practice entry (ADR 0015):** `call_transports/browser_webrtc/` serves `/practice`, where a browser on the developer's machine calls the agent over WebRTC through the same runner, pipeline and call trace (channel `browser`, no telephony cost). Development only and loopback clients only; refused offers, peers that never connect and closing are covered by negative tests and the threat model (S13). `LLM_PROVIDER=openrouter` reaches Groq's model from networks Groq refuses. Checked end to end on a local machine: an aiortc peer playing the browser heard the greeting 4.4 s after its offer (connection, pipeline start and the first speech included), and its hang-up freed the call slot. The first practice call with a person's voice followed the same day: 2 turns, 2.4 s and 1.03 s from end of speech to first audio, through a VPN and OpenRouter (not representative).
+
 **Fixed (2026-10-26), cost of the voice:** the first practice call's trace showed `tts_characters: 0` although the agent spoke: Pipecat's WebSocket Aura-2 service reports no usage. The Deepgram adapter now reports the characters it sends (§11). Call traces written before this fix leave the voice out of their estimated cost.
 
-**Next:** phase 0's **first real call over the phone line, measured per segment**, once it has a Venezuelan number. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).
+**Next:** practice calls through the browser entry tune the prompt and the pipeline while the Venezuelan number is obtained; then the WhatsApp entry with a Meta test number (§10). Phase 0's **first real call over the phone line, measured per segment**, waits for the Venezuelan number. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).

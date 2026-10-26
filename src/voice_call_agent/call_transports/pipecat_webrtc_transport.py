@@ -1,4 +1,4 @@
-"""Pipecat transport over an accepted WhatsApp WebRTC connection."""
+"""Pipecat transport over a WebRTC connection: a WhatsApp call or a browser practice call."""
 
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
@@ -7,7 +7,7 @@ from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from voice_call_agent.speech_pipeline.audio_format import AudioFormat
 
 # WebRTC delivers Opus at 48 kHz; the pipeline runs at 16 kHz (STT) and 24 kHz (TTS).
-WHATSAPP_AUDIO_FORMAT = AudioFormat(input_sample_rate_hz=16000, output_sample_rate_hz=24000)
+WEBRTC_AUDIO_FORMAT = AudioFormat(input_sample_rate_hz=16000, output_sample_rate_hz=24000)
 
 
 def build_webrtc_transport(connection: SmallWebRTCConnection) -> SmallWebRTCTransport:

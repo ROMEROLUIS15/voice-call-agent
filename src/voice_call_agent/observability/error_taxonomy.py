@@ -49,6 +49,10 @@ class ErrorCode(StrEnum):
     IDENTITY_MISMATCH = "IDENTITY_MISMATCH"
     # Capacity.
     CALL_REJECTED_NO_SLOT = "CALL_REJECTED_NO_SLOT"
+    # Browser practice entry (development only).
+    PRACTICE_CALL_NOT_CONNECTED = "PRACTICE_CALL_NOT_CONNECTED"
+    PRACTICE_CLIENT_NOT_LOCAL = "PRACTICE_CLIENT_NOT_LOCAL"
+    WEBRTC_CLOSE_TIMED_OUT = "WEBRTC_CLOSE_TIMED_OUT"
     # Protections doing their job.
     WEBHOOK_SIGNATURE_INVALID = "WEBHOOK_SIGNATURE_INVALID"
     WEBHOOK_REPLAY_REJECTED = "WEBHOOK_REPLAY_REJECTED"
@@ -107,6 +111,7 @@ ERROR_CATALOG: dict[ErrorCode, ErrorSpec] = {
         _failure(ErrorCode.TWILIO_HANGUP_FAILED, _W, "ending the call through Twilio failed"),
         _failure(ErrorCode.UNHANDLED_REQUEST_ERROR, _E, "unhandled error serving a request"),
         _failure(ErrorCode.TRACE_EXPORT_FAILED, _W, "a call trace could not be exported"),
+        _failure(ErrorCode.WEBRTC_CLOSE_TIMED_OUT, _W, "closing a WebRTC peer did not finish"),
         _failure(ErrorCode.SCHEDULING_BACKEND_UNAVAILABLE, _E, "scheduling backend unavailable"),
         _failure(ErrorCode.SCHEDULING_BACKEND_REJECTED, _C, "scheduling backend refused a request"),
         _failure(ErrorCode.IDEMPOTENCY_KEY_REUSED, _C, "idempotency key reused with another body"),
@@ -117,6 +122,17 @@ ERROR_CATALOG: dict[ErrorCode, ErrorSpec] = {
         _outcome(ErrorCode.IDENTITY_REQUIRED, "second factor required on the phone line"),
         _outcome(ErrorCode.IDENTITY_MISMATCH, "second factor did not match"),
         _outcome(ErrorCode.CALL_REJECTED_NO_SLOT, "no call slot free; call rejected", warning=True),
+        _outcome(
+            ErrorCode.PRACTICE_CALL_NOT_CONNECTED,
+            "practice browser never connected; call ended",
+            warning=True,
+        ),
+        _outcome(
+            ErrorCode.PRACTICE_CLIENT_NOT_LOCAL,
+            "practice call from another machine refused",
+            security_event=True,
+            warning=True,
+        ),
         _outcome(
             ErrorCode.WEBHOOK_SIGNATURE_INVALID,
             "webhook with a missing or invalid signature",

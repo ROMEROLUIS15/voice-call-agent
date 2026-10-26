@@ -25,7 +25,24 @@ uv run voice-call-agent      # http://127.0.0.1:8000/health/ready
 ```
 
 Twilio and Meta need a public URL: expose the port with `ngrok http 8000` (or cloudflared) and put
-that URL in `PUBLIC_BASE_URL`.
+that URL in `PUBLIC_BASE_URL`. Keep the practice entry off while the port is exposed.
+
+### Practice entry (development only)
+
+Talk to the agent from a browser on your own machine, with no phone number (ADR 0015):
+
+```bash
+# in .env: ENVIRONMENT=development and BROWSER_PRACTICE_ENABLED=true
+uv run voice-call-agent      # then open http://localhost:8000/practice
+```
+
+The page asks for the microphone and starts a call through the same engine and call trace as the
+other entries; use headphones to try interrupting the agent. Only a browser on this machine can
+start a call, and the service refuses the setting outside development. Its latency is not a phone
+call's: the browser's audio is wideband, with echo cancellation, and stays on the machine.
+
+If your network gets `403` from Groq, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`: the
+same model answers from Groq through OpenRouter, with one more hop (manifest §10).
 
 ### Phone-line entry (Twilio)
 
@@ -58,6 +75,7 @@ not mounted. To resume it:
 ## Security
 
 *   Webhook signatures (Twilio, Meta) validated in constant time; repeated or stale events are rejected; one Media Stream per call, behind an admission token.
+*   The browser practice entry exists only in development and answers only clients on the same machine.
 *   Rate limits per client address and route on the call entries; request bodies and WebSocket messages limited to 64 KiB.
 *   Security headers on every response, no `Server` header, CORS closed, trusted hosts only, no API documentation in production, error responses that reveal nothing.
 *   Behind a proxy, set `TRUSTED_PROXY_ADDRESSES` and `ALLOWED_HOSTS`; with several instances, a shared `RATE_LIMIT_STORAGE_URI`.
@@ -92,6 +110,13 @@ baseline is measured with the booking prompt of phase 2 (ADR 0013): until then `
 records the new inputs; from then on `--write-baseline` stores new measurements. Details:
 [golden dataset](docs/evals/golden-dataset.md).
 
+Text-to-speech voices are compared on the "first token → first audio" segment of manifest §6,
+with phone-quality samples of every voice to choose it by ear (manifest §12):
+
+```bash
+uv run --env-file .env python -m evals.text_to_speech_comparison  # report and samples in var/
+```
+
 ## Measured results
 
 Each figure states its date and what it was measured with; what is not measured yet says so.
@@ -117,4 +142,6 @@ Changes reach `main` through pull requests; CI's jobs are required checks (ADR 0
 `.github/workflows/evals.yml` runs the model evals when what shapes the agent's replies changes
 (skipped without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets); its check is not required, but a
 pull request is not merged with it failing. `.github/workflows/provider-reachability.yml` checks
-on demand that the runners reach every provider.
+on demand that the runners reach every provider. `.github/workflows/text-to-speech-comparison.yml`
+runs the voice comparison on demand and when the comparison changes (skipped without the
+`DEEPGRAM_API_KEY` secret); the samples are the run's artifact.

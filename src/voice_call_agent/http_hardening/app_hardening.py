@@ -1,5 +1,7 @@
 """Wraps the application with every HTTP protection, in the order they must apply."""
 
+from collections.abc import Mapping
+
 from fastapi import FastAPI
 from limits.aio.strategies import MovingWindowRateLimiter
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
@@ -20,6 +22,7 @@ def harden_app(
     webhooks: WebhookProtectionSettings,
     rate_limiter: MovingWindowRateLimiter,
     rate_limited_paths: frozenset[str],
+    page_policies: Mapping[str, bytes] | None = None,
 ) -> ASGIApp:
     """Return the application wrapped for production use.
 
@@ -44,4 +47,6 @@ def harden_app(
     )
     app.add_middleware(RequestBodyLimitMiddleware, max_body_size=http.max_request_body_bytes)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(http.allowed_hosts))
-    return SecurityHeadersMiddleware(app, strict_transport_security=http.is_production)
+    return SecurityHeadersMiddleware(
+        app, strict_transport_security=http.is_production, page_policies=page_policies
+    )
