@@ -12,6 +12,8 @@ class CallChannel(StrEnum):
 
     WHATSAPP = "whatsapp"
     TWILIO = "twilio"
+    BROWSER = "browser"
+    """Practice calls from a browser on the developer's machine; development only."""
 
 
 class TenantAlreadyResolvedError(Exception):
@@ -24,7 +26,8 @@ class CallSession(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     call_id: str
-    """Id in its channel: Twilio `CallSid` or Meta `call_id` (`call_sid` in the contract)."""
+    """Id in its channel: Twilio `CallSid`, Meta `call_id` or a practice call's own id
+    (`call_sid` in the contract)."""
     channel: CallChannel
     caller_phone: str | None
     """Caller's number in E.164, or `None` when the channel withheld it."""
@@ -35,7 +38,8 @@ class CallSession(BaseModel):
 
     @property
     def identity_verified(self) -> bool:
-        """Meta verifies the WhatsApp number; a phone caller ID can be spoofed (INV-4)."""
+        """Meta verifies the WhatsApp number; a phone caller ID can be spoofed and a browser
+        practice call has no number at all (INV-4)."""
         return self.channel is CallChannel.WHATSAPP
 
     def resolve_business(self, business_id: str) -> "CallSession":

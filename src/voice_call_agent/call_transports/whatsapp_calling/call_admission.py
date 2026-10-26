@@ -5,12 +5,12 @@ from pipecat.transports.whatsapp.api import WhatsAppConnectCall
 
 from voice_call_agent.call_session.session_builders import build_whatsapp_session
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
-from voice_call_agent.call_transports.whatsapp_calling.call_acceptance import CallAcceptor
-from voice_call_agent.call_transports.whatsapp_calling.calls_webhook_filter import CallEvents
-from voice_call_agent.call_transports.whatsapp_calling.pipecat_webrtc_transport import (
-    WHATSAPP_AUDIO_FORMAT,
+from voice_call_agent.call_transports.pipecat_webrtc_transport import (
+    WEBRTC_AUDIO_FORMAT,
     build_webrtc_transport,
 )
+from voice_call_agent.call_transports.whatsapp_calling.call_acceptance import CallAcceptor
+from voice_call_agent.call_transports.whatsapp_calling.calls_webhook_filter import CallEvents
 from voice_call_agent.observability.error_reporting import report_error
 from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.speech_pipeline.conversation_runner import ConversationRunner
@@ -46,7 +46,7 @@ async def admit_call_events(
         nonlocal launched
         session = build_whatsapp_session(call.id, call.from_, call.to)
         transport = build_webrtc_transport(connection)
-        supervisor.launch(slot, conversation_runner.run(transport, session, WHATSAPP_AUDIO_FORMAT))
+        supervisor.launch(slot, conversation_runner.run(transport, session, WEBRTC_AUDIO_FORMAT))
         launched = True
 
     try:

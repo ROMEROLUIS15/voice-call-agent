@@ -31,3 +31,15 @@ def test_uvicorn_never_announces_itself_and_trusts_only_configured_proxies() -> 
     assert config.server_header is False
     assert config.forwarded_allow_ips == "10.0.0.5"
     assert config.ws_max_size == settings.http_hardening().max_websocket_message_bytes
+
+
+def test_browser_practice_is_refused_in_production() -> None:
+    with pytest.raises(ValidationError, match="BROWSER_PRACTICE_ENABLED"):
+        make_service_settings(browser_practice_enabled=True)
+
+
+def test_browser_practice_is_off_by_default_and_allowed_in_development() -> None:
+    assert not make_service_settings().browser_practice_enabled
+    assert make_service_settings(
+        browser_practice_enabled=True, environment="development"
+    ).browser_practice_enabled

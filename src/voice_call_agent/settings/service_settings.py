@@ -1,7 +1,8 @@
 """Service settings read from environment variables (and from `.env` in development).
 
 An entry (phone line, WhatsApp) is enabled only when its group of variables is complete; a
-partial group is a startup error, not an entry that fails on its first call.
+partial group is a startup error, not an entry that fails on its first call. The browser
+practice entry is enabled explicitly, and only in development.
 """
 
 from importlib.metadata import version
@@ -55,6 +56,7 @@ class ServiceSettings(BaseSettings):
     groq_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
+    openrouter_api_key: SecretStr | None = None
 
     public_base_url: HttpUrl | None = None
     twilio_account_sid: str | None = None
@@ -67,6 +69,9 @@ class ServiceSettings(BaseSettings):
     whatsapp_app_secret: SecretStr | None = None
     whatsapp_verify_token: SecretStr | None = None
     whatsapp_graph_api_timeout_seconds: float = 5.0
+
+    browser_practice_enabled: bool = False
+    """Practice calls from a browser on this machine (development only, ADR 0015)."""
 
     max_concurrent_calls: int = 10
     shutdown_grace_seconds: float = 300.0
@@ -106,6 +111,11 @@ class ServiceSettings(BaseSettings):
             self.whatsapp_app_secret,
             self.whatsapp_verify_token,
         )
+        if self.browser_practice_enabled and self.environment is DeploymentEnvironment.PRODUCTION:
+            raise UnsafeSettingsError(
+                "BROWSER_PRACTICE_ENABLED needs ENVIRONMENT=development: the entry has no "
+                "authentication"
+            )
         if "*" in _comma_separated(self.cors_allowed_origins):
             raise UnsafeSettingsError("CORS_ALLOWED_ORIGINS must list explicit origins, never '*'")
         try:
@@ -210,6 +220,7 @@ class ServiceSettings(BaseSettings):
             LanguageModelProvider.GROQ: self.groq_api_key,
             LanguageModelProvider.GOOGLE: self.google_api_key,
             LanguageModelProvider.OPENAI: self.openai_api_key,
+            LanguageModelProvider.OPENROUTER: self.openrouter_api_key,
         }
         return keys[self.llm_provider]
 

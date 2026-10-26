@@ -33,6 +33,12 @@ def language_model_factory(settings: LanguageModelSettings) -> Callable[[str], A
             )
 
             return openai_model_factory(settings)
+        case LanguageModelProvider.OPENROUTER:
+            from voice_call_agent.adapters.language_model_providers.openrouter_model import (
+                openrouter_model_factory,
+            )
+
+            return openrouter_model_factory(settings)
 
 
 @dataclass(frozen=True)
