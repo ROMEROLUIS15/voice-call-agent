@@ -49,7 +49,9 @@ def estimate_cost(
     parts: list[float | None] = [
         # Streaming STT is billed for the audio streamed, which is the whole call.
         _times(prices.stt_usd_per_minute.get(services.stt_model), minutes),
-        _times(_voice_price(prices, services.tts_voice), usage.tts_characters / 1000),
+        _times(
+            voice_price_per_1k_characters(prices, services.tts_voice), usage.tts_characters / 1000
+        ),
         _llm_cost(prices.llm.get(f"{services.llm_provider}/{services.llm_model}"), usage),
         _times(prices.telephony_usd_per_minute.get(channel_label), minutes),
     ]
@@ -65,7 +67,8 @@ def _times(price: float | None, quantity: float) -> float | None:
     return None if price is None else price * quantity
 
 
-def _voice_price(prices: PriceTable, voice: str) -> float | None:
+def voice_price_per_1k_characters(prices: PriceTable, voice: str) -> float | None:
+    """The price of the voice's longest matching family, or `None` when it is not priced."""
     families = [family for family in prices.tts_usd_per_1k_characters if voice.startswith(family)]
     if not families:
         return None

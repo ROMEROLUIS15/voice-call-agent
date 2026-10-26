@@ -4,6 +4,7 @@ import pytest
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.groq.llm import GroqLLMService, GroqLLMSettings
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openrouter.llm import OpenRouterLLMService, OpenRouterLLMSettings
 from pipecat.services.settings import LLMSettings
 from pydantic import SecretStr
 
@@ -26,6 +27,7 @@ def _settings(provider: LanguageModelProvider, model: str | None = None) -> Lang
         (LanguageModelProvider.GROQ, GroqLLMService),
         (LanguageModelProvider.GOOGLE, GoogleLLMService),
         (LanguageModelProvider.OPENAI, OpenAILLMService),
+        (LanguageModelProvider.OPENROUTER, OpenRouterLLMService),
     ],
 )
 def test_provider_selects_its_service_with_the_prompt(
@@ -36,7 +38,10 @@ def test_provider_selects_its_service_with_the_prompt(
     assert cast(LLMSettings, service._settings).system_instruction == "system prompt"
 
 
-@pytest.mark.parametrize("provider", [LanguageModelProvider.GROQ, LanguageModelProvider.OPENAI])
+@pytest.mark.parametrize(
+    "provider",
+    [LanguageModelProvider.GROQ, LanguageModelProvider.OPENAI, LanguageModelProvider.OPENROUTER],
+)
 def test_openai_compatible_clients_have_an_explicit_timeout(
     provider: LanguageModelProvider,
 ) -> None:
@@ -72,3 +77,23 @@ def test_selection_resolves_the_default_model_for_traces() -> None:
     assert choice.provider == "groq"
     assert choice.model == "openai/gpt-oss-120b"  # Pipecat's default for Groq.
     assert select_language_model(_settings(LanguageModelProvider.GROQ, "custom")).model == "custom"
+
+
+def test_openrouter_sends_groqs_model_to_groq_only_with_low_effort() -> None:
+    choice = select_language_model(_settings(LanguageModelProvider.OPENROUTER))
+    assert (choice.provider, choice.model) == ("openrouter", "openai/gpt-oss-120b")
+    settings = cast(OpenRouterLLMSettings, choice.create("p")._settings)
+    assert settings.provider == OpenRouterLLMService.ProviderPreferences(
+        only=["groq"], allow_fallbacks=False
+    )
+    assert settings.extra == {"extra_body": {"reasoning": {"effort": "low"}}}
+
+
+def test_another_openrouter_model_stays_on_groq_with_its_default_effort() -> None:
+    service = language_model_factory(_settings(LanguageModelProvider.OPENROUTER, "other"))("p")
+    settings = cast(OpenRouterLLMSettings, service._settings)
+    assert settings.model == "other"
+    assert settings.provider == OpenRouterLLMService.ProviderPreferences(
+        only=["groq"], allow_fallbacks=False
+    )
+    assert not settings.extra  # No reasoning effort sent.
