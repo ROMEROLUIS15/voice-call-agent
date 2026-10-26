@@ -7,14 +7,14 @@ from pipecat.transports.whatsapp.api import WhatsAppConnectCallValue, WhatsAppWe
 from tests.recording_doubles import RecordingCallAcceptor, RecordingConversationRunner
 from tests.whatsapp_payloads import JsonObject, connect_payload, terminate_payload
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
+from voice_call_agent.call_transports.pipecat_webrtc_transport import (
+    WEBRTC_AUDIO_FORMAT,
+)
 from voice_call_agent.call_transports.whatsapp_calling.call_acceptance import OnCallAccepted
 from voice_call_agent.call_transports.whatsapp_calling.call_admission import admit_call_events
 from voice_call_agent.call_transports.whatsapp_calling.calls_webhook_filter import (
     CallEvents,
     extract_call_events,
-)
-from voice_call_agent.call_transports.whatsapp_calling.pipecat_webrtc_transport import (
-    WHATSAPP_AUDIO_FORMAT,
 )
 
 
@@ -49,7 +49,7 @@ async def test_accepted_call_runs_with_a_verified_identity() -> None:
 
     [(session, audio_format)] = runner.calls
     assert session.identity_verified
-    assert audio_format == WHATSAPP_AUDIO_FORMAT
+    assert audio_format == WEBRTC_AUDIO_FORMAT
     assert supervisor.active_calls == 1  # The slot belongs to the running call.
 
     runner.release.set()

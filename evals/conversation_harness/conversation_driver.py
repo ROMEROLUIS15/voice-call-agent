@@ -19,14 +19,15 @@ from evals.conversation_harness.scripted_speech import RecordingTextToSpeech, Sc
 from evals.golden_cases import GoldenCase
 from voice_call_agent.call_session.session import CallChannel, CallSession
 from voice_call_agent.call_session.session_builders import (
+    build_browser_session,
     build_twilio_session,
     build_whatsapp_session,
 )
+from voice_call_agent.call_transports.pipecat_webrtc_transport import (
+    WEBRTC_AUDIO_FORMAT,
+)
 from voice_call_agent.call_transports.twilio_media_streams.pipecat_websocket_transport import (
     TWILIO_AUDIO_FORMAT,
-)
-from voice_call_agent.call_transports.whatsapp_calling.pipecat_webrtc_transport import (
-    WHATSAPP_AUDIO_FORMAT,
 )
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.observability.call_trace import CallTrace, ServiceVersions
@@ -116,9 +117,14 @@ async def hold_conversation(
 
 def _session_of(case: GoldenCase) -> tuple[CallSession, AudioFormat]:
     call_id = f"golden-{case.id}"
-    if case.channel is CallChannel.WHATSAPP:
-        return build_whatsapp_session(call_id, CALLER_PHONE, BUSINESS_PHONE), WHATSAPP_AUDIO_FORMAT
-    return build_twilio_session(call_id, CALLER_PHONE, BUSINESS_PHONE), TWILIO_AUDIO_FORMAT
+    match case.channel:
+        case CallChannel.WHATSAPP:
+            session = build_whatsapp_session(call_id, CALLER_PHONE, BUSINESS_PHONE)
+            return session, WEBRTC_AUDIO_FORMAT
+        case CallChannel.TWILIO:
+            return build_twilio_session(call_id, CALLER_PHONE, BUSINESS_PHONE), TWILIO_AUDIO_FORMAT
+        case CallChannel.BROWSER:
+            return build_browser_session(call_id), WEBRTC_AUDIO_FORMAT
 
 
 async def _converse(

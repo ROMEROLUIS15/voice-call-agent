@@ -1,4 +1,4 @@
-"""Explicit timeouts for OpenAI-compatible clients (Groq, OpenAI).
+"""Explicit timeouts for OpenAI-compatible clients (Groq, OpenAI, OpenRouter).
 
 Pipecat builds these clients with the SDK defaults (600 s timeout, 2 retries) and exposes
 `create_client` as the extension point to change them.

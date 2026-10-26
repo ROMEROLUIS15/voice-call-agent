@@ -11,6 +11,12 @@ from loguru import logger
 from starlette.types import ASGIApp
 
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
+from voice_call_agent.call_transports.browser_webrtc.practice_routes import (
+    OFFER_PATH,
+    PRACTICE_PAGE_PATH,
+    PRACTICE_PAGE_POLICY,
+    build_practice_router,
+)
 from voice_call_agent.call_transports.replay_guard import ReplayGuard
 from voice_call_agent.call_transports.twilio_media_streams.call_termination import (
     CallTerminator,
@@ -59,12 +65,21 @@ def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> 
     )
     _add_health_routes(app, components.supervisor)
     rate_limited_paths = _mount_call_entries(app, settings, components)
+    page_policies: dict[str, bytes] = {}
+    if settings.browser_practice_enabled:
+        app.include_router(
+            build_practice_router(components.supervisor, components.conversation_runner)
+        )
+        rate_limited_paths |= {OFFER_PATH}
+        page_policies[PRACTICE_PAGE_PATH] = PRACTICE_PAGE_POLICY
+        logger.warning("browser practice entry enabled: development only")
     return harden_app(
         app,
         http=http,
         webhooks=settings.webhook_protection(),
         rate_limiter=components.rate_limiter,
         rate_limited_paths=rate_limited_paths,
+        page_policies=page_policies,
     )
 
 
@@ -120,7 +135,7 @@ def _mount_call_entries(
         )
         paths.add(WEBHOOK_PATH)
         logger.info("WhatsApp entry enabled")
-    if not paths:
+    if not paths and not settings.browser_practice_enabled:
         logger.warning("no call entry configured; check the phone-line and WhatsApp variables")
     return frozenset(paths)
 

@@ -47,3 +47,12 @@ def test_unknown_model_is_left_out() -> None:
 )
 def test_voice_price_comes_from_its_family(voice: str, price: float | None) -> None:
     assert voice_price_per_1k_characters(PRICES, voice) == price
+
+
+def test_browser_practice_call_through_openrouter_is_complete() -> None:
+    services = SERVICES.model_copy(update={"llm_provider": "openrouter"})
+    cost = estimate_cost(
+        usage=USAGE, services=services, duration_s=120, channel_label="browser", prices=PRICES
+    )
+    assert cost.complete
+    assert cost.usd == pytest.approx(2 * 0.0078 + 0.030 + 0.0027)  # No carrier minutes.

@@ -60,6 +60,25 @@
     'user_turn_completion_config': 'None',
   })
 # ---
+# name: test_model_configuration[openrouter]
+  dict({
+    'extra_body': "{'reasoning': {'effort': 'low'}}",
+    'filter_incomplete_user_turns': 'False',
+    'frequency_penalty': 'NOT_GIVEN',
+    'max_completion_tokens': 'NOT_GIVEN',
+    'max_tokens': 'NOT_GIVEN',
+    'model': 'openai/gpt-oss-120b',
+    'presence_penalty': 'NOT_GIVEN',
+    'provider': "order=None allow_fallbacks=False require_parameters=None data_collection=None zdr=None enforce_distillable_text=None only=['groq'] ignore=None quantizations=None sort=None preferred_min_throughput=None preferred_max_latency=None max_price=None",
+    'request_timeout_seconds': '10.0',
+    'seed': 'NOT_GIVEN',
+    'temperature': 'NOT_GIVEN',
+    'top_k': 'None',
+    'top_p': 'NOT_GIVEN',
+    'use_provider_thinking_default': 'False',
+    'user_turn_completion_config': 'None',
+  })
+# ---
 # name: test_port_schema[Appointment]
   dict({
     'additionalProperties': False,

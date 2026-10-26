@@ -12,6 +12,8 @@ from voice_call_agent.settings.sections import (
 )
 
 LIMITED_PATH = "/limited"
+PAGE_PATH = "/page"
+PAGE_POLICY = b"default-src 'none'; script-src 'self'"
 LEAKY_ERROR = "database password is hunter2 at /srv/app/secrets.py"
 
 
@@ -44,6 +46,10 @@ def hardened_test_app(
     async def echo(body: dict[str, str]) -> dict[str, str]:
         return body
 
+    @app.get(PAGE_PATH)
+    async def page() -> Response:
+        return Response("<p>page</p>", media_type="text/html")
+
     @app.api_route(LIMITED_PATH, methods=["GET", "POST"])
     async def limited() -> dict[str, str]:
         return {"status": "ok"}
@@ -66,4 +72,5 @@ def hardened_test_app(
         ),
         rate_limiter=build_rate_limiter("async+memory://"),
         rate_limited_paths=frozenset({LIMITED_PATH}),
+        page_policies={PAGE_PATH: PAGE_POLICY},
     )

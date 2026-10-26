@@ -25,7 +25,24 @@ uv run voice-call-agent      # http://127.0.0.1:8000/health/ready
 ```
 
 Twilio and Meta need a public URL: expose the port with `ngrok http 8000` (or cloudflared) and put
-that URL in `PUBLIC_BASE_URL`.
+that URL in `PUBLIC_BASE_URL`. Keep the practice entry off while the port is exposed.
+
+### Practice entry (development only)
+
+Talk to the agent from a browser on your own machine, with no phone number (ADR 0015):
+
+```bash
+# in .env: ENVIRONMENT=development and BROWSER_PRACTICE_ENABLED=true
+uv run voice-call-agent      # then open http://localhost:8000/practice
+```
+
+The page asks for the microphone and starts a call through the same engine and call trace as the
+other entries; use headphones to try interrupting the agent. Only a browser on this machine can
+start a call, and the service refuses the setting outside development. Its latency is not a phone
+call's: the browser's audio is wideband, with echo cancellation, and stays on the machine.
+
+If your network gets `403` from Groq, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`: the
+same model answers from Groq through OpenRouter, with one more hop (manifest §10).
 
 ### Phone-line entry (Twilio)
 
@@ -58,6 +75,7 @@ not mounted. To resume it:
 ## Security
 
 *   Webhook signatures (Twilio, Meta) validated in constant time; repeated or stale events are rejected; one Media Stream per call, behind an admission token.
+*   The browser practice entry exists only in development and answers only clients on the same machine.
 *   Rate limits per client address and route on the call entries; request bodies and WebSocket messages limited to 64 KiB.
 *   Security headers on every response, no `Server` header, CORS closed, trusted hosts only, no API documentation in production, error responses that reveal nothing.
 *   Behind a proxy, set `TRUSTED_PROXY_ADDRESSES` and `ALLOWED_HOSTS`; with several instances, a shared `RATE_LIMIT_STORAGE_URI`.
