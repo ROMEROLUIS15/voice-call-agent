@@ -98,7 +98,8 @@ def _summarize_segments(turns: list[TurnLatency]) -> list[SegmentSummary]:
 
 
 def render_budget_table(summaries: list[ChannelSummary]) -> str:
-    """Plain-text table for the terminal."""
+    """Plain-text table for the terminal, in ASCII: a Windows console (cp1252) cannot print
+    every character."""
     lines: list[str] = []
     for channel in summaries:
         lines.append(f"{channel.channel_label}: {channel.calls} calls, {channel.turns} turns")
@@ -106,8 +107,8 @@ def render_budget_table(summaries: list[ChannelSummary]) -> str:
             mark = "OK  " if s.within_budget else "OVER"
             budget = LATENCY_BUDGETS[s.segment]
             lines.append(
-                f"  {mark} {s.segment:<9} p50 {s.p50_ms:6.0f} ms (≤ {budget.p50_ms:.0f})"
-                f"   p95 {s.p95_ms:6.0f} ms (≤ {budget.p95_ms:.0f})"
+                f"  {mark} {s.segment:<9} p50 {s.p50_ms:6.0f} ms (<= {budget.p50_ms:.0f})"
+                f"   p95 {s.p95_ms:6.0f} ms (<= {budget.p95_ms:.0f})"
             )
     return "\n".join(lines) if lines else "No calls recorded."
 
