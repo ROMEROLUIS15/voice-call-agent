@@ -1,6 +1,15 @@
-"""Pipeline observers that feed the call trace: provider usage, caller turns, provider errors."""
+"""Pipeline observers that feed the call trace: provider usage, caller turns, provider errors and
+replies that said nothing."""
 
-from pipecat.frames.frames import ErrorFrame, MetricsFrame, TranscriptionFrame
+from pipecat.frames.frames import (
+    ErrorFrame,
+    FunctionCallsStartedFrame,
+    LLMFullResponseEndFrame,
+    LLMFullResponseStartFrame,
+    LLMTextFrame,
+    MetricsFrame,
+    TranscriptionFrame,
+)
 from pipecat.metrics.metrics import LLMUsageMetricsData, STTUsageMetricsData, TTSUsageMetricsData
 from pipecat.observers.base_observer import BaseObserver, FramePushed
 from pipecat.processors.frame_processor import FrameProcessor
@@ -67,3 +76,29 @@ def _code_for(processor: FrameProcessor) -> ErrorCode:
     if isinstance(processor, TTSService):
         return ErrorCode.TTS_EXCEPTION
     return ErrorCode.PIPELINE_EXCEPTION
+
+
+class SilentReplyObserver(BaseObserver):
+    """Reports a model response that said nothing and called no tool: the caller hears silence.
+
+    A provider can end a streamed response with an error that Pipecat does not surface, such as a
+    tool call that failed the provider's schema validation (manifest §10); this is how it shows.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(observe_every_push=False)
+        self._responding = False
+        self._did_something = False
+
+    async def on_push_frame(self, data: FramePushed) -> None:
+        frame = data.frame
+        if isinstance(frame, LLMFullResponseStartFrame):
+            self._responding, self._did_something = True, False
+        elif isinstance(frame, FunctionCallsStartedFrame) or (
+            isinstance(frame, LLMTextFrame) and frame.text.strip()
+        ):
+            self._did_something = True
+        elif isinstance(frame, LLMFullResponseEndFrame) and self._responding:
+            self._responding = False
+            if not self._did_something:
+                report_error(ErrorCode.LLM_EMPTY_RESPONSE)

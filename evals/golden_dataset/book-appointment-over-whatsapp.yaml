@@ -2,13 +2,13 @@ id: book-appointment-over-whatsapp
 title: A WhatsApp caller books an appointment after confirming it (AC-1)
 source: hand-written
 phase: 2
-status: pending
-pending_reason: Needs the booking tools, the confirmation of proposals and the backend catalog.
+status: active
 levels: [conversation, model]
 channel: whatsapp
+schedule: open
 language: es
 turns:
-  - says: Quiero un corte de cabello para mañana a las tres de la tarde.
+  - says: Quiero un corte de cabello para mañana a las tres de la tarde, a nombre de Ana Ejemplo.
   - says: Sí, confirmo.
 expected:
   intent: book
@@ -16,12 +16,15 @@ expected:
     service: corte de cabello
     day: mañana
     time: "15:00"
+    name: Ana Ejemplo
   tool_call:
-    name: book_appointment
+    name: propose_booking
     arguments:
-      service: corte de cabello
-      day: mañana
-      time: "15:00"
+      service_id: haircut
+      day: "2026-10-27"
+      start: "15:00"
+      client_name: Ana Ejemplo
+  writes: [proposed, booked]
   outcome: booked
   identity_verified: true
   quality: [natural-spanish]

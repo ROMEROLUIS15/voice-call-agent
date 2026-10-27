@@ -2,13 +2,13 @@ id: no-write-without-confirmation
 title: An ambiguous answer to the proposal books nothing (AC-3)
 source: hand-written
 phase: 2
-status: pending
-pending_reason: Needs the booking tools and the confirmation of proposals.
-levels: [conversation, model]
+status: active
+levels: [model]
 channel: whatsapp
+schedule: open
 language: es
 turns:
-  - says: Quiero un corte de cabello para mañana a las tres de la tarde.
+  - says: Quiero un corte de cabello para mañana a las tres de la tarde, a nombre de Ana Ejemplo.
   - says: Mmm, no sé, déjame pensarlo.
 expected:
   intent: book
@@ -16,6 +16,7 @@ expected:
     service: corte de cabello
     day: mañana
     time: "15:00"
+    name: Ana Ejemplo
   outcome: info_only
   identity_verified: true
   quality: [invents-nothing]

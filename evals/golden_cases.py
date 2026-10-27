@@ -17,7 +17,8 @@ from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
 
 GOLDEN_DATASET_DIR = Path(__file__).parent / "golden_dataset"
 CURRENT_PHASE = 0
-"""The phase in progress (manifest §9). Cases of this phase or earlier must be active."""
+"""The last phase completed (manifest §9): its cases and earlier ones must be active. A case of a
+later phase becomes active once what it needs exists (phase 2 started before phase 1)."""
 
 
 class CaseStatus(StrEnum):
@@ -37,6 +38,19 @@ class CaseSource(StrEnum):
     HAND_WRITTEN = "hand-written"
     PRODUCTION_FAILURE = "production-failure"
     """Added when a failure seen in production was fixed (constitution §16)."""
+
+
+class ScheduleCondition(StrEnum):
+    """The scheduling backend the case runs against (`conversation_harness/schedule_conditions`)."""
+
+    NONE = "none"
+    """No backend: the prompt that books nothing."""
+    OPEN = "open"
+    """The practice schedule (a fictitious barbershop), on a fixed clock."""
+    SLOT_TAKEN = "slot-taken"
+    """Another caller books the proposed slot just before the confirmation."""
+    UNAVAILABLE = "unavailable"
+    """Reads answer; every booking times out."""
 
 
 class CallerIntent(StrEnum):
@@ -69,7 +83,13 @@ class Expectations(_Strict):
     data: dict[str, str] = Field(default_factory=dict)
     """What the caller asked for (service, day, time…), as the agent must understand it."""
     tool_call: ExpectedToolCall | None = None
-    """The write the agent must propose; `None`: no write. Checked once tools exist (phase 2)."""
+    """The write the agent must propose (`propose_booking` and its arguments); `None`: no write.
+    At the conversation level the scripted model proposes it on the first caller turn and
+    confirms it on the second."""
+    writes: tuple[str, ...] = ()
+    """The write guards' decisions in the call trace, in order (conversation level)."""
+    real_failures: tuple[str, ...] = ()
+    """Real failure codes the case causes on purpose (a schedule that does not answer)."""
     outcome: CallOutcome
     identity_verified: bool
     agent_interrupted: bool = False
@@ -87,6 +107,7 @@ class GoldenCase(_Strict):
     pending_reason: str | None = None
     levels: tuple[EvalLevel, ...] = Field(min_length=1)
     channel: CallChannel
+    schedule: ScheduleCondition = ScheduleCondition.NONE
     language: Literal["es"]
     turns: tuple[CallerTurn, ...]
     expected: Expectations
@@ -96,8 +117,13 @@ class GoldenCase(_Strict):
     def _consistent(self) -> Self:
         if (self.status is CaseStatus.PENDING) != (self.pending_reason is not None):
             raise ValueError("a pending case says why, and only a pending case does")
-        if (self.phase <= CURRENT_PHASE) != (self.status is CaseStatus.ACTIVE):
-            raise ValueError(f"cases of phase {CURRENT_PHASE} or earlier are active, later pending")
+        if self.phase <= CURRENT_PHASE and self.status is not CaseStatus.ACTIVE:
+            raise ValueError(f"cases of phase {CURRENT_PHASE} or earlier are active")
+        write = self.expected.tool_call if self.status is CaseStatus.ACTIVE else None
+        if write is not None and self.schedule is ScheduleCondition.NONE:
+            raise ValueError("a write needs a schedule to write to")
+        if write is not None and write.name != "propose_booking":
+            raise ValueError("an active case's write is a propose_booking call")
         if unknown := set(self.expected.quality) - QUALITY_CRITERIA.keys():
             raise ValueError(f"unknown quality criteria: {sorted(unknown)}")
         if self.expected.quality and EvalLevel.MODEL not in self.levels:

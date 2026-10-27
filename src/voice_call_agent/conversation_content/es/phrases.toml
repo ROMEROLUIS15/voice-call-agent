@@ -1,4 +1,18 @@
 # Fixed phrases the agent speaks to the caller, in this locale.
-# Phase 0: generic greeting. From phase 1 on, each business's greeting comes from the backend.
+# The generic greeting is spoken when the call has no business; a business's own greeting comes
+# from the scheduling backend.
 
 greeting = "Hola, gracias por llamar. ¿En qué te puedo ayudar?"
+
+# How the booking prompt states the business's date, hours and services (Monday first).
+[booking_briefing]
+weekdays = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+months = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+today = "{weekday} {day} de {month} de {year} ({iso_date})"
+open_day = "{weekday} de {opens} a {closes}"
+closed_day = "{weekday} cerrado"
+service = "{name} [{id}]: {minutes} minutos"
+price = ", precio {price}"

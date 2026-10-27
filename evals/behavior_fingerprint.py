@@ -18,6 +18,7 @@ from evals.judge_scoring import JUDGE_MODEL
 from voice_call_agent.adapters.language_model_providers.provider_selection import (
     language_model_factory,
 )
+from voice_call_agent.agent_tools.booking_tools import TOOL_NAMES, tool_schema
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.settings.sections import LanguageModelProvider, LanguageModelSettings
 from voice_call_agent.settings.service_settings import ServiceSettings
@@ -53,6 +54,11 @@ def model_configuration(settings: LanguageModelSettings) -> dict[str, str]:
     } | {name: str(value) for name, value in sorted(generation.items())}
 
 
+def agent_tools() -> dict[str, object]:
+    """Each tool the model can call, as it receives it: name, description and arguments."""
+    return {name: tool_schema(name).to_default_dict() for name in TOOL_NAMES}
+
+
 def behavior_inputs() -> dict[str, str]:
     """What the baseline was measured with: readable where it fits, a digest where it does not."""
     configuration = model_configuration(default_language_model())
@@ -60,6 +66,7 @@ def behavior_inputs() -> dict[str, str]:
         "conversation_content": load_conversation_content().version,
         "language_model": f"{configuration['provider']} {configuration['model']}",
         "generation_settings": _digest(configuration),
+        "agent_tools": _digest({name: json.dumps(tool) for name, tool in agent_tools().items()}),
         "golden_dataset": golden_dataset_version(),
         "scoring": _digest({name: _normalized(_EVALS_DIR / name) for name in _SCORING_SOURCES}),
         "judge_model": JUDGE_MODEL,

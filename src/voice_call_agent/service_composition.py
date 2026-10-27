@@ -46,6 +46,7 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
     )
     trace_sinks: list[CallTraceSink] = [JsonlCallTraceSink(settings.call_trace_log().path)]
     trace_sinks.append(SentryCallTraceSink())  # A no-op unless error tracking is configured.
+    schedule = _scheduling_backend(settings)
     runner = PipecatConversationRunner(
         factories=factories,
         content=content,
@@ -59,6 +60,7 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
         ),
         prices=load_price_table(),
         trace_sinks=trace_sinks,
+        scheduling_backend=schedule,
     )
     supervision = settings.call_supervision()
     protection = settings.webhook_protection()
@@ -76,9 +78,12 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
         replay_guard=InMemoryReplayGuard(protection.replay_window_seconds),
         rate_limiter=build_rate_limiter(protection.rate_limit_storage_uri),
         shutdown_grace_seconds=supervision.shutdown_grace_seconds,
-        business_resolver=(
-            InMemorySchedule(load_practice_catalog())
-            if settings.scheduling_backend is SchedulingBackendKind.PRACTICE
-            else None
-        ),
+        business_resolver=schedule,
     )
+
+
+def _scheduling_backend(settings: ServiceSettings) -> InMemorySchedule | None:
+    """The practice schedule when chosen; no backend otherwise (the Cronix adapter: phase 1)."""
+    if settings.scheduling_backend is SchedulingBackendKind.PRACTICE:
+        return InMemorySchedule(load_practice_catalog())
+    return None
