@@ -90,7 +90,7 @@ class ConversationJudge:
             criterion = QUALITY_CRITERIA[criterion_id]
             metric = ConversationalGEval(
                 name=criterion.id,
-                criteria=criterion.criteria,
+                evaluation_steps=list(criterion.steps),
                 # Only these are shown to the judge: DeepEval 4.2.8 cannot show a chatbot role
                 # or a context in a conversational G-Eval, so the prompt goes in the scenario.
                 evaluation_params=[
