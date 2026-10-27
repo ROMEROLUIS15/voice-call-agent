@@ -58,3 +58,4 @@ jobs:
       - run: uv run pre-commit run bandit --all-files --hook-stage manual
       - run: uv run pre-commit run pip-audit --all-files --hook-stage manual
       - run: uv run pre-commit run gitleaks-history --all-files --hook-stage manual
+      - run: uv run pre-commit run actionlint --all-files --hook-stage manual
