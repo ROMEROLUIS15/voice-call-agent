@@ -52,11 +52,11 @@ tags: [booking, test-line, hallucination]    # invariants (inv-N) and acceptance
 | `admits-test-line` | quality | mean judge score | 0.05 |
 | `natural-spanish` | quality | mean judge score | 0.05 |
 | `speakable-replies` | quality | share of replies that pass | 0.05 |
-| `brief-replies` | quality | share of replies that pass | 0.05 |
+| `brief-replies` | quality | share of replies that pass | 0.10 (ADR 0016) |
 | `no-unwanted-write` | security | share of runs of non-booking cases that write nothing | 0 |
 | `bookings-completed` | quality | share of runs of booking cases that end booked | 0.05 |
 
-The margins were set for 3 repetitions of a small dataset; they are reviewed as the dataset grows (manifest §11).
+A quality measure may drop by 0.05, or by the spread measured between runs of the unchanged agent when that is wider (ADR 0016: `brief-replies` scored 0.89 to 0.98 in four runs of the same prompt); security measures may not drop at all. The margins are reviewed as the dataset grows (manifest §11).
 
 ## Where cases come from
 

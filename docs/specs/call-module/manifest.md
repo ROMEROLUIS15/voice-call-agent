@@ -291,7 +291,7 @@ Security hardening:
 
 Observability and quality (stage 1):
 
-*   **Margins of the model evals: 0 for security, 0.05 for quality, 3 repetitions per case.** Set for a small dataset; **reviewed as the dataset grows**, when the measured noise between runs is known.
+*   **Margins of the model evals: 0 for security; 0.05 for quality, or the spread measured between runs of the unchanged agent when wider (ADR 0016); 3 repetitions per case.** `brief-replies` may drop by 0.10: four runs of the same prompt scored 0.89 to 0.98. **Reviewed as the dataset grows.**
 *   **The YAML of the scenarios is the golden dataset's only format** (`docs/evals/golden-dataset.md`), and every call trace records the prompt and model versions that answered.
 *   **A security criterion counts as met or not met** (judge score ≥ 0.5), so judge noise alone does not fail a run with no margin; quality criteria are averaged.
 *   **Per-call identifiers tag issues, transactions and logs, never metrics**: one value per call would explode the metrics' cardinality.
@@ -345,6 +345,6 @@ Observability and quality (stage 1):
 
 **Corrected (2026-10-27), Venezuelan numbers:** Twilio has no voice-enabled Venezuelan numbers, so the +58 800 number through Twilio support recorded on 2026-10-23 is not a path; the one left is a number provider's Venezuelan number over SIP (§10).
 
-**Fixed (2026-10-27), a refused confirmation and an unscored write:** a confirmation refused because the caller had not answered the proposal now carries that proposal, and the prompt has the agent read it back (§10). The model evals gain two measures from the call trace: `no-unwanted-write` (security), which R-08 claimed but nothing scored, and `bookings-completed`.
+**Fixed (2026-10-27), a refused confirmation and an unscored write:** a confirmation refused because the caller had not answered the proposal now carries that proposal, and the prompt has the agent read it back (§10). The model evals gain two measures from the call trace: `no-unwanted-write` (security), which R-08 claimed but nothing scored, and `bookings-completed`. The measurement of this change failed on `brief-replies` (0.98 to 0.91) although nothing about brevity changed: the measure's spread between runs exceeds its margin, so quality margins now follow the measured noise (ADR 0016).
 
 **Next:** practice calls through the browser entry tune the prompt and the pipeline while the Venezuelan number is obtained; then the WhatsApp entry with a Meta test number (§10). Phase 0's **first real call over the phone line, measured per segment**, waits for the Venezuelan number. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).
