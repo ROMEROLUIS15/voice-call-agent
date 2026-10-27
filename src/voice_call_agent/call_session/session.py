@@ -5,6 +5,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict
 
 from voice_call_agent.observability.trace_context import CallTraceContext
+from voice_call_agent.scheduling_backend.scheduling_models import BusinessContext
 
 
 class CallChannel(StrEnum):
@@ -34,7 +35,9 @@ class CallSession(BaseModel):
     dialed_phone: str | None
     """Dialed number in E.164; on the phone line it resolves the business."""
     business_id: str | None = None
-    """Business resolved by the scheduling backend (phase 1). Fixed once resolved (INV-1)."""
+    """Business resolved by the scheduling backend. Fixed once resolved (INV-1)."""
+    business_context: BusinessContext | None = None
+    """What the backend returned about that business: its catalog, hours and greeting."""
 
     @property
     def identity_verified(self) -> bool:
@@ -42,7 +45,9 @@ class CallSession(BaseModel):
         practice call has no number at all (INV-4)."""
         return self.channel is CallChannel.WHATSAPP
 
-    def resolve_business(self, business_id: str) -> "CallSession":
+    def resolve_business(
+        self, business_id: str, context: BusinessContext | None = None
+    ) -> "CallSession":
         """The session with its business, resolved by the backend at the start of the call.
 
         The business never comes from what the caller says or what the LLM proposes, and once
@@ -50,7 +55,7 @@ class CallSession(BaseModel):
         """
         if self.business_id is not None and self.business_id != business_id:
             raise TenantAlreadyResolvedError(f"call {self.call_id} already has its business")
-        return self.model_copy(update={"business_id": business_id})
+        return self.model_copy(update={"business_id": business_id, "business_context": context})
 
     def trace_context(self) -> CallTraceContext:
         """Labels of the call for traces, logs and metrics."""

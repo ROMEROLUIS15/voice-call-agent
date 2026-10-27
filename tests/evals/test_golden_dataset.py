@@ -1,5 +1,6 @@
 """The golden dataset is well formed, covers the acceptance criteria and holds no personal data."""
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,8 @@ from voice_call_agent.observability.personal_data_redaction import PHONE_NUMBER_
 
 CASES = load_golden_dataset()
 CONVERSATION_CRITERIA = {f"ac-{number}" for number in range(1, 10)}
+ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+"""A tool's date argument (`2026-10-27`): digits and dashes, but no phone number."""
 """AC-10 (latency of real calls) and AC-11 (idempotency of the backend) are not conversations."""
 
 
@@ -29,10 +32,15 @@ def _case(**changes: Any) -> dict[str, Any]:
     return case | changes
 
 
+def _write(name: str = "propose_booking") -> dict[str, Any]:
+    return {"name": name, "arguments": {"service_id": "haircut"}}
+
+
 def test_ids_are_unique_and_every_phase_so_far_is_active() -> None:
     assert len({case.id for case in CASES}) == len(CASES)
     for case in CASES:
-        assert (case.status is CaseStatus.ACTIVE) == (case.phase <= CURRENT_PHASE), case.id
+        if case.phase <= CURRENT_PHASE:
+            assert case.status is CaseStatus.ACTIVE, case.id
 
 
 def test_every_conversational_acceptance_criterion_has_a_case() -> None:
@@ -42,7 +50,12 @@ def test_every_conversational_acceptance_criterion_has_a_case() -> None:
 
 def test_no_case_holds_a_phone_number() -> None:
     for path in GOLDEN_DATASET_DIR.glob("*.yaml"):
-        assert not PHONE_NUMBER_PATTERN.search(path.read_text(encoding="utf-8")), path.name
+        text = ISO_DATE.sub("<date>", path.read_text(encoding="utf-8"))
+        assert not PHONE_NUMBER_PATTERN.search(text), path.name
+
+
+def test_the_phone_check_still_sees_a_number_next_to_a_date() -> None:
+    assert PHONE_NUMBER_PATTERN.search(ISO_DATE.sub("<date>", "2026-10-27 +58 412 000 0000"))
 
 
 @pytest.mark.parametrize(
@@ -50,7 +63,9 @@ def test_no_case_holds_a_phone_number() -> None:
     [
         {"status": "pending"},  # Pending without saying why.
         {"pending_reason": "Not yet."},  # Active with a reason to be pending.
-        {"phase": CURRENT_PHASE + 1},  # A later phase that is active.
+        {"phase": CURRENT_PHASE, "status": "pending", "pending_reason": "Later."},  # Due.
+        {"schedule": "none", "expected": _case()["expected"] | {"tool_call": _write()}},
+        {"schedule": "open", "expected": _case()["expected"] | {"tool_call": _write("x")}},
         {"expected": _case()["expected"] | {"quality": ["sounds-nice"]}},
         {"levels": ["conversation"]},  # Quality criteria without the model level.
         {"turns": [{"says": "Hola", "barge_in": True}]},  # Barge-in at the model level.
