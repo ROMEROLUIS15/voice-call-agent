@@ -1,6 +1,7 @@
 """Estimated cost of a call from its usage, duration and a versioned price table."""
 
 import tomllib
+from collections.abc import Mapping
 from importlib import resources
 
 from pydantic import BaseModel, ConfigDict
@@ -15,6 +16,8 @@ class LanguageModelPrice(BaseModel):
 
     usd_per_million_input_tokens: float
     usd_per_million_output_tokens: float
+    upstream: str | None = None
+    """For a routing provider, the upstream these prices are (as the provider names it)."""
 
 
 class PriceTable(BaseModel):
@@ -39,26 +42,33 @@ def load_price_table() -> PriceTable:
 def estimate_cost(
     *,
     usage: ProviderUsage,
+    llm_upstreams: Mapping[str, int],
     services: ServiceVersions,
     duration_s: float,
     channel_label: str,
     prices: PriceTable,
 ) -> CostEstimate:
-    """Sum the priced parts; any unknown price marks the estimate as incomplete."""
+    """Sum the priced parts; any unknown price marks the estimate as incomplete, and so does a
+    response served by an upstream other than the one the language model is priced at."""
     minutes = duration_s / 60
+    llm_price = prices.llm.get(f"{services.llm_provider}/{services.llm_model}")
     parts: list[float | None] = [
         # Streaming STT is billed for the audio streamed, which is the whole call.
         _times(prices.stt_usd_per_minute.get(services.stt_model), minutes),
         _times(
             voice_price_per_1k_characters(prices, services.tts_voice), usage.tts_characters / 1000
         ),
-        _llm_cost(prices.llm.get(f"{services.llm_provider}/{services.llm_model}"), usage),
+        _llm_cost(llm_price, usage),
         _times(prices.telephony_usd_per_minute.get(channel_label), minutes),
     ]
     known = [part for part in parts if part is not None]
+    priced_upstream = llm_price.upstream if llm_price else None
+    unpriced_upstream = priced_upstream is not None and any(
+        upstream != priced_upstream for upstream in llm_upstreams
+    )
     return CostEstimate(
         usd=round(sum(known), 6),
-        complete=len(known) == len(parts),
+        complete=len(known) == len(parts) and not unpriced_upstream,
         price_table_version=prices.version,
     )
 

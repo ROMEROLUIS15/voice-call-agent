@@ -23,6 +23,7 @@ from voice_call_agent.observability.call_trace_store import CallTraceSink, publi
 from voice_call_agent.observability.cost_estimation import PriceTable
 from voice_call_agent.observability.error_reporting import errors_recorded_by, report_error
 from voice_call_agent.observability.error_taxonomy import ErrorCode
+from voice_call_agent.observability.upstream_attribution import upstreams_recorded_by
 from voice_call_agent.scheduling_backend.scheduling_errors import (
     SchedulingBackendError,
     SchedulingBackendUnavailableError,
@@ -82,8 +83,8 @@ class PipecatConversationRunner:
             recorder=recorder,
             today_in=self._today_in,
         )
-        # Errors reported anywhere in this call's tasks land in its trace.
-        with errors_recorded_by(recorder):
+        # Errors and upstreams reported anywhere in this call's tasks land in its trace.
+        with errors_recorded_by(recorder), upstreams_recorded_by(recorder):
             try:
                 await self._converse(transport, audio_format, recorder, plan)
             finally:

@@ -14,7 +14,12 @@ USAGE = ProviderUsage(llm_input_tokens=10_000, llm_output_tokens=2_000, tts_char
 
 def test_phone_line_call_with_known_prices_is_complete() -> None:
     cost = estimate_cost(
-        usage=USAGE, services=SERVICES, duration_s=120, channel_label="twilio", prices=PRICES
+        usage=USAGE,
+        llm_upstreams={},
+        services=SERVICES,
+        duration_s=120,
+        channel_label="twilio",
+        prices=PRICES,
     )
     stt = 2 * 0.0078
     tts = 1.0 * 0.030
@@ -27,7 +32,12 @@ def test_phone_line_call_with_known_prices_is_complete() -> None:
 
 def test_unknown_price_makes_the_estimate_incomplete_not_invented() -> None:
     cost = estimate_cost(
-        usage=USAGE, services=SERVICES, duration_s=120, channel_label="whatsapp", prices=PRICES
+        usage=USAGE,
+        llm_upstreams={},
+        services=SERVICES,
+        duration_s=120,
+        channel_label="whatsapp",
+        prices=PRICES,
     )
     assert not cost.complete
     assert cost.usd == pytest.approx(2 * 0.0078 + 0.030 + 0.0027)
@@ -36,7 +46,12 @@ def test_unknown_price_makes_the_estimate_incomplete_not_invented() -> None:
 def test_unknown_model_is_left_out() -> None:
     services = SERVICES.model_copy(update={"llm_model": "unpriced-model"})
     cost = estimate_cost(
-        usage=USAGE, services=services, duration_s=60, channel_label="twilio", prices=PRICES
+        usage=USAGE,
+        llm_upstreams={},
+        services=services,
+        duration_s=60,
+        channel_label="twilio",
+        prices=PRICES,
     )
     assert not cost.complete
 
@@ -52,7 +67,33 @@ def test_voice_price_comes_from_its_family(voice: str, price: float | None) -> N
 def test_browser_practice_call_through_openrouter_is_complete() -> None:
     services = SERVICES.model_copy(update={"llm_provider": "openrouter"})
     cost = estimate_cost(
-        usage=USAGE, services=services, duration_s=120, channel_label="browser", prices=PRICES
+        usage=USAGE,
+        llm_upstreams={},
+        services=services,
+        duration_s=120,
+        channel_label="browser",
+        prices=PRICES,
     )
     assert cost.complete
     assert cost.usd == pytest.approx(2 * 0.0078 + 0.030 + 0.0027)  # No carrier minutes.
+
+
+@pytest.mark.parametrize(
+    ("upstreams", "complete"),
+    [({"Groq": 4}, True), ({"Groq": 3, "Cerebras": 1}, False)],
+    ids=["groq-only", "cerebras-served-one"],
+)
+def test_a_response_from_an_unpriced_upstream_makes_the_estimate_incomplete(
+    upstreams: dict[str, int], complete: bool
+) -> None:
+    """OpenRouter is priced at Groq's rate; Cerebras charges more, so its share is not covered."""
+    services = SERVICES.model_copy(update={"llm_provider": "openrouter"})
+    cost = estimate_cost(
+        usage=USAGE,
+        llm_upstreams=upstreams,
+        services=services,
+        duration_s=120,
+        channel_label="browser",
+        prices=PRICES,
+    )
+    assert cost.complete is complete

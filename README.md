@@ -49,8 +49,10 @@ outside development. With it, ask for an appointment by voice: the agent checks 
 availability, proposes, reads the summary back and books only after you say yes (ADR 0011). Each
 decision lands in the call's trace (`writes`) with the `booked` outcome.
 
-If your network gets `403` from Groq, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`: the
-same model answers from Groq through OpenRouter, with one more hop (manifest §10).
+The language model goes through OpenRouter by default (`OPENROUTER_API_KEY`): the same
+`gpt-oss-120b`, served by Groq or, when Groq fails, by Cerebras, which also works from networks
+that Groq refuses (manifest §7, §10). Each call's trace counts the responses each one served
+(`llm_upstreams`).
 
 ### Phone-line entry (Twilio)
 
@@ -155,7 +157,7 @@ uv run pre-commit run --all-files --hook-stage manual
 
 Changes reach `main` through pull requests; CI's jobs are required checks (ADR 0012).
 `.github/workflows/evals.yml` runs the model evals when what shapes the agent's replies changes
-(skipped without the `GROQ_API_KEY` and `OPENROUTER_API_KEY` secrets, the second for the judge); its check is not required, but a
+(skipped without the `OPENROUTER_API_KEY` secret, for the model and the judge); its check is not required, but a
 pull request is not merged with it failing. `.github/workflows/provider-reachability.yml` checks
 on demand that the runners reach every provider, and prints the Groq key's rate limits, which tell
 its tier. `.github/workflows/text-to-speech-comparison.yml`
