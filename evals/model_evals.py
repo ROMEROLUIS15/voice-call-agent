@@ -4,7 +4,7 @@
 
 Runs every active model-level golden case with the configured language model, scores the
 conversations (task metrics and the judge) and compares them with a baseline. Needs the key of
-the model's provider and `GOOGLE_API_KEY` for the judge. Exit code: 0 no regression,
+the model's provider and `OPENROUTER_API_KEY` for the judge. Exit code: 0 no regression,
 1 regression, 2 the evals could not run (a missing key, or a provider that failed during the run).
 """
 
@@ -78,14 +78,16 @@ def main(argv: list[str] | None = None) -> int:
         return record_unmeasured_fingerprint(BASELINE_PATH)
     settings = ModelEvalSettings()
     model = settings.language_model()
-    if model is None or settings.google_api_key is None:
-        print("Cannot run: the model's provider key and GOOGLE_API_KEY are needed.")
+    if model is None or settings.openrouter_api_key is None:
+        print(
+            "Cannot run: the model's provider key and OPENROUTER_API_KEY (the judge's) are needed."
+        )
         return EXIT_CANNOT_RUN
     if arguments.write_baseline and _differs_from_default(model):
         print("Cannot write the baseline: it is measured with the default model only.")
         return EXIT_CANNOT_RUN
     under_test = model_under_test(select_language_model(model))
-    judge = ConversationJudge(settings.google_api_key.get_secret_value())
+    judge = ConversationJudge(settings.openrouter_api_key.get_secret_value())
     try:
         runs = asyncio.run(
             run_cases(runnable_cases(load_golden_dataset(), EvalLevel.MODEL), under_test, judge)

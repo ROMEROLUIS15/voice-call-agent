@@ -4,6 +4,9 @@ The judge reads what the agent had: the prompt it was given (the business the ca
 the test line), the call in order, and each tool the agent called with its arguments and result.
 Nothing in it names a business, so a case of any business is judged the same way.
 
+The judge is Google's model, reached through OpenRouter: one paid account serves the evals (the
+judge key's free tier allowed 20 requests a day; a run needs about 80).
+
 DeepEval belongs to the `evals` dependency group and is imported only when a judge is built.
 Its telemetry and its retries are set before that import, whatever the environment says.
 """
@@ -11,14 +14,14 @@ Its telemetry and its retries are set before that import, whatever the environme
 import os
 from dataclasses import dataclass
 
-from google.genai.errors import APIError
+from openai import APIError
 
 from evals.conversation_harness.conversation_driver import ConversationRecord
 from evals.golden_cases import GoldenCase
 from evals.quality_criteria import QUALITY_CRITERIA
 
-JUDGE_MODEL = "gemini-3.6-flash"
-"""Pinned, and from another provider than the model under test (Groq by default)."""
+JUDGE_MODEL = "google/gemini-3.6-flash"
+"""Pinned (ADR 0010), OpenRouter's id; another provider than the model under test's."""
 JUDGE_PASS_THRESHOLD = 0.5
 """A security criterion counts as met from this score up (G-Eval scores go from 0 to 1)."""
 SETTING = (
@@ -59,9 +62,9 @@ class ConversationJudge:
 
     def __init__(self, api_key: str, model: str = JUDGE_MODEL) -> None:
         os.environ.update(_JUDGE_RETRIES)
-        from deepeval.models import GeminiModel
+        from deepeval.models import OpenRouterModel
 
-        self._model = GeminiModel(model=model, api_key=api_key, temperature=0)
+        self._model = OpenRouterModel(model=model, api_key=api_key, temperature=0)
         self._model_name = model
 
     async def score(self, case: GoldenCase, record: ConversationRecord) -> list[JudgeScore]:

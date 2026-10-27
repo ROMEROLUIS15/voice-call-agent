@@ -71,7 +71,7 @@ def test_a_provider_failure_during_the_run_cannot_run(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
-    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-judge-key")
 
     async def failing_run(*_: object, **__: object) -> list[CaseRun]:
         raise failure

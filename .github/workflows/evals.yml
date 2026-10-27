@@ -56,10 +56,10 @@ jobs:
         id: secrets
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          if [ -z "$GROQ_API_KEY" ] || [ -z "$GOOGLE_API_KEY" ]; then
-            echo "::notice::Model evals skipped: the GROQ_API_KEY and GOOGLE_API_KEY secrets are not available."
+          if [ -z "$GROQ_API_KEY" ] || [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "::notice::Model evals skipped: the GROQ_API_KEY and OPENROUTER_API_KEY secrets are not available."
             echo "present=false" >> "$GITHUB_OUTPUT"
           else
             echo "present=true" >> "$GITHUB_OUTPUT"
@@ -88,7 +88,7 @@ jobs:
         if: steps.secrets.outputs.present == 'true'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           WRITE_BASELINE: ${{ inputs.write_baseline }}
         run: |
           options=(--compare-with "$RUNNER_TEMP/baseline.json" --report "$RUNNER_TEMP/evals-report.md")

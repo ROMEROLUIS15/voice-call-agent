@@ -167,6 +167,6 @@ def test_the_baseline_is_measured_with_the_default_model_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
-    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-judge-key")
     monkeypatch.setenv("LLM_MODEL", "another-model")
     assert main(["--write-baseline"]) == EXIT_CANNOT_RUN
