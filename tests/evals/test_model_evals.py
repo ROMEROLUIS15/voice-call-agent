@@ -7,6 +7,7 @@ from pipecat.services.ai_service import AIService
 
 from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, ScriptedLanguageModel
 from evals.eval_baseline import EvalBaseline, MetricScore, Verdict, compare_with_baseline
+from evals.eval_settings import ModelEvalSettings
 from evals.golden_cases import EvalLevel, load_golden_dataset, runnable_cases
 from evals.model_eval_runs import CaseRun, ModelUnderTest, aggregate_scores, run_cases
 from evals.model_evals import EXIT_CANNOT_RUN, EXIT_OK, EXIT_REGRESSION, conclude, main
@@ -15,6 +16,7 @@ from evals.task_metrics import is_brief, is_speakable
 from tests.evals.eval_runs_factory import FixedScoreJudge, case_run
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import ServiceVersions
+from voice_call_agent.settings.sections import LanguageModelProvider
 
 UNMEASURED = EvalBaseline(fingerprint="f", inputs={})
 
@@ -145,6 +147,16 @@ def test_a_regression_fails_and_keeps_the_baseline(tmp_path: Path) -> None:
     report = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "REGRESSION: invents-nothing" in report
     assert "Judge `invents-nothing` 0.20: because" in report
+
+
+@pytest.mark.parametrize("provider", list(LanguageModelProvider))
+def test_the_evals_run_with_every_provider_the_service_accepts(
+    provider: LanguageModelProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", provider.value)
+    monkeypatch.setenv(f"{provider.value.upper()}_API_KEY", "test-key")
+    model = ModelEvalSettings().language_model()
+    assert model is not None and model.provider is provider
 
 
 def test_the_evals_need_both_keys() -> None:
