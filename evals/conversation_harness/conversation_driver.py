@@ -35,6 +35,7 @@ from voice_call_agent.call_transports.twilio_media_streams.pipecat_websocket_tra
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.observability.call_trace import CallTrace, ServiceVersions
 from voice_call_agent.observability.cost_estimation import load_price_table
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
 from voice_call_agent.scheduling_backend.scheduling_models import BusinessContext
 from voice_call_agent.speech_pipeline.audio_format import AudioFormat
@@ -56,6 +57,11 @@ _POLL_S = 0.01
 
 class ConversationStalledError(Exception):
     """The agent did not do what the conversation was waiting for in time."""
+
+
+class LanguageModelUnavailableError(Exception):
+    """The model's provider failed during the call (a rate limit, an outage): the conversation
+    measured the provider, not the agent."""
 
 
 @dataclass(frozen=True)
@@ -117,6 +123,8 @@ async def hold_conversation(
     finally:
         await transport.hang_up()
         await asyncio.wait_for(call, _END_TIMEOUT_S)
+        # Checked after a stall too: a provider failure is what stalls the call.
+        _require_an_available_model(case, sink.traces)
     [trace] = sink.traces
     return ConversationRecord(
         trace=trace,
@@ -147,6 +155,14 @@ def _session_of(case: GoldenCase) -> tuple[CallSession, AudioFormat]:
             return build_twilio_session(call_id, CALLER_PHONE, BUSINESS_PHONE), TWILIO_AUDIO_FORMAT
         case CallChannel.BROWSER:
             return build_browser_session(call_id), WEBRTC_AUDIO_FORMAT
+
+
+def _require_an_available_model(case: GoldenCase, traces: list[CallTrace]) -> None:
+    failure = ErrorCode.LLM_EXCEPTION
+    if failure in case.expected.real_failures:
+        return
+    if any(error.code == failure for trace in traces for error in trace.errors):
+        raise LanguageModelUnavailableError(f"{case.id}: the language model's provider failed")
 
 
 async def _converse(

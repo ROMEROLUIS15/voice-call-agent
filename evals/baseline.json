@@ -1,12 +1,12 @@
 {
-  "fingerprint": "66af64419bb641a0",
+  "fingerprint": "47237bc28cc6484d",
   "inputs": {
     "conversation_content": "es-5afbb23cbb4e",
     "language_model": "groq openai/gpt-oss-120b",
     "generation_settings": "830ed76e7584e77a",
     "agent_tools": "2ccad98b392f4536",
     "golden_dataset": "f42795fe0f25",
-    "scoring": "657d494f3125e1d1",
+    "scoring": "4bc1aa77ae1f1016",
     "judge_model": "gemini-3.6-flash"
   },
   "measured_with": null,

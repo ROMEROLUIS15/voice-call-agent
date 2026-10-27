@@ -8,6 +8,8 @@ import os
 from dataclasses import dataclass
 from typing import Literal
 
+from google.genai.errors import APIError
+
 from evals.conversation_harness.conversation_driver import ConversationRecord
 from evals.golden_cases import GoldenCase
 from evals.quality_criteria import QUALITY_CRITERIA
@@ -22,6 +24,10 @@ CHATBOT_ROLE = (
 )
 
 type Role = Literal["user", "assistant"]
+
+
+class JudgeUnavailableError(Exception):
+    """The judge's provider failed after its retries: the conversation stays unscored."""
 
 
 @dataclass(frozen=True)
@@ -49,6 +55,7 @@ class ConversationJudge:
         from deepeval.models import GeminiModel
 
         self._model = GeminiModel(model=model, api_key=api_key, temperature=0)
+        self._model_name = model
 
     async def score(self, case: GoldenCase, record: ConversationRecord) -> list[JudgeScore]:
         from deepeval.metrics import ConversationalGEval
@@ -72,6 +79,11 @@ class ConversationJudge:
                 model=self._model,
                 threshold=JUDGE_PASS_THRESHOLD,
             )
-            score = float(await metric.a_measure(test_case, _show_indicator=False))
+            try:
+                score = float(await metric.a_measure(test_case, _show_indicator=False))
+            except (APIError, TimeoutError) as error:
+                raise JudgeUnavailableError(
+                    f"the judge {self._model_name} failed: {error}"
+                ) from error
             scores.append(JudgeScore(criterion.id, score, str(metric.reason or "")))
         return scores
