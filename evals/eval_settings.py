@@ -23,8 +23,9 @@ class ModelEvalSettings(BaseSettings):
     llm_request_timeout_seconds: float = _SERVICE_DEFAULTS["llm_request_timeout_seconds"].default
     groq_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
-    """Key of the provider's model when the provider is Google, and always of the judge."""
     openai_api_key: SecretStr | None = None
+    openrouter_api_key: SecretStr | None = None
+    """Key of the provider's model when the provider is OpenRouter, and always of the judge."""
 
     def language_model(self) -> LanguageModelSettings | None:
         """The model under test, or `None` without its provider's key."""
@@ -32,6 +33,7 @@ class ModelEvalSettings(BaseSettings):
             LanguageModelProvider.GROQ: self.groq_api_key,
             LanguageModelProvider.GOOGLE: self.google_api_key,
             LanguageModelProvider.OPENAI: self.openai_api_key,
+            LanguageModelProvider.OPENROUTER: self.openrouter_api_key,
         }[self.llm_provider]
         if api_key is None:
             return None

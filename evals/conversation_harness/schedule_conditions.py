@@ -1,7 +1,7 @@
 """The scheduling backend a golden case runs against: none, or the practice schedule in a state.
 
 The clock is fixed so that "mañana" is always the same day: Monday 26 October 2026, 10:10 in
-Caracas, where the practice barbershop is.
+Caracas, where the practice businesses are.
 """
 
 from datetime import UTC, datetime
@@ -43,12 +43,19 @@ class _UnavailableForBookings(InMemorySchedule):
         raise SchedulingBackendUnavailableError("the schedule does not answer in this case")
 
 
-def schedule_for(condition: ScheduleCondition) -> InMemorySchedule | None:
-    """The practice schedule in the case's state, on the harness clock; `None`: no backend."""
+def schedule_for(condition: ScheduleCondition, business: str | None) -> InMemorySchedule | None:
+    """The practice schedule in the case's state, on the harness clock, where every call reaches
+    `business`; `None`: no backend."""
     kinds: dict[ScheduleCondition, type[InMemorySchedule]] = {
         ScheduleCondition.OPEN: InMemorySchedule,
         ScheduleCondition.SLOT_TAKEN: _SlotTakenBeforeConfirmation,
         ScheduleCondition.UNAVAILABLE: _UnavailableForBookings,
     }
     kind = kinds.get(condition)
-    return None if kind is None else kind(load_practice_catalog(), now=harness_clock)
+    if kind is None or business is None:
+        return None
+    catalog = load_practice_catalog()
+    if business not in {known.id for known in catalog.businesses}:
+        raise ValueError(f"no practice business {business!r}")
+    reached = catalog.model_copy(update={"default_business": business})
+    return kind(reached, now=harness_clock)
