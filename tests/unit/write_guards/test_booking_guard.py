@@ -70,8 +70,13 @@ async def test_a_confirmation_before_the_caller_answers_writes_nothing() -> None
     proposal = await call.guard.propose("haircut", TUESDAY, time(11), "Ana Ejemplo")
     assert isinstance(proposal, Proposed)
     refused = await call.guard.confirm(proposal.proposal_id)
-    assert refused == ConfirmationRefused(reason=ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED)
+    # The proposal stays pending and comes back, for the agent to read it and ask.
+    assert refused == ConfirmationRefused(
+        reason=ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED, pending_proposal=proposal
+    )
     assert await call.backend.upcoming_appointments(CALL_ID) == []
+    call.caller_speaks()
+    assert isinstance(await call.guard.confirm(proposal.proposal_id), Booked)
 
 
 async def test_a_confirmed_proposal_is_booked_once() -> None:
