@@ -83,7 +83,14 @@ uv run --env-file .env --group evals python -m evals.model_evals --write-baselin
 
 The model evals need the key of the configured provider (`LLM_PROVIDER`, `GROQ_API_KEY` by default) and `GOOGLE_API_KEY` for the judge. They exit with 0 (no regression), 1 (regression) or 2 (could not run), write a Markdown report (`var/evals/report.md`) and print it. `--write-baseline` stores the scores only without a regression and only for the default model. `--record-fingerprint` records the inputs without measuring, allowed only while the baseline has never been measured.
 
-In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies change, compares with the baseline of the commit the change starts from and puts the report in the run summary. Without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets it is skipped with a notice. Its check is not required (it runs only on those changes), but a pull request is not merged with it failing (ADR 0012).
+On a network that refuses the default provider (Groq refuses some VPN exits), the baseline is measured from a GitHub-hosted runner instead, on the pull request's branch, and committed in that pull request:
+
+```bash
+gh workflow run evals.yml --ref <branch> -f write_baseline=true
+gh run download <run-id> -n evals-baseline -D evals   # replaces evals/baseline.json
+```
+
+In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies change, compares with the baseline of the commit the change starts from and puts the report in the run summary; run on demand with `write_baseline`, it also stores a new baseline, kept 14 days as the `evals-baseline` artifact. Without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets it is skipped with a notice. Its check is not required (it runs only on those changes), but a pull request is not merged with it failing (ADR 0012).
 
 ## Rules
 

@@ -5,6 +5,8 @@ name: Model evals
 # docs/evals/golden-dataset.md). Runs when what shapes the agent's replies changes, and on
 # demand. Without the provider secrets the job is skipped with a notice: pull requests from
 # forks never receive secrets, and this workflow never runs on `pull_request_target`.
+# Run on demand with `write_baseline`, it measures the baseline from a GitHub-hosted runner, for
+# networks that refuse the default provider, and keeps it as the `evals-baseline` artifact.
 
 on:
   pull_request:
@@ -29,6 +31,11 @@ on:
       - "uv.lock"
       - ".github/workflows/evals.yml"
   workflow_dispatch:
+    inputs:
+      write_baseline:
+        description: "Without regression, store the scores as the new baseline (artifact evals-baseline)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -82,13 +89,24 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-        run: >-
-          uv run --group evals python -m evals.model_evals
-          --compare-with "$RUNNER_TEMP/baseline.json"
-          --report "$RUNNER_TEMP/evals-report.md"
+          WRITE_BASELINE: ${{ inputs.write_baseline }}
+        run: |
+          options=(--compare-with "$RUNNER_TEMP/baseline.json" --report "$RUNNER_TEMP/evals-report.md")
+          if [ "$WRITE_BASELINE" = "true" ]; then
+            options+=(--write-baseline)
+          fi
+          uv run --group evals python -m evals.model_evals "${options[@]}"
       - name: Report in the run summary
         if: always() && steps.secrets.outputs.present == 'true'
         run: |
           if [ -f "$RUNNER_TEMP/evals-report.md" ]; then
             cat "$RUNNER_TEMP/evals-report.md" >> "$GITHUB_STEP_SUMMARY"
           fi
+      # Scores and digests of the inputs, no conversation: safe in a public repository's artifacts.
+      - uses: actions/upload-artifact@v7
+        if: inputs.write_baseline && steps.secrets.outputs.present == 'true'
+        with:
+          name: evals-baseline
+          path: evals/baseline.json
+          retention-days: 14
+          if-no-files-found: error
