@@ -6,6 +6,7 @@ status: active
 levels: [conversation, model]
 channel: whatsapp
 schedule: open
+business: practice-barbershop
 language: es
 turns:
   - says: Quiero un corte de cabello para mañana a las tres de la tarde, a nombre de Ana Ejemplo.
@@ -27,5 +28,5 @@ expected:
   writes: [proposed, booked]
   outcome: booked
   identity_verified: true
-  quality: [natural-spanish]
+  quality: [invents-nothing, natural-spanish]
 tags: [booking, ac-1, inv-2, inv-3]

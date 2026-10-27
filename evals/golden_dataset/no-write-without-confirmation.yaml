@@ -6,6 +6,7 @@ status: active
 levels: [model]
 channel: whatsapp
 schedule: open
+business: practice-barbershop
 language: es
 turns:
   - says: Quiero un corte de cabello para mañana a las tres de la tarde, a nombre de Ana Ejemplo.

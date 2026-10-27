@@ -51,7 +51,8 @@ class ServiceSettings(BaseSettings):
     stt_model: str = "flux-general-multi"
     tts_voice: str = "aura-2-selena-es"
 
-    llm_provider: LanguageModelProvider = LanguageModelProvider.GROQ
+    llm_provider: LanguageModelProvider = LanguageModelProvider.OPENROUTER
+    """OpenRouter, Groq then Cerebras, while Groq's developer tier is closed (manifest §7)."""
     llm_model: str | None = None
     llm_request_timeout_seconds: float = 10.0
     groq_api_key: SecretStr | None = None
