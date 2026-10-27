@@ -2,14 +2,14 @@
 
 Alert rules of the Sentry project `voice-call-agent` (ADR 0009). They are built only on what the service emits: the `voice.call` transaction of each call (status `internal_error` when it had a real failure), the `voice.latency.*` distributions and the `voice.error` counter with its `error_code`, `error_kind` and `security_event` attributes.
 
-| Alert | Condition | Window | Action interval | Why |
-|---|---|---|---|---|
-| Real failures | More than 5 % of `voice.call` transactions with status `internal_error` | 15 min | 30 min | Callers are being failed, whatever the cause |
-| Turn latency | p95 of `voice.latency.total` above 1,600 ms | 30 min | 60 min | Manifest §6 p95 limit for end of speech → first audio |
-| Provider errors | More than 5 `voice.error` with `error_code` in `STT_EXCEPTION`, `LLM_EXCEPTION`, `TTS_EXCEPTION` | 10 min | 30 min | A provider is failing; the fallback (phase 4) or a provider change is needed |
-| Security spike | More than 50 `voice.error` with `security_event:true` | 5 min | 30 min | Invalid signatures, replays, stale events, refused handshakes or rate limits beyond normal noise |
+| Monitor | Condition (Sentry query) | Window | Why |
+|---|---|---|---|
+| Real failures | `failure_rate()` of `span.op:voice.call` above 0.05: transactions with status `internal_error` | 15 min | Callers are being failed, whatever the cause |
+| Turn latency | `p95(span.duration)` of `span.op:voice.turn` above 1,600 ms: each turn span lasts from end of speech to first audio, the value `voice.latency.total` records | 30 min | Manifest §6 p95 limit for end of speech → first audio |
+| Provider errors | `sum(value,voice.error,counter,-)` with `error_code:[STT_EXCEPTION,LLM_EXCEPTION,TTS_EXCEPTION]` above 5 | 10 min | A provider is failing; the fallback (phase 4) or a provider change is needed |
+| Security spike | `sum(value,voice.error,counter,-)` with `tags[security_event,boolean]:true` above 50 | 5 min | Invalid signatures, replays, stale events, refused handshakes or rate limits beyond normal noise |
 
-The action interval keeps one ongoing problem from paging repeatedly. Thresholds are reviewed with the first real traffic (phase 0 calls).
+The four monitors watch the `production` environment only: practice calls (`development`) show in Sentry's Explore without paging anyone. They share one alert that emails the maintainer at most every 30 minutes, so one ongoing problem does not page repeatedly; real failures also open issues, which the project's default alert emails for high priority. Thresholds are reviewed with the first real traffic (phase 0 calls).
 
 ## From an alert to the cause
 
@@ -19,4 +19,4 @@ The action interval keeps one ongoing problem from paging repeatedly. Thresholds
 
 ## Status
 
-**Pending creation.** The organization does not let members create projects, so the project and these rules wait for an owner to create the project (or allow members to). Until then `SENTRY_DSN` is empty and nothing is sent.
+**Created on 2026-10-27**, in the same Sentry organization as the scheduling backend's web project, so that once the contract exists (phase 1) a trace can follow a call across both. Each query was checked against real events before its monitor was created: a practice call's `voice.call` transaction and turn spans, the `voice.latency.*` distributions and a test security event counted by `voice.error`. `SENTRY_DSN` lives only in `.env`.
