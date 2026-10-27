@@ -56,8 +56,10 @@ def model_configuration(settings: LanguageModelSettings) -> dict[str, str]:
     service = language_model_factory(settings)("")
     generation = service.settings.given_fields()
     generation.pop("system_instruction", None)
+    # The provider's name under its own key: OpenRouter's settings have a `provider` field too
+    # (its routing preferences), which would otherwise replace it.
     return {
-        "provider": settings.provider.value,
+        "llm_provider": settings.provider.value,
         "request_timeout_seconds": str(settings.request_timeout_seconds),
     } | {name: str(value) for name, value in sorted(generation.items())}
 
@@ -72,7 +74,7 @@ def behavior_inputs() -> dict[str, str]:
     configuration = model_configuration(default_language_model())
     return {
         "conversation_content": load_conversation_content().version,
-        "language_model": f"{configuration['provider']} {configuration['model']}",
+        "language_model": f"{configuration['llm_provider']} {configuration['model']}",
         "generation_settings": _digest(configuration),
         "agent_tools": _digest({name: json.dumps(tool) for name, tool in agent_tools().items()}),
         "golden_dataset": golden_dataset_version(),
