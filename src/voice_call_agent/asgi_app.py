@@ -10,6 +10,7 @@ from limits.aio.strategies import MovingWindowRateLimiter
 from loguru import logger
 from starlette.types import ASGIApp
 
+from voice_call_agent.call_session.business_resolution import BusinessResolver
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
 from voice_call_agent.call_transports.browser_webrtc.practice_routes import (
     OFFER_PATH,
@@ -49,6 +50,8 @@ class ServiceComponents:
     replay_guard: ReplayGuard
     rate_limiter: MovingWindowRateLimiter
     shutdown_grace_seconds: float
+    business_resolver: BusinessResolver | None = None
+    """Present when a scheduling backend is configured; the practice entry resolves with it."""
 
 
 def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> ASGIApp:
@@ -68,7 +71,9 @@ def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> 
     page_policies: dict[str, bytes] = {}
     if settings.browser_practice_enabled:
         app.include_router(
-            build_practice_router(components.supervisor, components.conversation_runner)
+            build_practice_router(
+                components.supervisor, components.conversation_runner, components.business_resolver
+            )
         )
         rate_limited_paths |= {OFFER_PATH}
         page_policies[PRACTICE_PAGE_PATH] = PRACTICE_PAGE_POLICY

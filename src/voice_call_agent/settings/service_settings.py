@@ -23,6 +23,7 @@ from voice_call_agent.settings.sections import (
     LanguageModelSettings,
     LogFormat,
     LogSettings,
+    SchedulingBackendKind,
     ServerSettings,
     SpeechSettings,
     TwilioMediaStreamsSettings,
@@ -72,6 +73,7 @@ class ServiceSettings(BaseSettings):
 
     browser_practice_enabled: bool = False
     """Practice calls from a browser on this machine (development only, ADR 0015)."""
+    scheduling_backend: SchedulingBackendKind = SchedulingBackendKind.NONE
 
     max_concurrent_calls: int = 10
     shutdown_grace_seconds: float = 300.0
@@ -115,6 +117,14 @@ class ServiceSettings(BaseSettings):
             raise UnsafeSettingsError(
                 "BROWSER_PRACTICE_ENABLED needs ENVIRONMENT=development: the entry has no "
                 "authentication"
+            )
+        if (
+            self.scheduling_backend is SchedulingBackendKind.PRACTICE
+            and self.environment is DeploymentEnvironment.PRODUCTION
+        ):
+            raise UnsafeSettingsError(
+                "SCHEDULING_BACKEND=practice needs ENVIRONMENT=development: its businesses are "
+                "fictitious"
             )
         if "*" in _comma_separated(self.cors_allowed_origins):
             raise UnsafeSettingsError("CORS_ALLOWED_ORIGINS must list explicit origins, never '*'")

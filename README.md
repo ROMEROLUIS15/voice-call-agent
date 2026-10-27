@@ -32,7 +32,7 @@ that URL in `PUBLIC_BASE_URL`. Keep the practice entry off while the port is exp
 Talk to the agent from a browser on your own machine, with no phone number (ADR 0015):
 
 ```bash
-# in .env: ENVIRONMENT=development and BROWSER_PRACTICE_ENABLED=true
+# in .env: ENVIRONMENT=development, BROWSER_PRACTICE_ENABLED=true and SCHEDULING_BACKEND=practice
 uv run voice-call-agent      # then open http://localhost:8000/practice
 ```
 
@@ -40,6 +40,10 @@ The page asks for the microphone and starts a call through the same engine and c
 other entries; use headphones to try interrupting the agent. Only a browser on this machine can
 start a call, and the service refuses the setting outside development. Its latency is not a phone
 call's: the browser's audio is wideband, with echo cancellation, and stays on the machine.
+
+`SCHEDULING_BACKEND=practice` gives the calls a fictitious barbershop to book with, kept in memory
+and lost on restart (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is
+also refused outside development.
 
 If your network gets `403` from Groq, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`: the
 same model answers from Groq through OpenRouter, with one more hop (manifest §10).

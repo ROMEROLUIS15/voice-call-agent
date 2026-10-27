@@ -24,7 +24,7 @@ async def test_a_browser_that_never_connects_ends_the_call_and_frees_its_slot(
     supervisor = CallSupervisor(1)
     runner = RecordingConversationRunner()
     app = FastAPI()
-    app.include_router(build_practice_router(supervisor, runner, connect_timeout_seconds=0.2))
+    app.include_router(build_practice_router(supervisor, runner, None, connect_timeout_seconds=0.2))
     browser, offer = await browser_offer()  # Its answer is never applied: it never connects.
     try:
         with reported_error_codes() as codes:

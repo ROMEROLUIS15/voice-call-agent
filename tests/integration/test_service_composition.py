@@ -7,6 +7,7 @@ from voice_call_agent.call_transports.twilio_media_streams.call_termination impo
 from voice_call_agent.call_transports.whatsapp_calling.call_acceptance import (
     WhatsAppCallAcceptor,
 )
+from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
 from voice_call_agent.service_composition import compose_service
 from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
 
@@ -33,3 +34,11 @@ def test_disabled_entries_get_no_components() -> None:
     )
     assert components.call_terminator is None
     assert components.call_acceptor is None
+
+
+def test_the_practice_schedule_is_wired_only_when_chosen() -> None:
+    assert compose_service(make_service_settings()).business_resolver is None
+    practice = compose_service(
+        make_service_settings(scheduling_backend="practice", environment="development")
+    )
+    assert isinstance(practice.business_resolver, InMemorySchedule)

@@ -23,6 +23,8 @@ dependencies = [
     # Rate limiting of the call entries (exact pin: security relevant).
     "limits==5.8.0",
     "sentry-sdk==2.71.0",
+    # IANA time zones for `zoneinfo` where the system has none (Windows): business local time.
+    "tzdata>=2026.1",
 ]
 
 [project.scripts]
