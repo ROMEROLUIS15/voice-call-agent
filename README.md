@@ -10,8 +10,9 @@ Before touching code: [`CLAUDE.md`](CLAUDE.md), [constitution](docs/specs/consti
 [architecture decisions](docs/adr/README.md), [threat model](docs/security/threat-model.md) and
 [golden dataset](docs/evals/golden-dataset.md).
 
-**Status: phase 0** (technical test, without Cronix). The agent talks in Spanish and measures
-latency per segment and per channel; it does not book yet. v1 books appointments; checking,
+**Status: phase 0, with phase 2 started** (without Cronix). The agent talks in Spanish and measures
+latency per segment and per channel; against the development practice schedule it already books by
+voice, with proposals validated by code and confirmed by the caller. v1 books appointments; checking,
 rescheduling and cancelling follow in v1.1 (manifest §2). The phone line is the main path: the
 WhatsApp entry is paused until Meta enables *Calling* on the number (manifest §10).
 
@@ -43,7 +44,9 @@ call's: the browser's audio is wideband, with echo cancellation, and stays on th
 
 `SCHEDULING_BACKEND=practice` gives the calls a fictitious barbershop to book with, kept in memory
 and lost on restart (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is
-also refused outside development.
+also refused outside development. With it, ask for an appointment by voice: the agent checks the
+availability, proposes, reads the summary back and books only after you say yes (ADR 0011). Each
+decision lands in the call's trace (`writes`) with the `booked` outcome.
 
 If your network gets `403` from Groq, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`: the
 same model answers from Groq through OpenRouter, with one more hop (manifest §10).

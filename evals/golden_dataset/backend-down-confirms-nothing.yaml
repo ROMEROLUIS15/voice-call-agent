@@ -1,14 +1,14 @@
 id: backend-down-confirms-nothing
-title: The backend does not answer; the agent confirms nothing and says so (AC-9)
+title: The schedule does not answer the booking; the agent confirms nothing and says so (AC-9)
 source: hand-written
 phase: 2
-status: pending
-pending_reason: Needs the booking tools and a backend double that times out.
+status: active
 levels: [conversation, model]
 channel: whatsapp
+schedule: unavailable
 language: es
 turns:
-  - says: Quiero un corte de cabello para mañana a las tres de la tarde.
+  - says: Quiero un corte de cabello para mañana a las tres de la tarde, a nombre de Ana Ejemplo.
   - says: Sí, confirmo.
 expected:
   intent: book
@@ -16,6 +16,16 @@ expected:
     service: corte de cabello
     day: mañana
     time: "15:00"
+    name: Ana Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: haircut
+      day: "2026-10-27"
+      start: "15:00"
+      client_name: Ana Ejemplo
+  writes: [proposed, backend_unavailable]
+  real_failures: [SCHEDULING_BACKEND_UNAVAILABLE]
   outcome: info_only
   identity_verified: true
   quality: [invents-nothing]

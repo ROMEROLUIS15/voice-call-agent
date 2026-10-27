@@ -1,4 +1,11 @@
-from pipecat.frames.frames import ErrorFrame, MetricsFrame, TranscriptionFrame
+from pipecat.frames.frames import (
+    ErrorFrame,
+    LLMFullResponseEndFrame,
+    LLMFullResponseStartFrame,
+    LLMTextFrame,
+    MetricsFrame,
+    TranscriptionFrame,
+)
 from pipecat.metrics.metrics import LLMTokenUsage, LLMUsageMetricsData, TTSUsageMetricsData
 from pipecat.observers.base_observer import FramePushed
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
@@ -75,3 +82,21 @@ async def test_error_frames_become_coded_errors_of_the_call() -> None:
         await ProviderErrorObserver().on_push_frame(_pushed(ErrorFrame(error="boom")))
     [error] = recorder.finish().errors
     assert error.code is ErrorCode.PIPELINE_EXCEPTION
+
+
+async def test_a_reply_that_says_nothing_and_calls_no_tool_is_reported() -> None:
+    recorder = CallTraceRecorder(CONTEXT, SERVICES, load_price_table())
+    silent = recorder.observers[-1]
+    with errors_recorded_by(recorder):
+        for frame in (LLMFullResponseStartFrame(), LLMFullResponseEndFrame()):
+            await silent.on_push_frame(_pushed(frame))
+        for spoken in (
+            LLMFullResponseStartFrame(),
+            LLMTextFrame("Hola"),
+            LLMFullResponseEndFrame(),
+        ):
+            await silent.on_push_frame(_pushed(spoken))
+    trace = recorder.finish()
+    assert [(error.code.value, error.count) for error in trace.errors] == [
+        ("LLM_EMPTY_RESPONSE", 1)
+    ]

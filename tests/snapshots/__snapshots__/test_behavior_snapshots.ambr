@@ -1,6 +1,150 @@
 # serializer version: 1
+# name: test_agent_tools
+  dict({
+    'check_availability': dict({
+      'description': 'Free start times of one day for one service, and whether the time the caller asked for is free. Call it before offering or accepting a time.',
+      'name': 'check_availability',
+      'parameters': dict({
+        'properties': dict({
+          'day': dict({
+            'description': 'The day, as YYYY-MM-DD.',
+            'format': 'date',
+            'type': 'string',
+          }),
+          'service_id': dict({
+            'description': "The service's id, from the brackets in the service list.",
+            'type': 'string',
+          }),
+          'start': dict({
+            'anyOf': list([
+              dict({
+                'pattern': '^([01][0-9]|2[0-3]):[0-5][0-9]$',
+                'type': 'string',
+              }),
+              dict({
+                'type': 'null',
+              }),
+            ]),
+            'default': None,
+            'description': 'The time the caller asked for, as HH:MM, if they named one.',
+          }),
+        }),
+        'required': list([
+          'service_id',
+          'day',
+        ]),
+        'type': 'object',
+      }),
+    }),
+    'confirm_booking': dict({
+      'description': 'Book a proposal, only after the caller accepted it unchanged. Report the real result.',
+      'name': 'confirm_booking',
+      'parameters': dict({
+        'properties': dict({
+          'proposal_id': dict({
+            'description': 'The proposal_id that propose_booking returned, once the caller accepted it.',
+            'format': 'uuid',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'proposal_id',
+        ]),
+        'type': 'object',
+      }),
+    }),
+    'propose_booking': dict({
+      'description': 'Propose a booking once the service, day, time and name are known. Read the summary it returns to the caller and ask whether they confirm it.',
+      'name': 'propose_booking',
+      'parameters': dict({
+        'properties': dict({
+          'client_name': dict({
+            'description': 'The name the appointment is booked under.',
+            'maxLength': 120,
+            'minLength': 1,
+            'type': 'string',
+          }),
+          'day': dict({
+            'description': 'The day, as YYYY-MM-DD.',
+            'format': 'date',
+            'type': 'string',
+          }),
+          'service_id': dict({
+            'description': "The service's id, from the brackets in the service list.",
+            'type': 'string',
+          }),
+          'start': dict({
+            'description': 'The start time, as HH:MM in 24-hour time.',
+            'pattern': '^([01][0-9]|2[0-3]):[0-5][0-9]$',
+            'type': 'string',
+          }),
+        }),
+        'required': list([
+          'service_id',
+          'day',
+          'start',
+          'client_name',
+        ]),
+        'type': 'object',
+      }),
+    }),
+  })
+# ---
+# name: test_booking_prompt_of_the_practice_barbershop
+  '''
+  Eres la recepcionista telefónica de Barbería La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno.
+  
+  Tu respuesta se convierte en voz: no uses listas, emojis, asteriscos ni otros símbolos. Escribe los números, las fechas y las horas como se dicen ("el martes veintisiete a las tres y media de la tarde").
+  
+  Hoy es lunes 26 de octubre de 2026 (2026-10-26). Horario de atención: lunes de 09:00 a 18:00; martes de 09:00 a 18:00; miércoles de 09:00 a 18:00; jueves de 09:00 a 18:00; viernes de 09:00 a 18:00; sábado de 09:00 a 14:00; domingo cerrado.
+  
+  Servicios (el identificador entre corchetes es para las herramientas):
+  - Corte de cabello [haircut]: 30 minutos, precio 8.00
+  - Corte y barba [haircut-and-beard]: 60 minutos, precio 12.00
+  - Afeitado [shave]: 30 minutos, precio 6.00
+  
+  Para agendar una cita:
+  1. Averigua qué servicio, qué día y a qué hora quiere la persona, y a nombre de quién va la cita. Pregunta solo lo que falte, de a una cosa por vez.
+  2. Antes de ofrecer o aceptar una hora, consulta la disponibilidad con la herramienta. Nunca inventes horarios, servicios ni precios: usa solo lo que está en esta lista y lo que devuelven las herramientas.
+  3. Cuando tengas servicio, día, hora y nombre, propón la cita con la herramienta de proponer. Lee en voz alta el resumen que devuelve (servicio, día, hora y nombre) y pregunta si lo confirma.
+  4. Confirma la cita con la herramienta de confirmar solo si la persona acepta esa propuesta sin cambios. Si duda, cambia algo o dice que no, no confirmes: ajusta y vuelve a proponer, o despídete.
+  5. Di el resultado real que devuelve la herramienta. Si el horario se ocupó, ofrece otro disponible. Si la agenda no responde, di que no pudiste agendar y sugiere llamar más tarde. Nunca digas que una cita quedó agendada si la herramienta no lo confirmó.
+  
+  En las herramientas usa las fechas con el formato año-mes-día (2026-10-27) y las horas de 24 horas (15:30). Los identificadores (de servicio, de propuesta o de cita) son solo para las herramientas: nunca los digas.
+  '''
+# ---
 # name: test_fixed_phrases
   dict({
+    'booking_briefing': dict({
+      'closed_day': '{weekday} cerrado',
+      'months': tuple(
+        'enero',
+        'febrero',
+        'marzo',
+        'abril',
+        'mayo',
+        'junio',
+        'julio',
+        'agosto',
+        'septiembre',
+        'octubre',
+        'noviembre',
+        'diciembre',
+      ),
+      'open_day': '{weekday} de {opens} a {closes}',
+      'price': ', precio {price}',
+      'service': '{name} [{id}]: {minutes} minutos',
+      'today': '{weekday} {day} de {month} de {year} ({iso_date})',
+      'weekdays': tuple(
+        'lunes',
+        'martes',
+        'miércoles',
+        'jueves',
+        'viernes',
+        'sábado',
+        'domingo',
+      ),
+    }),
     'greeting': 'Hola, gracias por llamar. ¿En qué te puedo ayudar?',
   })
 # ---

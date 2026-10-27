@@ -18,7 +18,8 @@ source: hand-written                         # hand-written | production-failure
 phase: 0                                     # manifest §9: the phase that makes it runnable
 status: active                               # active | pending (pending_reason required)
 levels: [model]                              # conversation and/or model
-channel: whatsapp                            # whatsapp | twilio
+channel: whatsapp                            # whatsapp | twilio | browser
+schedule: none                               # none | open | slot-taken | unavailable (below)
 language: es
 turns:                                       # what the caller says, in order
   - says: Hola, quiero agendar un corte de cabello para mañana a las tres de la tarde.
@@ -26,7 +27,9 @@ turns:                                       # what the caller says, in order
 expected:
   intent: book                               # none | ask-info | book | check-appointments | reschedule | cancel | leave-message
   data: {service: corte de cabello, day: mañana, time: "15:00"}
-  tool_call: null                            # the write to propose, or null for none (checked from phase 2)
+  tool_call: null                            # the write to propose (propose_booking and its arguments), or null
+  writes: []                                 # the write guards' decisions in the call trace, in order
+  real_failures: []                          # real failure codes the case causes on purpose
   outcome: info_only                         # CallOutcome of the call trace
   identity_verified: true                    # INV-4: true only on WhatsApp
   agent_interrupted: false                   # INV-7: the agent stopped talking when interrupted
@@ -34,9 +37,11 @@ expected:
 tags: [booking, test-line, hallucination]    # invariants (inv-N) and acceptance criteria (ac-N)
 ```
 
+**Schedule.** `none`: no scheduling backend, the prompt that books nothing. Any other value runs the case against the practice schedule (a fictitious barbershop) on a fixed clock, Monday 26 October 2026 at 10:10 in Caracas, so "mañana" is always Tuesday 27: `open`, `slot-taken` (another caller books the proposed slot just before the confirmation) or `unavailable` (reads answer, bookings time out). A case with a write needs a schedule.
+
 ## What each level checks
 
-*   **Conversation level** (`evals/conversation_checks.py`): the agent greets first with the fixed greeting; it answers each turn; it stops talking when the caller barges in; the language model receives the system prompt and every caller turn in order; the call trace has the case's channel, identity and outcome, one measured latency per turn, the greeting latency, the prompt version and no real failure.
+*   **Conversation level** (`evals/conversation_checks.py`): the agent greets first with the fixed greeting; it answers each turn; it stops talking when the caller barges in; the language model receives the system prompt and every caller turn in order; the call trace has the case's channel, identity and outcome, one measured latency per turn, the greeting latency, the prompt version, the expected write decisions and only the real failures the case causes. With a write, the scripted model proposes it on the first caller turn and confirms it on the second, through the real tools and write guards.
 *   **Model level**: for every reply of the model, `speakable-replies` (no digits, markup, list markers or emojis: replies become speech) and `brief-replies` (at most two sentences); and the judge criteria the case lists (`evals/quality_criteria.py`).
 
 | Measure | Kind | Scored as | May drop by |
@@ -59,7 +64,7 @@ The margins were set for 3 repetitions of a small dataset; they are reviewed as 
 
 *   One behaviour per case, tied to an invariant or an acceptance criterion through its tags.
 *   An expectation that can be observed: the call trace, what the agent said, what the model received, or a judge criterion written so that a reader can apply it.
-*   Written ahead when useful, but `pending` with its reason until its phase makes it runnable. A pending case never runs and never counts: no test pretends to cover what does not exist yet. Advancing `CURRENT_PHASE` in `evals/golden_cases.py` forces that phase's cases to become active.
+*   Written ahead when useful, but `pending` with its reason until what it needs exists. A pending case never runs and never counts: no test pretends to cover what does not exist yet. A case becomes active as soon as it can run, whatever its phase (phase 2 started before phase 1); advancing `CURRENT_PHASE` in `evals/golden_cases.py`, the last phase completed, forces every case of that phase and earlier to be active.
 *   Barge-in depends on timing, so it is checked at the conversation level only.
 
 ## Adding a case
@@ -88,4 +93,4 @@ In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, mode
 
 ## Status
 
-Phase 0: four reference conversations (greeting, barge-in, identity per channel) and five model-level cases about the test line, plus pending cases for AC-1 to AC-9 and for what a spoofed caller ID must not reveal. The baseline stays **unmeasured** until the booking prompt of phase 2 exists (ADR 0013): the phase 0 prompt is provisional, and the first measured run with the booking prompt becomes the baseline.
+Eight reference conversations: greeting, barge-in and identity per channel, and booking against the practice schedule (AC-1, AC-2, AC-4, AC-9). Model level: the five cases about the test line and the booking cases (AC-1, AC-2, AC-3, AC-9). Pending: an unknown dialed number (AC-6), an unresolved business on WhatsApp (AC-5), the interruption time (AC-8) and the phase 3 cases. The booking prompt exists; the baseline stays **unmeasured** until its first run with the real model and the judge, which becomes the baseline (ADR 0013).

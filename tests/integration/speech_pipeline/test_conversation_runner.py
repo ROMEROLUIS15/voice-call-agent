@@ -11,12 +11,17 @@ from pipecat.services.stt_service import STTService
 from pipecat.services.tts_service import TTSService
 
 from evals.conversation_harness.loopback_transport import LoopbackTransport
+from tests.browser_peer import reported_error_codes
 from tests.call_trace_factory import SERVICES
 from voice_call_agent.call_session.session_builders import build_twilio_session
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import CallTrace
 from voice_call_agent.observability.cost_estimation import load_price_table
+from voice_call_agent.scheduling_backend.scheduling_errors import (
+    SchedulingBackendUnavailableError,
+)
 from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
+from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBackend
 from voice_call_agent.speech_pipeline.audio_format import AudioFormat
 from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
 from voice_call_agent.speech_pipeline.pipeline_assembly import SpeechServiceFactories
@@ -74,3 +79,22 @@ async def test_conversation_ends_on_hang_up_and_publishes_its_trace() -> None:
     assert trace.services.llm_model == SERVICES.llm_model
     assert not trace.real_failure
     assert trace.cost.price_table_version == load_price_table().version
+
+
+async def test_a_failure_closing_the_backend_call_is_reported() -> None:
+    class _CannotClose:
+        async def close_call(self, call_id: str, outcome: CallOutcome) -> None:
+            raise SchedulingBackendUnavailableError
+
+    runner = PipecatConversationRunner(
+        factories=_pass_through_factories(),
+        content=load_conversation_content(),
+        services=SERVICES,
+        prices=load_price_table(),
+        trace_sinks=[],
+        scheduling_backend=cast(SchedulingBackend, _CannotClose()),
+    )
+    session = build_twilio_session("CA1", None, None).resolve_business("barbershop")
+    with reported_error_codes() as codes:
+        await runner._close_backend_call(session, CallOutcome.INFO_ONLY)
+    assert codes == ["SCHEDULING_BACKEND_UNAVAILABLE"]

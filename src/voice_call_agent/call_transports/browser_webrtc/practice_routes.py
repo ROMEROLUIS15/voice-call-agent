@@ -144,7 +144,7 @@ class BrowserPracticeEndpoints:
             report_error(code, error=error, call_id=session.call_id)
             return session
         if isinstance(resolution, BusinessResolved):
-            return session.resolve_business(resolution.business_id)
+            return session.resolve_business(resolution.business_id, resolution.context)
         return session
 
 
