@@ -28,6 +28,8 @@ class BookingBriefing(BaseModel):
     closed_day: str
     service: str
     price: str
+    no_price: str
+    """For a service whose business publishes no price."""
 
 
 class ConversationContent(BaseModel):

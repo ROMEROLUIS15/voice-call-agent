@@ -1,7 +1,7 @@
 {
-  "fingerprint": "a089d41ec3498811",
+  "fingerprint": "09ef67e5523d66a8",
   "inputs": {
-    "conversation_content": "es-5afbb23cbb4e",
+    "conversation_content": "es-e55a2e51b5f2",
     "language_model": "openrouter openai/gpt-oss-120b",
     "generation_settings": "1388462588ef5679",
     "agent_tools": "2ccad98b392f4536",
