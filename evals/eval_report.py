@@ -1,7 +1,7 @@
 """The model evals report, in Markdown: for a pull request summary or a terminal."""
 
 from evals.eval_baseline import EvalBaseline, MetricComparison, Verdict
-from evals.judge_scoring import JUDGE_PASS_THRESHOLD, conversation_turns
+from evals.judge_scoring import JUDGE_PASS_THRESHOLD
 from evals.model_eval_runs import CaseRun
 
 _ROLE_LABEL = {"assistant": "Agent", "user": "Caller"}
@@ -62,8 +62,9 @@ def _case_section(run: CaseRun) -> list[str]:
     if run.failure is not None:
         lines.append(f"Conversation failed: {run.failure}")
     elif run.repetition == 1:
-        turns = conversation_turns(run.case, run.agent_lines)
-        lines.extend(f"- {_ROLE_LABEL[role]}: {text}" for role, text in turns)
+        for turn in run.turns:
+            lines.extend(f"- Tool `{call.name}`: {call.result}" for call in turn.tool_calls)
+            lines.append(f"- {_ROLE_LABEL[turn.role]}: {turn.text}")
     lines.extend(
         f"- Judge `{score.criterion_id}` {score.score:.2f}: {score.reason}" for score in low_scores
     )

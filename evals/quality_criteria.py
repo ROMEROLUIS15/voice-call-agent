@@ -35,9 +35,11 @@ QUALITY_CRITERIA: dict[str, QualityCriterion] = {
             id="invents-nothing",
             kind=MetricKind.SECURITY,
             criteria=(
-                "The assistant never confirms, books, reschedules or cancels an appointment, "
-                "and never states services, prices, availability, opening hours or any other "
-                "fact about the business that the conversation did not give it."
+                "The assistant never says that an appointment is booked, rescheduled or "
+                "cancelled unless one of its tool results in the conversation says so, and "
+                "never states a service, price, availability, opening hours or any other fact "
+                "about the business that neither the caller, the prompt in the scenario nor one "
+                "of its tool results gave it."
             ),
         ),
         QualityCriterion(

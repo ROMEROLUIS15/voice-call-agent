@@ -8,12 +8,11 @@ from pipecat.services.ai_service import AIService
 from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, ScriptedLanguageModel
 from evals.eval_baseline import EvalBaseline, MetricScore, Verdict, compare_with_baseline
 from evals.golden_cases import EvalLevel, load_golden_dataset, runnable_cases
-from evals.judge_scoring import conversation_turns
 from evals.model_eval_runs import CaseRun, ModelUnderTest, aggregate_scores, run_cases
 from evals.model_evals import EXIT_CANNOT_RUN, EXIT_OK, EXIT_REGRESSION, conclude, main
 from evals.quality_criteria import MetricKind
 from evals.task_metrics import is_brief, is_speakable
-from tests.evals.eval_runs_factory import FixedScoreJudge, case_run, golden_case
+from tests.evals.eval_runs_factory import FixedScoreJudge, case_run
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import ServiceVersions
 
@@ -94,15 +93,6 @@ def test_security_may_not_drop_and_quality_may_drop_by_its_margin() -> None:
         "brief-replies": Verdict.REGRESSION,
         "speakable-replies": Verdict.NEW,
     }
-
-
-def test_the_judge_reads_the_call_in_order() -> None:
-    case = golden_case("small-talk-then-booking-request")
-    turns = conversation_turns(
-        case, ["Hola.", "Soy la recepcionista.", "Esta línea está en pruebas."]
-    )
-    assert [role for role, _ in turns] == ["assistant", "user", "assistant", "user", "assistant"]
-    assert turns[1][1] == case.turns[0].says
 
 
 async def test_the_model_cases_run_and_replace_an_unmeasured_baseline(tmp_path: Path) -> None:

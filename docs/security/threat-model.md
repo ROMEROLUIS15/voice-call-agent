@@ -51,7 +51,7 @@ Living document: every change that touches an attack surface updates it in the s
 | S9 | Logs and traces | Everything the service writes |
 | S10 | Supply chain and repository | Dependencies, CI, git history |
 | S11 | Error tracking (Sentry) | Outbound error events, call transactions and metrics |
-| S12 | Model evals and measurements in CI | Provider secrets in GitHub Actions; golden conversations sent to the model under test and the judge; fixed replies sent to the text-to-speech voices, their samples kept as run artifacts |
+| S12 | Model evals and measurements in CI | Provider secrets in GitHub Actions; golden conversations sent to the model under test and the judge, with the prompt the model received and its tool results (fictitious businesses and callers); fixed replies sent to the text-to-speech voices, their samples kept as run artifacts |
 | S13 | Browser practice entry (development only, ADR 0015) | `GET /practice`, `GET /practice/call.js`, `POST /practice/offer` and the WebRTC media it negotiates |
 
 S3 and S4 exist only when the WhatsApp variable group is complete. While the WhatsApp entry is paused (manifest §10) it is not configured in deployment, so they are not exposed; their mitigations and tests stay. S13 exists only with `BROWSER_PRACTICE_ENABLED=true`, which the service refuses at startup unless `ENVIRONMENT=development`.
@@ -164,4 +164,5 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-26 | Browser practice entry for development (S13, T-37 to T-41, R-09); Groq reachable through OpenRouter, restricted to Groq | S6, S13 |
 | 2026-10-26 | Practice schedule: fictitious businesses in memory, refused at startup outside development (`test_the_practice_schedule_is_refused_in_production`); the tenant isolation tests run against it | S7, S13 |
 | 2026-10-26 | Booking tools and write guards: T-17, T-19, T-20, T-21 advance with their tests; T-43, tool arguments kept out of the logs; R-08 records decisions without the caller's words | S5, S7, S9 |
+| 2026-10-27 | The judge reads the model's prompt and tool results: fictitious practice businesses and invented callers only (T-33 covers it) | S12 |
 | 2026-10-27 | The evals workflow measures the baseline on demand (`write_baseline`, only for those who can run workflows) and keeps it as an artifact of scores and input digests; T-32 covers it | S12 |

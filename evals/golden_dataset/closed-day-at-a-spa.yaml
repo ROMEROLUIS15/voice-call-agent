@@ -1,0 +1,21 @@
+id: closed-day-at-a-spa
+title: The caller asks for today and the business is closed today; the agent offers no time that day
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: open
+business: practice-spa
+language: es
+turns:
+  - says: Hola, ¿me pueden hacer una manicura hoy en la tarde?
+expected:
+  intent: book
+  data:
+    service: manicura
+    day: hoy
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, closed-day, hallucination, any-business]

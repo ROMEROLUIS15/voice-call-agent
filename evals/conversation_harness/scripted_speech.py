@@ -9,6 +9,7 @@ cut Aura-2.
 import asyncio
 import time
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 
 from pipecat.frames.frames import (
     Frame,
@@ -74,6 +75,15 @@ class ScriptedSpeechToText(STTService):
         await self.broadcast_frame(ProposedUserStoppedSpeakingFrame)
 
 
+@dataclass(frozen=True)
+class RecordedToolCall:
+    """A tool the model called, with its arguments, and what the tool answered."""
+
+    name: str
+    arguments: dict[str, object]
+    result: object
+
+
 class RecordingTextToSpeech(TTSService):
     """Synthesizes silence whose length follows the text, and records what it was asked to say."""
 
@@ -88,11 +98,24 @@ class RecordingTextToSpeech(TTSService):
         self.last_reply_completed_at = 0.0
         self._reply_says_something = False
         self._calls_in_progress: set[str] = set()
+        self._tool_calls: dict[int, tuple[RecordedToolCall, ...]] = {}
+        self._unspoken_tool_calls: list[RecordedToolCall] = []
+        """Results the agent has not said anything after yet."""
 
     @property
     def agent_lines(self) -> list[str]:
         """What the agent was asked to say: the greeting, then each reply."""
         return [" ".join(pieces) for pieces in self._lines.values()]
+
+    @property
+    def tool_calls(self) -> dict[int, tuple[RecordedToolCall, ...]]:
+        """The tools called before each line, by the index in `agent_lines` of the first line
+        spoken after their results; calls with nothing spoken after them come under the next
+        index."""
+        calls = dict(self._tool_calls)
+        if self._unspoken_tool_calls:
+            calls[len(self._lines)] = tuple(self._unspoken_tool_calls)
+        return calls
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         self._follow_the_model(frame)
@@ -115,8 +138,13 @@ class RecordingTextToSpeech(TTSService):
             self._calls_in_progress.add(frame.tool_call_id)
         elif isinstance(frame, FunctionCallResultFrame):
             self._calls_in_progress.discard(frame.tool_call_id)
+            call = RecordedToolCall(frame.function_name, dict(frame.arguments), frame.result)
+            self._unspoken_tool_calls.append(call)
 
     async def run_tts(self, text: str, context_id: str) -> AsyncGenerator[Frame | None, None]:
+        if context_id not in self._lines and self._unspoken_tool_calls:
+            self._tool_calls[len(self._lines)] = tuple(self._unspoken_tool_calls)
+            self._unspoken_tool_calls.clear()
         self._lines.setdefault(context_id, []).append(text.strip())
         duration_ms = AUDIO_MS_PER_WORD * max(1, len(text.split()))
         self.synthesized_ms += duration_ms

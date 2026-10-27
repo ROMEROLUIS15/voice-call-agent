@@ -1,0 +1,24 @@
+id: no-write-without-confirmation-at-a-spa
+title: At a spa, an ambiguous answer to the proposal books nothing (AC-3)
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: open
+business: practice-spa
+language: es
+turns:
+  - says: Hola, quiero un masaje relajante para mañana a las cuatro de la tarde, a nombre de Ana Ejemplo.
+  - says: Ay, no sé, mejor lo pienso y te aviso.
+expected:
+  intent: book
+  data:
+    service: masaje relajante
+    day: mañana
+    time: "16:00"
+    name: Ana Ejemplo
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing]
+tags: [booking, ac-3, inv-2, security, any-business]

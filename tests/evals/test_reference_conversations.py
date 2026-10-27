@@ -44,10 +44,28 @@ async def test_reference_conversation(case: GoldenCase) -> None:
     greeting = record.business.greeting if record.business else CONTENT.greeting
     assert conversation_failures(case, record, greeting) == []
     [model] = models
-    assert model.system_prompt == _expected_prompt(record)
+    assert model.system_prompt == _expected_prompt(record) == record.system_prompt
     # The model hears every caller turn, in order, whatever the agent was saying.
     assert model.caller_messages == [turn.says for turn in case.turns]
     assert record.trace.services.prompt_version == CONTENT.version
+    _assert_the_transcript_is_in_order(case, record)
+
+
+def _assert_the_transcript_is_in_order(case: GoldenCase, record: ConversationRecord) -> None:
+    """What the judge reads: every turn in order, each tool after the caller turn that asked
+    for it and with the line spoken after its result."""
+    turns = record.turns
+    callers = [index for index, turn in enumerate(turns) if turn.role == "user"]
+    assert [turns[index].text for index in callers] == [turn.says for turn in case.turns]
+    assert [t.text for t in turns if t.role == "assistant" and t.text] == record.agent_lines
+    tools = [(index, call.name) for index, turn in enumerate(turns) for call in turn.tool_calls]
+    if case.expected.tool_call is None:
+        assert tools == []
+        return
+    # The scripted model proposes on the first caller turn and confirms on the second.
+    assert [name for _, name in tools] == ["propose_booking", "confirm_booking"]
+    (proposed, _), (confirmed, _) = tools
+    assert callers[0] < proposed < callers[1] < confirmed
 
 
 def _expected_prompt(record: ConversationRecord) -> str:

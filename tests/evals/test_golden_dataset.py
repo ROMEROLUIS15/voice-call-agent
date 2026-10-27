@@ -12,11 +12,14 @@ from evals.golden_cases import (
     CURRENT_PHASE,
     GOLDEN_DATASET_DIR,
     CaseStatus,
+    EvalLevel,
     GoldenCase,
     golden_dataset_version,
     load_golden_dataset,
+    runnable_cases,
 )
 from voice_call_agent.observability.personal_data_redaction import PHONE_NUMBER_PATTERN
+from voice_call_agent.practice_schedule.practice_catalog import load_practice_catalog
 
 CASES = load_golden_dataset()
 CONVERSATION_CRITERIA = {f"ac-{number}" for number in range(1, 10)}
@@ -48,6 +51,14 @@ def test_every_conversational_acceptance_criterion_has_a_case() -> None:
     assert tags >= CONVERSATION_CRITERIA
 
 
+def test_the_model_evals_run_against_every_practice_business() -> None:
+    """The agent is shown working for each kind of business, not for one catalog: a business
+    added to the practice schedule needs its cases, and a case names a business that exists."""
+    model_cases = runnable_cases(CASES, EvalLevel.MODEL)
+    exercised = {case.business for case in model_cases if case.business is not None}
+    assert exercised == {business.id for business in load_practice_catalog().businesses}
+
+
 def test_no_case_holds_a_phone_number() -> None:
     for path in GOLDEN_DATASET_DIR.glob("*.yaml"):
         text = ISO_DATE.sub("<date>", path.read_text(encoding="utf-8"))
@@ -65,7 +76,13 @@ def test_the_phone_check_still_sees_a_number_next_to_a_date() -> None:
         {"pending_reason": "Not yet."},  # Active with a reason to be pending.
         {"phase": CURRENT_PHASE, "status": "pending", "pending_reason": "Later."},  # Due.
         {"schedule": "none", "expected": _case()["expected"] | {"tool_call": _write()}},
-        {"schedule": "open", "expected": _case()["expected"] | {"tool_call": _write("x")}},
+        {
+            "schedule": "open",
+            "business": "practice-barbershop",
+            "expected": _case()["expected"] | {"tool_call": _write("x")},
+        },
+        {"schedule": "open"},  # A schedule without the business the call reaches.
+        {"business": "practice-spa"},  # A business without a schedule.
         {"expected": _case()["expected"] | {"quality": ["sounds-nice"]}},
         {"levels": ["conversation"]},  # Quality criteria without the model level.
         {"turns": [{"says": "Hola", "barge_in": True}]},  # Barge-in at the model level.
