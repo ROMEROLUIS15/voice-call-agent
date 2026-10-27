@@ -84,9 +84,9 @@ async def test_each_shipped_business_offers_its_own_slots_and_days() -> None:
     assert facial.slots[-1] == time(14, 0)  # 50 minutes fit before 15:00; 14:30 would not.
 
 
-def test_a_service_without_a_price_is_offered_without_one() -> None:
+def test_a_service_without_a_price_says_it_is_not_published() -> None:
     content = load_conversation_content()
     clinic = load_practice_catalog().business("practice-dental-clinic").context(None)
     prompt = booking_prompt(content, clinic, MONDAY)
     [line] = [line for line in prompt.splitlines() if "[first-assessment]" in line]
-    assert content.booking_briefing.price.split("{")[0] not in line
+    assert line.endswith(content.booking_briefing.no_price)  # Never read as a free service.

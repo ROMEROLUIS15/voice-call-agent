@@ -123,7 +123,7 @@
   
   Servicios (el identificador entre corchetes es para las herramientas):
   - Limpieza dental [dental-cleaning]: 45 minutos, precio 25.00
-  - Consulta de evaluación [first-assessment]: 30 minutos
+  - Consulta de evaluación [first-assessment]: 30 minutos, precio no publicado
   - Blanqueamiento dental [teeth-whitening]: 90 minutos, precio 120.00
   
   Para agendar una cita:
@@ -177,6 +177,7 @@
         'noviembre',
         'diciembre',
       ),
+      'no_price': ', precio no publicado',
       'open_day': '{weekday} de {opens} a {closes}',
       'price': ', precio {price}',
       'service': '{name} [{id}]: {minutes} minutos',
