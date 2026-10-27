@@ -1,0 +1,25 @@
+id: agreement-before-the-proposal-at-a-spa
+title: The caller agrees before the agent proposes; the booking waits for the read-back and still completes
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-spa
+language: es
+turns:
+  - says: Hola, resérvame una manicura para mañana a las once de la mañana a nombre de Ana Ejemplo, y si está libre confírmala de una vez.
+  - says: Sí, confírmala.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: manicura
+    day: mañana
+    time: "11:00"
+    name: Ana Ejemplo
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, ac-2, inv-2, any-business]
