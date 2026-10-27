@@ -90,6 +90,9 @@ class ConfirmationRefused(_Result):
     kind: Literal["refused"] = "refused"
     reason: ConfirmationRefusal | str
     """A guard's refusal, or the backend's rejection (`SLOT_CONFLICT`, `OUTSIDE_HOURS`...)."""
+    pending_proposal: Proposed | None = None
+    """With `caller_has_not_answered`: the proposal, still pending, for the agent to read back
+    and ask about; without it the model took the refusal for a failure (manifest §10)."""
 
 
 @dataclass(frozen=True)
@@ -225,7 +228,9 @@ class BookingGuard:
             )
         else:
             self._decide(WriteAction.CONFIRM_BOOKING, reason.value, proposal)
-        return ConfirmationRefused(reason=reason)
+        unanswered = reason is ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED
+        pending = _proposed(proposal) if unanswered and proposal is not None else None
+        return ConfirmationRefused(reason=reason, pending_proposal=pending)
 
     def _decide(self, action: WriteAction, outcome: str, proposal: _Proposal) -> None:
         self._on_decision(

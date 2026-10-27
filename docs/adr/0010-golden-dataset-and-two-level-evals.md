@@ -1,6 +1,6 @@
 # ADR 0010: Golden dataset and evals at two levels, with a judge model
 
-*   **Status:** Accepted, amended by 0013
+*   **Status:** Accepted, amended by 0013 and 0016
 *   **Date:** 2026-10-19
 
 ## Context

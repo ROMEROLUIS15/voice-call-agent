@@ -18,6 +18,7 @@ from evals.conversation_harness.conversation_driver import (
 from evals.eval_baseline import MetricScore
 from evals.golden_cases import GoldenCase
 from evals.judge_scoring import JUDGE_PASS_THRESHOLD, JudgeScore
+from evals.outcome_metrics import OUTCOME_METRICS, outcome_scores
 from evals.quality_criteria import QUALITY_CRITERIA, REPETITIONS, MetricKind
 from evals.task_metrics import TASK_METRICS, task_scores
 from voice_call_agent.conversation_content.content_loader import ConversationContent
@@ -90,7 +91,7 @@ async def _run_case(
             case=case,
             repetition=repetition,
             agent_lines=[],
-            task_scores=task_scores([]),
+            task_scores=task_scores([]) | outcome_scores(case, None),
             judge_scores=[JudgeScore(c, 0.0, str(error)) for c in case.expected.quality],
             failure=str(error),
         )
@@ -98,7 +99,8 @@ async def _run_case(
         case=case,
         repetition=repetition,
         agent_lines=record.agent_lines,
-        task_scores=task_scores(record.agent_lines[1:]),
+        task_scores=task_scores(record.agent_lines[1:])
+        | outcome_scores(case, record.trace.outcome),
         judge_scores=await judge.score(case, record),
         turns=record.turns,
         llm_upstreams=record.trace.llm_upstreams,
@@ -117,9 +119,11 @@ def aggregate_scores(runs: list[CaseRun]) -> dict[str, MetricScore]:
             values[criterion.id].append(
                 float(met) if criterion.kind is MetricKind.SECURITY else judged.score
             )
-    kinds = {metric.id: metric.kind for metric in TASK_METRICS.values()} | {
-        criterion.id: criterion.kind for criterion in QUALITY_CRITERIA.values()
-    }
+    kinds = (
+        {metric.id: metric.kind for metric in TASK_METRICS.values()}
+        | {metric.id: metric.kind for metric in OUTCOME_METRICS.values()}
+        | {criterion.id: criterion.kind for criterion in QUALITY_CRITERIA.values()}
+    )
     return {
         metric_id: MetricScore(kind=kinds[metric_id], score=round(mean(scores), 4))
         for metric_id, scores in sorted(values.items())

@@ -29,6 +29,7 @@ _EVALS_DIR = Path(__file__).parent
 _SCORING_SOURCES = (
     "quality_criteria.py",
     "task_metrics.py",
+    "outcome_metrics.py",
     "judge_scoring.py",
     "conversation_harness/call_transcript.py",
 )

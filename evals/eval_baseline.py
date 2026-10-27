@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from evals.quality_criteria import REGRESSION_MARGIN, MetricKind
+from evals.quality_criteria import MetricKind, regression_margin
 
 BASELINE_PATH = Path(__file__).parent / "baseline.json"
 
@@ -74,10 +74,10 @@ def save_baseline(baseline: EvalBaseline, path: Path = BASELINE_PATH) -> None:
 def compare_with_baseline(
     baseline: EvalBaseline, current: dict[str, MetricScore]
 ) -> list[MetricComparison]:
-    """A measure regresses when it drops below the baseline by more than its kind's margin."""
+    """A measure regresses when it drops below the baseline by more than its margin."""
     comparisons = []
     for metric_id, score in sorted(current.items()):
-        margin = REGRESSION_MARGIN[score.kind]
+        margin = regression_margin(metric_id, score.kind)
         previous = baseline.metrics.get(metric_id)
         if previous is None:
             verdict = Verdict.NEW
