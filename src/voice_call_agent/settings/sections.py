@@ -45,6 +45,15 @@ class LanguageModelSettings(_Section):
     request_timeout_seconds: float = Field(gt=0)
 
 
+class SchedulingBackendKind(StrEnum):
+    """Where the agent reads and writes appointments."""
+
+    NONE = "none"
+    """No backend yet (phase 0): the agent converses and books nothing."""
+    PRACTICE = "practice"
+    """The in-memory practice schedule with fictitious businesses; development only."""
+
+
 class TwilioMediaStreamsSettings(_Section):
     """Phone-line entry."""
 

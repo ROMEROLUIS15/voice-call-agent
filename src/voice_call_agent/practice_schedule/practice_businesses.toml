@@ -1,0 +1,42 @@
+# Fictitious businesses of the practice schedule (development only). Never real data.
+# Names, the greeting and the services are in the callers' language, as a scheduling backend
+# would return them.
+
+default_business = "practice-barbershop"
+
+[[businesses]]
+id = "practice-barbershop"
+name = "Barbería La Práctica"
+timezone = "America/Caracas"
+greeting = "Hola, gracias por llamar a Barbería La Práctica. ¿En qué te puedo ayudar?"
+slot_minutes = 30
+# E.164 numbers that reach this business (a Meta test number, for instance). A call with no
+# dialed number, such as a browser practice call, reaches the default business.
+dialed_numbers = []
+
+[[businesses.services]]
+id = "haircut"
+name = "Corte de cabello"
+duration_min = 30
+price = "8.00"
+
+[[businesses.services]]
+id = "haircut-and-beard"
+name = "Corte y barba"
+duration_min = 60
+price = "12.00"
+
+[[businesses.services]]
+id = "shave"
+name = "Afeitado"
+duration_min = 30
+price = "6.00"
+
+# A day that is not listed is closed.
+[businesses.opening_hours]
+mon = { opens = "09:00:00", closes = "18:00:00" }
+tue = { opens = "09:00:00", closes = "18:00:00" }
+wed = { opens = "09:00:00", closes = "18:00:00" }
+thu = { opens = "09:00:00", closes = "18:00:00" }
+fri = { opens = "09:00:00", closes = "18:00:00" }
+sat = { opens = "09:00:00", closes = "14:00:00" }
