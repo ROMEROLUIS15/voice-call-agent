@@ -1,0 +1,20 @@
+id: unpublished-price-at-a-dental-clinic
+title: The caller asks the price of a service the business publishes no price for; the agent invents none
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-dental-clinic
+language: es
+turns:
+  - says: Buenas tardes, ¿cuánto cuesta la consulta de evaluación?
+expected:
+  intent: ask-info
+  data:
+    service: consulta de evaluación
+  outcome: info_only
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [info, hallucination, any-business]

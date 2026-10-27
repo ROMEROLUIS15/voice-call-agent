@@ -42,9 +42,10 @@ other entries; use headphones to try interrupting the agent. Only a browser on t
 start a call, and the service refuses the setting outside development. Its latency is not a phone
 call's: the browser's audio is wideband, with echo cancellation, and stays on the machine.
 
-`SCHEDULING_BACKEND=practice` gives the calls a fictitious barbershop to book with, kept in memory
-and lost on restart (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is
-also refused outside development. With it, ask for an appointment by voice: the agent checks the
+`SCHEDULING_BACKEND=practice` gives the calls fictitious businesses to book with (a barbershop, a
+dental clinic and a spa; a practice call reaches `default_business`), kept in memory and lost on
+restart (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is also refused
+outside development. With it, ask for an appointment by voice: the agent checks the
 availability, proposes, reads the summary back and books only after you say yes (ADR 0011). Each
 decision lands in the call's trace (`writes`) with the `booked` outcome.
 
@@ -112,7 +113,12 @@ uv run pytest tests/evals tests/snapshots                         # reference co
 uv run --env-file .env --group evals python -m evals.model_evals  # real model + judge vs the baseline
 ```
 
-A change to the prompt, phrases, model or scoring changes the behaviour fingerprint. The first
+The booking cases run against every practice business, each a different kind of business, so the
+agent is shown working for any catalog, not for one; the judge reads the prompt the agent received
+and every tool result, and so checks that each fact the agent stated came from them.
+
+A change to the prompt, phrases, model, practice businesses or scoring changes the behaviour
+fingerprint. The first
 baseline is measured with the booking prompt of phase 2 (ADR 0013): until then `--record-fingerprint`
 records the new inputs; from then on `--write-baseline` stores new measurements. Where the network
 refuses the default provider, the evals workflow measures it from a GitHub-hosted runner

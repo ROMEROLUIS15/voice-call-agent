@@ -2,7 +2,8 @@
 
 The baseline records the inputs it was measured with; `tests/evals/test_behavior_fingerprint.py`
 fails when they change, so no change to the prompt, the phrases, the model, its generation
-settings, the dataset or the metrics lands without new evals (constitution §16). Only what the
+settings, the dataset, the businesses it runs against or the metrics lands without new evals
+(constitution §16). Only what the
 model evals exercise counts: they run with scripted speech, so the speech-to-text model and the
 voice are left out (ADR 0013).
 """
@@ -20,12 +21,19 @@ from voice_call_agent.adapters.language_model_providers.provider_selection impor
 )
 from voice_call_agent.agent_tools.booking_tools import TOOL_NAMES, tool_schema
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
+from voice_call_agent.practice_schedule.practice_catalog import load_practice_catalog
 from voice_call_agent.settings.sections import LanguageModelProvider, LanguageModelSettings
 from voice_call_agent.settings.service_settings import ServiceSettings
 
 _EVALS_DIR = Path(__file__).parent
-_SCORING_SOURCES = ("quality_criteria.py", "task_metrics.py", "judge_scoring.py")
-"""What decides a score: criteria, margins, repetitions, deterministic checks and the judge."""
+_SCORING_SOURCES = (
+    "quality_criteria.py",
+    "task_metrics.py",
+    "judge_scoring.py",
+    "conversation_harness/call_transcript.py",
+)
+"""What decides a score: criteria, margins, repetitions, deterministic checks, the judge and
+the transcript it reads."""
 
 
 def _default(setting: str) -> str:
@@ -68,6 +76,8 @@ def behavior_inputs() -> dict[str, str]:
         "generation_settings": _digest(configuration),
         "agent_tools": _digest({name: json.dumps(tool) for name, tool in agent_tools().items()}),
         "golden_dataset": golden_dataset_version(),
+        # The booking prompt the model receives is built from these businesses.
+        "practice_businesses": _digest({"catalog": load_practice_catalog().model_dump_json()}),
         "scoring": _digest({name: _normalized(_EVALS_DIR / name) for name in _SCORING_SOURCES}),
         "judge_model": JUDGE_MODEL,
     }

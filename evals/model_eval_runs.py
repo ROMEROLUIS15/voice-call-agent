@@ -9,6 +9,7 @@ from typing import Protocol
 
 from pipecat.services.ai_service import AIService
 
+from evals.conversation_harness.call_transcript import SpokenTurn
 from evals.conversation_harness.conversation_driver import (
     ConversationRecord,
     ConversationStalledError,
@@ -40,6 +41,8 @@ class CaseRun:
     task_scores: dict[str, float]
     judge_scores: list[JudgeScore]
     failure: str | None = None
+    turns: tuple[SpokenTurn, ...] = ()
+    """The call in order, as the judge read it."""
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,7 @@ async def _run_case(
         agent_lines=record.agent_lines,
         task_scores=task_scores(record.agent_lines[1:]),
         judge_scores=await judge.score(case, record),
+        turns=record.turns,
     )
 
 

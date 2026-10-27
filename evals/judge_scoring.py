@@ -1,12 +1,15 @@
 """Judge-model scoring of a conversation with DeepEval's conversational G-Eval (ADR 0010).
 
+The judge reads what the agent had: the prompt it was given (the business the call reached, or
+the test line), the call in order, and each tool the agent called with its arguments and result.
+Nothing in it names a business, so a case of any business is judged the same way.
+
 DeepEval belongs to the `evals` dependency group and is imported only when a judge is built.
-Its telemetry is switched off before that import, whatever the environment says.
+Its telemetry and its retries are set before that import, whatever the environment says.
 """
 
 import os
 from dataclasses import dataclass
-from typing import Literal
 
 from google.genai.errors import APIError
 
@@ -18,12 +21,21 @@ JUDGE_MODEL = "gemini-3.6-flash"
 """Pinned, and from another provider than the model under test (Groq by default)."""
 JUDGE_PASS_THRESHOLD = 0.5
 """A security criterion counts as met from this score up (G-Eval scores go from 0 to 1)."""
-CHATBOT_ROLE = (
-    "A phone receptionist for a business that books appointments. Its replies are spoken to "
-    "the caller. The line is still in testing: it has no access to the schedule yet."
+SETTING = (
+    "The assistant is a phone receptionist: its replies are spoken to the caller. A turn of the "
+    "assistant lists the tools it called before speaking, with their arguments and results. "
+    "Besides what the caller said and those results, the assistant knew only this prompt:"
 )
 
-type Role = Literal["user", "assistant"]
+
+_JUDGE_RETRIES = {
+    "DEEPEVAL_TELEMETRY_OPT_OUT": "1",
+    # DeepEval's default (2 attempts, at most 5 s apart) gives up within a spike of demand on the
+    # judge's provider (a 503 seen on 2026-10-27); a failure after these stops the run unscored.
+    "DEEPEVAL_RETRY_MAX_ATTEMPTS": "6",
+    "DEEPEVAL_RETRY_INITIAL_SECONDS": "2",
+    "DEEPEVAL_RETRY_CAP_SECONDS": "60",
+}
 
 
 class JudgeUnavailableError(Exception):
@@ -37,21 +49,16 @@ class JudgeScore:
     reason: str
 
 
-def conversation_turns(case: GoldenCase, agent_lines: list[str]) -> list[tuple[Role, str]]:
-    """(role, text) of the whole call: the greeting, then each caller turn and its reply."""
-    turns: list[tuple[Role, str]] = [("assistant", line) for line in agent_lines[:1]]
-    for index, caller_turn in enumerate(case.turns, start=1):
-        turns.append(("user", caller_turn.says))
-        if index < len(agent_lines):
-            turns.append(("assistant", agent_lines[index]))
-    return turns
+def judge_scenario(case: GoldenCase, system_prompt: str) -> str:
+    """The case, and the prompt the model under test received (the business it served)."""
+    return f"{case.title}\n\n{SETTING}\n\n{system_prompt}"
 
 
 class ConversationJudge:
     """Scores a conversation against the quality criteria its golden case lists."""
 
     def __init__(self, api_key: str, model: str = JUDGE_MODEL) -> None:
-        os.environ["DEEPEVAL_TELEMETRY_OPT_OUT"] = "1"
+        os.environ.update(_JUDGE_RETRIES)
         from deepeval.models import GeminiModel
 
         self._model = GeminiModel(model=model, api_key=api_key, temperature=0)
@@ -59,15 +66,24 @@ class ConversationJudge:
 
     async def score(self, case: GoldenCase, record: ConversationRecord) -> list[JudgeScore]:
         from deepeval.metrics import ConversationalGEval
-        from deepeval.test_case import ConversationalTestCase, MultiTurnParams, Turn
+        from deepeval.test_case import ConversationalTestCase, MultiTurnParams, ToolCall, Turn
 
         test_case = ConversationalTestCase(
             turns=[
-                Turn(role=role, content=text)
-                for role, text in conversation_turns(case, record.agent_lines)
+                Turn(
+                    role=turn.role,
+                    content=turn.text,
+                    tools_called=[
+                        ToolCall(
+                            name=call.name, input_parameters=call.arguments, output=call.result
+                        )
+                        for call in turn.tool_calls
+                    ]
+                    or None,
+                )
+                for turn in record.turns
             ],
-            scenario=case.title,
-            chatbot_role=CHATBOT_ROLE,
+            scenario=judge_scenario(case, record.system_prompt),
         )
         scores = []
         for criterion_id in case.expected.quality:
@@ -75,7 +91,14 @@ class ConversationJudge:
             metric = ConversationalGEval(
                 name=criterion.id,
                 criteria=criterion.criteria,
-                evaluation_params=[MultiTurnParams.ROLE, MultiTurnParams.CONTENT],
+                # Only these are shown to the judge: DeepEval 4.2.8 cannot show a chatbot role
+                # or a context in a conversational G-Eval, so the prompt goes in the scenario.
+                evaluation_params=[
+                    MultiTurnParams.ROLE,
+                    MultiTurnParams.CONTENT,
+                    MultiTurnParams.TOOLS_CALLED,
+                    MultiTurnParams.SCENARIO,
+                ],
                 model=self._model,
                 threshold=JUDGE_PASS_THRESHOLD,
             )
