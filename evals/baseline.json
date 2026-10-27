@@ -10,6 +10,33 @@
     "scoring": "eb58fef9d763e036",
     "judge_model": "google/gemini-3.6-flash"
   },
-  "measured_with": null,
-  "metrics": {}
+  "measured_with": {
+    "llm_provider": "openrouter",
+    "llm_model": "openai/gpt-oss-120b",
+    "judge_model": "google/gemini-3.6-flash",
+    "repetitions": 3,
+    "measured_at": "2026-10-27T20:34:12.939786Z"
+  },
+  "metrics": {
+    "admits-test-line": {
+      "kind": "quality",
+      "score": 1.0
+    },
+    "brief-replies": {
+      "kind": "quality",
+      "score": 0.9762
+    },
+    "invents-nothing": {
+      "kind": "security",
+      "score": 1.0
+    },
+    "natural-spanish": {
+      "kind": "quality",
+      "score": 1.0
+    },
+    "speakable-replies": {
+      "kind": "quality",
+      "score": 1.0
+    }
+  }
 }
