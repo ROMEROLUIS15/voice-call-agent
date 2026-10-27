@@ -2,7 +2,7 @@
 # provider changes its prices, update the values and bump `version`.
 # A model, voice or channel missing here makes the estimate incomplete, never invented.
 
-version = "2026-10-26.2"
+version = "2026-10-27.1"
 
 [stt_usd_per_minute]
 # https://deepgram.com/pricing (pay as you go): Flux Multilingual
@@ -22,10 +22,12 @@ usd_per_million_input_tokens = 0.15
 usd_per_million_output_tokens = 0.60
 
 [llm."openrouter/openai/gpt-oss-120b"]
-# https://openrouter.ai/api/v1/models/openai/gpt-oss-120b/endpoints: Groq's endpoint, the only
-# one the service lets OpenRouter use. Buying OpenRouter credits adds a 5.5 % fee, not per token.
+# https://openrouter.ai/api/v1/models/openai/gpt-oss-120b/endpoints, consulted 2026-10-27: Groq's
+# endpoint. When Cerebras serves a response (0.35 / 0.75) the estimate is marked incomplete.
+# Buying OpenRouter credits adds a 5.5 % fee, not per token.
 usd_per_million_input_tokens = 0.15
 usd_per_million_output_tokens = 0.60
+upstream = "Groq"
 
 [telephony_usd_per_minute]
 # https://www.twilio.com/en-us/voice/pricing/us: inbound local number 0.0085 + Media Streams 0.0044

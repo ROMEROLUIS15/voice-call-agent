@@ -1,0 +1,18 @@
+id: services-and-prices-at-a-spa
+title: The caller asks what services there are and their prices; the agent states only the business's own
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: open
+business: practice-spa
+language: es
+turns:
+  - says: Hola, ¿qué servicios tienen y cuánto cuestan?
+expected:
+  intent: ask-info
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing, natural-spanish]
+tags: [info, hallucination, any-business]

@@ -20,6 +20,7 @@ status: active                               # active | pending (pending_reason 
 levels: [model]                              # conversation and/or model
 channel: whatsapp                            # whatsapp | twilio | browser
 schedule: none                               # none | open | slot-taken | unavailable (below)
+business: null                               # with a schedule: the practice business the call reaches
 language: es
 turns:                                       # what the caller says, in order
   - says: Hola, quiero agendar un corte de cabello para mañana a las tres de la tarde.
@@ -37,11 +38,12 @@ expected:
 tags: [booking, test-line, hallucination]    # invariants (inv-N) and acceptance criteria (ac-N)
 ```
 
-**Schedule.** `none`: no scheduling backend, the prompt that books nothing. Any other value runs the case against the practice schedule (a fictitious barbershop) on a fixed clock, Monday 26 October 2026 at 10:10 in Caracas, so "mañana" is always Tuesday 27: `open`, `slot-taken` (another caller books the proposed slot just before the confirmation) or `unavailable` (reads answer, bookings time out). A case with a write needs a schedule.
+**Schedule and business.** `none`: no scheduling backend, the prompt that books nothing. Any other value runs the case against the practice schedule on a fixed clock, Monday 26 October 2026 at 10:10 in Caracas, so "mañana" is always Tuesday 27: `open`, `slot-taken` (another caller books the proposed slot just before the confirmation) or `unavailable` (reads answer, bookings time out). A case with a write needs a schedule. A case with a schedule names its `business`, an id of `practice_businesses.toml`, and every call of the case reaches it. The practice businesses differ on purpose (a barbershop, a dental clinic and a spa: other services, durations that are not a multiple of the slot, a service without a price, a closed Monday), and the model-level cases must run against every one of them (`test_the_model_evals_run_against_every_practice_business`): the agent is shown working for any business, not for one catalog.
 
 ## What each level checks
 
 *   **Conversation level** (`evals/conversation_checks.py`): the agent greets first with the fixed greeting; it answers each turn; it stops talking when the caller barges in; the language model receives the system prompt and every caller turn in order; the call trace has the case's channel, identity and outcome, one measured latency per turn, the greeting latency, the prompt version, the expected write decisions and only the real failures the case causes. With a write, the scripted model proposes it on the first caller turn and confirms it on the second, through the real tools and write guards.
+*   **What the judge reads**: the case's title and the prompt the model received (the booking prompt of the business the call reached, or the test line's), then the call in the order it happened, each turn of the agent with the tools it called before speaking, their arguments and their results (`evals/conversation_harness/call_transcript.py`). Nothing in it names a business. A line the agent says before calling a tool is its own turn, so the order comes from when each caller turn was said, not from pairing lines and turns. The judge follows the evaluation steps written for each criterion in `evals/quality_criteria.py`, the same every run. With what the agent knew in view, `invents-nothing` checks that every booking it announces and every fact it states came from the caller, its prompt or a tool result.
 *   **Model level**: for every reply of the model, `speakable-replies` (no digits, markup, list markers or emojis: replies become speech) and `brief-replies` (at most two sentences); and the judge criteria the case lists (`evals/quality_criteria.py`).
 
 | Measure | Kind | Scored as | May drop by |
@@ -81,9 +83,16 @@ uv run --env-file .env --group evals python -m evals.model_evals  # level 2 agai
 uv run --env-file .env --group evals python -m evals.model_evals --write-baseline
 ```
 
-The model evals need the key of the configured provider (`LLM_PROVIDER`, `GROQ_API_KEY` by default) and `GOOGLE_API_KEY` for the judge. They exit with 0 (no regression), 1 (regression) or 2 (could not run), write a Markdown report (`var/evals/report.md`) and print it. `--write-baseline` stores the scores only without a regression and only for the default model. `--record-fingerprint` records the inputs without measuring, allowed only while the baseline has never been measured.
+The model evals need the key of the configured provider (`LLM_PROVIDER`, OpenRouter by default) and `OPENROUTER_API_KEY` for the judge (`google/gemini-3.6-flash` through OpenRouter). They exit with 0 (no regression), 1 (regression) or 2 (could not run: a missing key, or a provider that failed during the run, such as the model's rate limit or the judge's outage, since those conversations would measure the provider; nothing is scored or stored), write a Markdown report (`var/evals/report.md`) and print it. `--write-baseline` stores the scores only without a regression and only for the default model. `--record-fingerprint` records the inputs without measuring, allowed only while the baseline has never been measured.
 
-In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies change, compares with the baseline of the commit the change starts from and puts the report in the run summary. Without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets it is skipped with a notice. Its check is not required (it runs only on those changes), but a pull request is not merged with it failing (ADR 0012).
+On a network that refuses the default provider (Groq refuses some VPN exits), the baseline is measured from a GitHub-hosted runner instead, on the pull request's branch, and committed in that pull request:
+
+```bash
+gh workflow run evals.yml --ref <branch> -f write_baseline=true
+gh run download <run-id> -n evals-baseline -D evals   # replaces evals/baseline.json
+```
+
+In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies change, compares with the baseline of the commit the change starts from and puts the report in the run summary; run on demand with `write_baseline`, it also stores a new baseline, kept 14 days as the `evals-baseline` artifact. Without the `OPENROUTER_API_KEY` secret (the model's and the judge's) it is skipped with a notice. Its check is not required (it runs only on those changes), but a pull request is not merged with it failing (ADR 0012).
 
 ## Rules
 
@@ -93,4 +102,4 @@ In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, mode
 
 ## Status
 
-Eight reference conversations: greeting, barge-in and identity per channel, and booking against the practice schedule (AC-1, AC-2, AC-4, AC-9). Model level: the five cases about the test line and the booking cases (AC-1, AC-2, AC-3, AC-9). Pending: an unknown dialed number (AC-6), an unresolved business on WhatsApp (AC-5), the interruption time (AC-8) and the phase 3 cases. The booking prompt exists; the baseline stays **unmeasured** until its first run with the real model and the judge, which becomes the baseline (ADR 0013).
+Nine reference conversations: greeting, barge-in and identity per channel, and booking against the practice schedule (AC-1, AC-2, AC-4, AC-9, and AC-2 at the dental clinic). Model level, 14 cases (42 conversations and 81 judge scores per run, one judge request each): the five cases about the test line, and booking cases at the three practice businesses: the barbershop (AC-1, AC-2, AC-3, AC-9), the dental clinic (AC-2 with 15-minute slots; a service without a price) and the spa (AC-3; a closed day; its services and prices). Pending: an unknown dialed number (AC-6), an unresolved business on WhatsApp (AC-5), the interruption time (AC-8) and the phase 3 cases. **Baseline measured on 2026-10-27** (`evals/baseline.json`, ADR 0013): `invents-nothing` 1.00, `natural-spanish` 1.00, `admits-test-line` 1.00, `speakable-replies` 1.00, `brief-replies` 0.98, with `openai/gpt-oss-120b` through OpenRouter and the judge `google/gemini-3.6-flash`. From now on a change to what shapes the agent's replies needs a new measurement (`--write-baseline`), not `--record-fingerprint`. The report names the upstream providers that served the model under test.

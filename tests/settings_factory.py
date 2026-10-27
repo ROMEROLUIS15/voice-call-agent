@@ -11,7 +11,7 @@ META_VERIFY_TOKEN = "meta-verify-token"
 def make_service_settings(**overrides: object) -> ServiceSettings:
     values: dict[str, object] = {
         "deepgram_api_key": "dg-key",
-        "groq_api_key": "groq-key",
+        "openrouter_api_key": "or-key",
         "public_base_url": PUBLIC_BASE_URL,
         "twilio_account_sid": "AC00000000000000000000000000000000",
         "twilio_auth_token": TWILIO_AUTH_TOKEN,

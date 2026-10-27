@@ -46,7 +46,7 @@ class ScheduleCondition(StrEnum):
     NONE = "none"
     """No backend: the prompt that books nothing."""
     OPEN = "open"
-    """The practice schedule (a fictitious barbershop), on a fixed clock."""
+    """The practice schedule, on a fixed clock, reached at the case's business."""
     SLOT_TAKEN = "slot-taken"
     """Another caller books the proposed slot just before the confirmation."""
     UNAVAILABLE = "unavailable"
@@ -108,6 +108,9 @@ class GoldenCase(_Strict):
     levels: tuple[EvalLevel, ...] = Field(min_length=1)
     channel: CallChannel
     schedule: ScheduleCondition = ScheduleCondition.NONE
+    business: str | None = None
+    """The practice business the call reaches (`practice_businesses.toml`); needed with a
+    schedule, so that each booking case says which kind of business it shows working."""
     language: Literal["es"]
     turns: tuple[CallerTurn, ...]
     expected: Expectations
@@ -122,6 +125,8 @@ class GoldenCase(_Strict):
         write = self.expected.tool_call if self.status is CaseStatus.ACTIVE else None
         if write is not None and self.schedule is ScheduleCondition.NONE:
             raise ValueError("a write needs a schedule to write to")
+        if (self.schedule is ScheduleCondition.NONE) != (self.business is None):
+            raise ValueError("a case with a schedule names its business, and only such a case")
         if write is not None and write.name != "propose_booking":
             raise ValueError("an active case's write is a propose_booking call")
         if unknown := set(self.expected.quality) - QUALITY_CRITERIA.keys():

@@ -15,6 +15,7 @@ from functools import partial
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.services.ai_service import AIService
 
+from evals.conversation_harness.call_transcript import SpokenTurn, call_transcript
 from evals.conversation_harness.loopback_transport import LoopbackTransport
 from evals.conversation_harness.schedule_conditions import harness_clock, schedule_for
 from evals.conversation_harness.scripted_speech import RecordingTextToSpeech, ScriptedSpeechToText
@@ -35,6 +36,7 @@ from voice_call_agent.call_transports.twilio_media_streams.pipecat_websocket_tra
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.observability.call_trace import CallTrace, ServiceVersions
 from voice_call_agent.observability.cost_estimation import load_price_table
+from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
 from voice_call_agent.scheduling_backend.scheduling_models import BusinessContext
 from voice_call_agent.speech_pipeline.audio_format import AudioFormat
@@ -58,13 +60,24 @@ class ConversationStalledError(Exception):
     """The agent did not do what the conversation was waiting for in time."""
 
 
+class LanguageModelUnavailableError(Exception):
+    """The model's provider failed during the call (a rate limit, an outage): the conversation
+    measured the provider, not the agent."""
+
+
 @dataclass(frozen=True)
 class ConversationRecord:
     """What happened in a golden case's conversation."""
 
     trace: CallTrace
     agent_lines: list[str]
-    """What the agent was asked to say: the greeting, then one item per reply."""
+    """What the agent was asked to say: the greeting, then one item per model response."""
+    turns: tuple[SpokenTurn, ...]
+    """The call in order: the agent's lines, with the tools called before each, and the
+    caller's turns where the caller said them."""
+    system_prompt: str
+    """What the model was told: the prompt of the business the call reached, or the one that
+    books nothing."""
     synthesized_ms: float
     played_ms: float
     business: BusinessContext | None
@@ -74,6 +87,18 @@ class ConversationRecord:
     def agent_interrupted(self) -> bool:
         """Some of the agent's speech never reached the caller: it stopped when interrupted."""
         return self.played_ms < self.synthesized_ms
+
+
+class _PromptKeepingModelFactory:
+    """Creates the model under test and keeps the prompt it was given."""
+
+    def __init__(self, create: Callable[[str], AIService]) -> None:
+        self._create = create
+        self.system_prompt = ""
+
+    def create(self, system_prompt: str) -> AIService:
+        self.system_prompt = system_prompt
+        return self._create(system_prompt)
 
 
 class _RecordingTraceSink:
@@ -94,11 +119,12 @@ async def hold_conversation(
     """Call, say each of the caller's turns, wait for the last reply and hang up."""
     stt, tts, transport = ScriptedSpeechToText(), RecordingTextToSpeech(), LoopbackTransport()
     sink = _RecordingTraceSink()
-    schedule = schedule_for(case.schedule)
+    schedule = schedule_for(case.schedule, case.business)
+    model = _PromptKeepingModelFactory(create_language_model)
     runner = PipecatConversationRunner(
         factories=SpeechServiceFactories(
             create_stt=lambda: stt,
-            create_language_model=create_language_model,
+            create_language_model=model.create,
             create_tts=lambda: tts,
             create_vad=SileroVADAnalyzer,
         ),
@@ -113,14 +139,18 @@ async def hold_conversation(
     session = await _with_business(session, schedule)
     call = asyncio.create_task(runner.run(transport, session, audio_format))
     try:
-        await _converse(case, stt, tts, transport)
+        caller_turns = await _converse(case, stt, tts, transport)
     finally:
         await transport.hang_up()
         await asyncio.wait_for(call, _END_TIMEOUT_S)
+        # Checked after a stall too: a provider failure is what stalls the call.
+        _require_an_available_model(case, sink.traces)
     [trace] = sink.traces
     return ConversationRecord(
         trace=trace,
         agent_lines=tts.agent_lines,
+        turns=call_transcript(tts.agent_lines, tts.tool_calls, caller_turns),
+        system_prompt=model.system_prompt,
         synthesized_ms=tts.synthesized_ms,
         played_ms=transport.output().played_ms,
         business=session.business_context,
@@ -128,7 +158,7 @@ async def hold_conversation(
 
 
 async def _with_business(session: CallSession, schedule: InMemorySchedule | None) -> CallSession:
-    """Resolved as an entry does at the start of the call: the practice barbershop."""
+    """Resolved as an entry does at the start of the call: the case's practice business."""
     if schedule is None:
         return session
     resolution = await schedule.resolve_call_business(session)
@@ -149,21 +179,33 @@ def _session_of(case: GoldenCase) -> tuple[CallSession, AudioFormat]:
             return build_browser_session(call_id), WEBRTC_AUDIO_FORMAT
 
 
+def _require_an_available_model(case: GoldenCase, traces: list[CallTrace]) -> None:
+    failure = ErrorCode.LLM_EXCEPTION
+    if failure in case.expected.real_failures:
+        return
+    if any(error.code == failure for trace in traces for error in trace.errors):
+        raise LanguageModelUnavailableError(f"{case.id}: the language model's provider failed")
+
+
 async def _converse(
     case: GoldenCase,
     stt: ScriptedSpeechToText,
     tts: RecordingTextToSpeech,
     transport: LoopbackTransport,
-) -> None:
+) -> list[tuple[int, str]]:
+    """Each caller turn as `(agent lines spoken before it, what the caller said)`."""
     await transport.wait_until_ready(_START_TIMEOUT_S)
     await transport.connect()
+    caller_turns = []
     for replies_so_far, turn in enumerate(case.turns):
         if turn.barge_in:
             await _wait_until(partial(_reply_started, transport, replies_so_far), "a reply")
         else:
             await _wait_until(partial(_reply_over, tts, transport, replies_so_far), "silence")
+        caller_turns.append((len(tts.agent_lines), turn.says))
         await stt.caller_says(turn.says)
     await _wait_until(partial(_reply_over, tts, transport, len(case.turns)), "the last reply")
+    return caller_turns
 
 
 def _reply_started(transport: LoopbackTransport, replies: int) -> bool:

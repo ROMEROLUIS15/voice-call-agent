@@ -5,7 +5,7 @@ from importlib import resources
 from typing import Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from voice_call_agent.scheduling_backend.scheduling_models import (
     BusinessContext,
@@ -54,6 +54,14 @@ class PracticeBusiness(BaseModel):
             weekly_hours=self.weekly_hours,
             known_client_first_name=known_client_first_name,
         )
+
+    @field_validator("services", mode="before")
+    @classmethod
+    def _unpriced_services(cls, services: object) -> object:
+        """A service listed without a price has none: TOML cannot write a missing value."""
+        if not isinstance(services, list):
+            return services
+        return [{"price": None} | s if isinstance(s, dict) else s for s in services]
 
     @model_validator(mode="after")
     def _check(self) -> Self:

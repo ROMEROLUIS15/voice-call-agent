@@ -4,8 +4,8 @@
 
 Runs every active model-level golden case with the configured language model, scores the
 conversations (task metrics and the judge) and compares them with a baseline. Needs the key of
-the model's provider and `GOOGLE_API_KEY` for the judge. Exit code: 0 no regression,
-1 regression, 2 the evals could not run.
+the model's provider and `OPENROUTER_API_KEY` for the judge. Exit code: 0 no regression,
+1 regression, 2 the evals could not run (a missing key, or a provider that failed during the run).
 """
 
 import argparse
@@ -20,6 +20,7 @@ from evals.behavior_fingerprint import (
     default_language_model,
     model_configuration,
 )
+from evals.conversation_harness.conversation_driver import LanguageModelUnavailableError
 from evals.eval_baseline import (
     BASELINE_PATH,
     EvalBaseline,
@@ -33,7 +34,7 @@ from evals.eval_baseline import (
 from evals.eval_report import render_report
 from evals.eval_settings import ModelEvalSettings
 from evals.golden_cases import EvalLevel, load_golden_dataset, runnable_cases
-from evals.judge_scoring import JUDGE_MODEL, ConversationJudge
+from evals.judge_scoring import JUDGE_MODEL, ConversationJudge, JudgeUnavailableError
 from evals.model_eval_runs import (
     CaseRun,
     ModelUnderTest,
@@ -77,17 +78,24 @@ def main(argv: list[str] | None = None) -> int:
         return record_unmeasured_fingerprint(BASELINE_PATH)
     settings = ModelEvalSettings()
     model = settings.language_model()
-    if model is None or settings.google_api_key is None:
-        print("Cannot run: the model's provider key and GOOGLE_API_KEY are needed.")
+    if model is None or settings.openrouter_api_key is None:
+        print(
+            "Cannot run: the model's provider key and OPENROUTER_API_KEY (the judge's) are needed."
+        )
         return EXIT_CANNOT_RUN
     if arguments.write_baseline and _differs_from_default(model):
         print("Cannot write the baseline: it is measured with the default model only.")
         return EXIT_CANNOT_RUN
     under_test = model_under_test(select_language_model(model))
-    judge = ConversationJudge(settings.google_api_key.get_secret_value())
-    runs = asyncio.run(
-        run_cases(runnable_cases(load_golden_dataset(), EvalLevel.MODEL), under_test, judge)
-    )
+    judge = ConversationJudge(settings.openrouter_api_key.get_secret_value())
+    try:
+        runs = asyncio.run(
+            run_cases(runnable_cases(load_golden_dataset(), EvalLevel.MODEL), under_test, judge)
+        )
+    except (LanguageModelUnavailableError, JudgeUnavailableError) as error:
+        # Scoring these conversations would measure the provider, not the agent.
+        print(f"Cannot run: {error}. Nothing was scored or stored; run the evals again.")
+        return EXIT_CANNOT_RUN
     return conclude(
         runs,
         under_test.services,

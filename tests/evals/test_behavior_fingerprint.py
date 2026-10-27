@@ -32,6 +32,11 @@ def test_the_baseline_was_measured_with_the_current_behavior() -> None:
     assert baseline.fingerprint == behavior_fingerprint(baseline.inputs)
 
 
+def test_the_language_model_input_names_the_provider_and_the_model() -> None:
+    """OpenRouter's settings carry a `provider` field of their own (its routing preferences)."""
+    assert behavior_inputs()["language_model"] == "openrouter openai/gpt-oss-120b"
+
+
 def test_the_model_configuration_follows_the_configured_model() -> None:
     default = default_language_model()
     other = default.model_copy(update={"model": "another-model", "api_key": SecretStr("x")})
