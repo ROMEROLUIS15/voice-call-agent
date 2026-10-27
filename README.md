@@ -114,7 +114,9 @@ uv run --env-file .env --group evals python -m evals.model_evals  # real model +
 
 A change to the prompt, phrases, model or scoring changes the behaviour fingerprint. The first
 baseline is measured with the booking prompt of phase 2 (ADR 0013): until then `--record-fingerprint`
-records the new inputs; from then on `--write-baseline` stores new measurements. Details:
+records the new inputs; from then on `--write-baseline` stores new measurements. Where the network
+refuses the default provider, the evals workflow measures it from a GitHub-hosted runner
+(`gh workflow run evals.yml --ref <branch> -f write_baseline=true`). Details:
 [golden dataset](docs/evals/golden-dataset.md).
 
 Text-to-speech voices are compared on the "first token → first audio" segment of manifest §6,
