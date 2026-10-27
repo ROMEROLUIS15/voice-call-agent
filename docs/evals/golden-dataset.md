@@ -81,7 +81,7 @@ uv run --env-file .env --group evals python -m evals.model_evals  # level 2 agai
 uv run --env-file .env --group evals python -m evals.model_evals --write-baseline
 ```
 
-The model evals need the key of the configured provider (`LLM_PROVIDER`, `GROQ_API_KEY` by default) and `GOOGLE_API_KEY` for the judge. They exit with 0 (no regression), 1 (regression) or 2 (could not run), write a Markdown report (`var/evals/report.md`) and print it. `--write-baseline` stores the scores only without a regression and only for the default model. `--record-fingerprint` records the inputs without measuring, allowed only while the baseline has never been measured.
+The model evals need the key of the configured provider (`LLM_PROVIDER`, `GROQ_API_KEY` by default) and `GOOGLE_API_KEY` for the judge. They exit with 0 (no regression), 1 (regression) or 2 (could not run: a missing key, or a provider that failed during the run, such as the model's rate limit or the judge's outage, since those conversations would measure the provider; nothing is scored or stored), write a Markdown report (`var/evals/report.md`) and print it. `--write-baseline` stores the scores only without a regression and only for the default model. `--record-fingerprint` records the inputs without measuring, allowed only while the baseline has never been measured.
 
 On a network that refuses the default provider (Groq refuses some VPN exits), the baseline is measured from a GitHub-hosted runner instead, on the pull request's branch, and committed in that pull request:
 
