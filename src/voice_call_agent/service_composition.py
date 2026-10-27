@@ -25,6 +25,9 @@ from voice_call_agent.observability.call_trace import ServiceVersions
 from voice_call_agent.observability.call_trace_store import CallTraceSink, JsonlCallTraceSink
 from voice_call_agent.observability.cost_estimation import load_price_table
 from voice_call_agent.observability.sentry_trace_export import SentryCallTraceSink
+from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
+from voice_call_agent.practice_schedule.practice_catalog import load_practice_catalog
+from voice_call_agent.settings.sections import SchedulingBackendKind
 from voice_call_agent.settings.service_settings import ServiceSettings
 from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
 from voice_call_agent.speech_pipeline.pipeline_assembly import SpeechServiceFactories
@@ -73,4 +76,9 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
         replay_guard=InMemoryReplayGuard(protection.replay_window_seconds),
         rate_limiter=build_rate_limiter(protection.rate_limit_storage_uri),
         shutdown_grace_seconds=supervision.shutdown_grace_seconds,
+        business_resolver=(
+            InMemorySchedule(load_practice_catalog())
+            if settings.scheduling_backend is SchedulingBackendKind.PRACTICE
+            else None
+        ),
     )

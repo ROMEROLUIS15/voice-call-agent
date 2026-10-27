@@ -43,3 +43,14 @@ def test_browser_practice_is_off_by_default_and_allowed_in_development() -> None
     assert make_service_settings(
         browser_practice_enabled=True, environment="development"
     ).browser_practice_enabled
+
+
+def test_the_practice_schedule_is_refused_in_production() -> None:
+    with pytest.raises(ValidationError, match="SCHEDULING_BACKEND"):
+        make_service_settings(scheduling_backend="practice")
+    assert (
+        make_service_settings(
+            scheduling_backend="practice", environment="development"
+        ).scheduling_backend.value
+        == "practice"
+    )

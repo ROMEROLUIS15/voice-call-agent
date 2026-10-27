@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from tests.app_builder import AppUnderTest
 from tests.browser_peer import browser_offer, wait_until
+from tests.practice_catalogs import schedule
 from voice_call_agent.call_transports.browser_webrtc.practice_routes import PRACTICE_PAGE_POLICY
 from voice_call_agent.call_transports.pipecat_webrtc_transport import WEBRTC_AUDIO_FORMAT
 
@@ -50,3 +51,18 @@ async def test_an_offer_is_answered_and_the_call_runs_once_the_browser_connects(
     assert session.call_id.startswith("practice-")
     assert audio_format == WEBRTC_AUDIO_FORMAT
     await wait_until(lambda: app_under_test.supervisor.active_calls == 0)
+
+
+async def test_a_practice_call_gets_the_business_the_schedule_resolves() -> None:
+    app_under_test = AppUnderTest(business_resolver=schedule())
+    transport = httpx.ASGITransport(app=app_under_test.build(**PRACTICE), client=("127.0.0.1", 1))
+    browser, offer = await browser_offer()
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            answer = (await client.post("/practice/offer", json=offer)).json()
+        await browser.setRemoteDescription(RTCSessionDescription(**answer))
+        await wait_until(lambda: bool(app_under_test.runner.calls))
+    finally:
+        await browser.close()
+    [(session, _)] = app_under_test.runner.calls
+    assert session.business_id == "barbershop"  # The default business: no dialed number.
