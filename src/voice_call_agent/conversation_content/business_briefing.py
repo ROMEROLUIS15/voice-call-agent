@@ -56,7 +56,10 @@ def _opening_hours(briefing: BookingBriefing, business: BusinessContext) -> list
 
 def _service(briefing: BookingBriefing, service: ServiceOffering) -> str:
     line = briefing.service.format(name=service.name, id=service.id, minutes=service.duration_min)
-    if service.price is not None:
+    # Said, not left out: a service listed without a price reads as a free one (manifest §10).
+    if service.price is None:
+        line += briefing.no_price
+    else:
         line += briefing.price.format(price=service.price)
     return line
 

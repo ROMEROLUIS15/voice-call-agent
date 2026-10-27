@@ -60,8 +60,11 @@ def test_fixed_phrases(snapshot: SnapshotAssertion) -> None:
     } == snapshot
 
 
-def test_booking_prompt_of_the_practice_barbershop(snapshot: SnapshotAssertion) -> None:
-    business = load_practice_catalog().business_for_number(None).context(None)
+@pytest.mark.parametrize("business_id", [b.id for b in load_practice_catalog().businesses])
+def test_booking_prompt_of_each_practice_business(
+    business_id: str, snapshot: SnapshotAssertion
+) -> None:
+    business = load_practice_catalog().business(business_id).context(None)
     assert booking_prompt(load_conversation_content(), business, date(2026, 10, 26)) == snapshot
 
 

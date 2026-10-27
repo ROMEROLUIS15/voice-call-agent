@@ -52,14 +52,19 @@ def test_language_model_section_carries_the_selected_key() -> None:
     assert section.api_key.get_secret_value() == "g-key"
 
 
-def test_openrouter_needs_its_own_key() -> None:
+def test_openrouter_is_the_default_provider_and_needs_its_own_key() -> None:
     with pytest.raises(ValidationError, match="openrouter"):
-        make_service_settings(llm_provider="openrouter")
-    section = make_service_settings(
-        llm_provider="openrouter", openrouter_api_key="or-key"
-    ).language_model()
+        make_service_settings(openrouter_api_key=None, groq_api_key="groq-key")
+    section = make_service_settings().language_model()
     assert section.provider is LanguageModelProvider.OPENROUTER
     assert section.api_key.get_secret_value() == "or-key"
+
+
+def test_groq_directly_needs_its_own_key() -> None:
+    with pytest.raises(ValidationError, match="groq"):
+        make_service_settings(llm_provider="groq")
+    section = make_service_settings(llm_provider="groq", groq_api_key="groq-key").language_model()
+    assert section.provider is LanguageModelProvider.GROQ
 
 
 def test_validation_errors_do_not_echo_the_input() -> None:

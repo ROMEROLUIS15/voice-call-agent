@@ -1,6 +1,8 @@
 # Fictitious businesses of the practice schedule (development only). Never real data.
 # Names, the greeting and the services are in the callers' language, as a scheduling backend
-# would return them.
+# would return them. They differ on purpose (kind of business, services, durations that are
+# not a multiple of the slot, a service without a price, closed days) so that the evals show
+# the agent working for any business, not for one catalog.
 
 default_business = "practice-barbershop"
 
@@ -40,3 +42,71 @@ wed = { opens = "09:00:00", closes = "18:00:00" }
 thu = { opens = "09:00:00", closes = "18:00:00" }
 fri = { opens = "09:00:00", closes = "18:00:00" }
 sat = { opens = "09:00:00", closes = "14:00:00" }
+
+[[businesses]]
+id = "practice-dental-clinic"
+name = "Consultorio Odontológico La Práctica"
+timezone = "America/Caracas"
+greeting = "Buenos días, consultorio odontológico La Práctica. ¿En qué le puedo ayudar?"
+slot_minutes = 15
+dialed_numbers = []
+
+[[businesses.services]]
+id = "dental-cleaning"
+name = "Limpieza dental"
+duration_min = 45
+price = "25.00"
+
+[[businesses.services]]
+id = "first-assessment"
+name = "Consulta de evaluación"
+duration_min = 30
+# No price: the clinic gives it at the visit.
+
+[[businesses.services]]
+id = "teeth-whitening"
+name = "Blanqueamiento dental"
+duration_min = 90
+price = "120.00"
+
+[businesses.opening_hours]
+mon = { opens = "08:00:00", closes = "16:00:00" }
+tue = { opens = "08:00:00", closes = "16:00:00" }
+wed = { opens = "08:00:00", closes = "16:00:00" }
+thu = { opens = "08:00:00", closes = "16:00:00" }
+fri = { opens = "08:00:00", closes = "16:00:00" }
+
+[[businesses]]
+id = "practice-spa"
+name = "Spa La Práctica"
+timezone = "America/Caracas"
+greeting = "Hola, gracias por llamar a Spa La Práctica. ¿Qué te gustaría reservar?"
+slot_minutes = 30
+dialed_numbers = []
+
+[[businesses.services]]
+id = "relaxing-massage"
+name = "Masaje relajante"
+duration_min = 60
+price = "35.00"
+
+[[businesses.services]]
+id = "facial-cleansing"
+name = "Limpieza facial"
+duration_min = 50
+price = "28.00"
+
+[[businesses.services]]
+id = "manicure"
+name = "Manicura"
+duration_min = 40
+price = "12.00"
+
+# Closed on Mondays.
+[businesses.opening_hours]
+tue = { opens = "10:00:00", closes = "19:00:00" }
+wed = { opens = "10:00:00", closes = "19:00:00" }
+thu = { opens = "10:00:00", closes = "19:00:00" }
+fri = { opens = "10:00:00", closes = "19:00:00" }
+sat = { opens = "10:00:00", closes = "19:00:00" }
+sun = { opens = "10:00:00", closes = "15:00:00" }

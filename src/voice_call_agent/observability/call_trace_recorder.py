@@ -25,7 +25,8 @@ from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
 
 
 class CallTraceRecorder:
-    """Records one call. Errors arrive through `record_error` (see `errors_recorded_by`)."""
+    """Records one call. Errors arrive through `record_error` (see `errors_recorded_by`), and
+    the upstream provider of each response through `record_llm_upstream`."""
 
     def __init__(
         self, context: CallTraceContext, services: ServiceVersions, prices: PriceTable
@@ -38,6 +39,7 @@ class CallTraceRecorder:
         self._latency = CallLatencyTracker(context)
         self._usage = UsageObserver()
         self._errors: Counter[ErrorCode] = Counter()
+        self._upstreams: Counter[str] = Counter()
         self._writes: list[WriteDecision] = []
         self._specs: dict[ErrorCode, ErrorSpec] = {}
         self.observers: list[BaseObserver] = [
@@ -58,6 +60,9 @@ class CallTraceRecorder:
 
     def record_write(self, decision: WriteDecision) -> None:
         self._writes.append(decision)
+
+    def record_llm_upstream(self, upstream: str) -> None:
+        self._upstreams[upstream] += 1
 
     def record_error(self, spec: ErrorSpec) -> None:
         self._errors[spec.code] += 1
@@ -87,8 +92,10 @@ class CallTraceRecorder:
             ],
             writes=list(self._writes),
             usage=self._usage.usage.model_copy(),
+            llm_upstreams=dict(sorted(self._upstreams.items())),
             cost=estimate_cost(
                 usage=self._usage.usage,
+                llm_upstreams=self._upstreams,
                 services=self._services,
                 duration_s=duration_s,
                 channel_label=self._context.channel_label,

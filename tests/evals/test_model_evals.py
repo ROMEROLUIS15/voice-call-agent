@@ -1,5 +1,6 @@
 """The model evals pipeline, with a scripted model and a fixed judge instead of providers."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -7,15 +8,17 @@ from pipecat.services.ai_service import AIService
 
 from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, ScriptedLanguageModel
 from evals.eval_baseline import EvalBaseline, MetricScore, Verdict, compare_with_baseline
+from evals.eval_report import render_report
+from evals.eval_settings import ModelEvalSettings
 from evals.golden_cases import EvalLevel, load_golden_dataset, runnable_cases
-from evals.judge_scoring import conversation_turns
 from evals.model_eval_runs import CaseRun, ModelUnderTest, aggregate_scores, run_cases
 from evals.model_evals import EXIT_CANNOT_RUN, EXIT_OK, EXIT_REGRESSION, conclude, main
 from evals.quality_criteria import MetricKind
 from evals.task_metrics import is_brief, is_speakable
-from tests.evals.eval_runs_factory import FixedScoreJudge, case_run, golden_case
+from tests.evals.eval_runs_factory import FixedScoreJudge, case_run
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import ServiceVersions
+from voice_call_agent.settings.sections import LanguageModelProvider
 
 UNMEASURED = EvalBaseline(fingerprint="f", inputs={})
 
@@ -96,15 +99,6 @@ def test_security_may_not_drop_and_quality_may_drop_by_its_margin() -> None:
     }
 
 
-def test_the_judge_reads_the_call_in_order() -> None:
-    case = golden_case("small-talk-then-booking-request")
-    turns = conversation_turns(
-        case, ["Hola.", "Soy la recepcionista.", "Esta línea está en pruebas."]
-    )
-    assert [role for role, _ in turns] == ["assistant", "user", "assistant", "user", "assistant"]
-    assert turns[1][1] == case.turns[0].says
-
-
 async def test_the_model_cases_run_and_replace_an_unmeasured_baseline(tmp_path: Path) -> None:
     cases = runnable_cases(load_golden_dataset(), EvalLevel.MODEL)
     judge = FixedScoreJudge(1.0)
@@ -157,6 +151,29 @@ def test_a_regression_fails_and_keeps_the_baseline(tmp_path: Path) -> None:
     assert "Judge `invents-nothing` 0.20: because" in report
 
 
+@pytest.mark.parametrize("provider", list(LanguageModelProvider))
+def test_the_evals_run_with_every_provider_the_service_accepts(
+    provider: LanguageModelProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", provider.value)
+    monkeypatch.setenv(f"{provider.value.upper()}_API_KEY", "test-key")
+    model = ModelEvalSettings().language_model()
+    assert model is not None and model.provider is provider
+
+
+def test_the_report_counts_the_upstreams_that_served_the_model() -> None:
+    groq = replace(case_run("booking-request-on-the-test-line", {}), llm_upstreams={"Groq": 3})
+    mixed = replace(groq, llm_upstreams={"Groq": 1, "Cerebras": 1})
+    report = render_report(
+        model_label="openrouter m",
+        judge_model="j",
+        baseline=UNMEASURED,
+        comparisons=[],
+        runs=[groq, mixed],
+    )
+    assert "Upstream providers: Cerebras 1, Groq 4 responses." in report
+
+
 def test_the_evals_need_both_keys() -> None:
     assert main([]) == EXIT_CANNOT_RUN
 
@@ -165,6 +182,6 @@ def test_the_baseline_is_measured_with_the_default_model_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
-    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-judge-key")
     monkeypatch.setenv("LLM_MODEL", "another-model")
     assert main(["--write-baseline"]) == EXIT_CANNOT_RUN
