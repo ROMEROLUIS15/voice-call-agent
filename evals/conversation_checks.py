@@ -19,7 +19,8 @@ def conversation_failures(case: GoldenCase, record: ConversationRecord, greeting
         ("first thing the agent says", record.agent_lines[:1], [greeting]),
         ("agent lines (greeting + one per turn)", len(record.agent_lines), len(case.turns) + 1),
         ("agent stopped when interrupted", record.agent_interrupted, expected.agent_interrupted),
-        ("real failures", real_failures, []),
+        ("write decisions", [write.outcome for write in trace.writes], list(expected.writes)),
+        ("real failures", sorted(real_failures), sorted(expected.real_failures)),
     ]
     return [
         f"{name}: expected {wanted!r}, got {actual!r}"

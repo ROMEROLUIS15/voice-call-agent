@@ -26,6 +26,7 @@ class ErrorCode(StrEnum):
     # Providers and the pipeline.
     STT_EXCEPTION = "STT_EXCEPTION"
     LLM_EXCEPTION = "LLM_EXCEPTION"
+    LLM_EMPTY_RESPONSE = "LLM_EMPTY_RESPONSE"
     TTS_EXCEPTION = "TTS_EXCEPTION"
     PIPELINE_EXCEPTION = "PIPELINE_EXCEPTION"
     CALL_TASK_FAILED = "CALL_TASK_FAILED"
@@ -47,6 +48,10 @@ class ErrorCode(StrEnum):
     NOT_FOUND = "NOT_FOUND"
     IDENTITY_REQUIRED = "IDENTITY_REQUIRED"
     IDENTITY_MISMATCH = "IDENTITY_MISMATCH"
+    # The agent's tools and the write guards.
+    TOOL_ARGUMENTS_INVALID = "TOOL_ARGUMENTS_INVALID"
+    WRITE_PROPOSAL_REFUSED = "WRITE_PROPOSAL_REFUSED"
+    WRITE_CONFIRMATION_REFUSED = "WRITE_CONFIRMATION_REFUSED"
     # Capacity.
     CALL_REJECTED_NO_SLOT = "CALL_REJECTED_NO_SLOT"
     # Browser practice entry (development only).
@@ -102,6 +107,7 @@ ERROR_CATALOG: dict[ErrorCode, ErrorSpec] = {
     for spec in (
         _failure(ErrorCode.STT_EXCEPTION, _E, "speech-to-text service failed"),
         _failure(ErrorCode.LLM_EXCEPTION, _E, "language model service failed"),
+        _failure(ErrorCode.LLM_EMPTY_RESPONSE, _E, "the language model answered nothing"),
         _failure(ErrorCode.TTS_EXCEPTION, _E, "text-to-speech service failed"),
         _failure(ErrorCode.PIPELINE_EXCEPTION, _E, "pipeline processor failed"),
         _failure(ErrorCode.CALL_TASK_FAILED, _E, "call ended with an unhandled error"),
@@ -121,6 +127,16 @@ ERROR_CATALOG: dict[ErrorCode, ErrorSpec] = {
         _outcome(ErrorCode.NOT_FOUND, "appointment not found for this caller"),
         _outcome(ErrorCode.IDENTITY_REQUIRED, "second factor required on the phone line"),
         _outcome(ErrorCode.IDENTITY_MISMATCH, "second factor did not match"),
+        _outcome(
+            ErrorCode.TOOL_ARGUMENTS_INVALID, "the model called a tool with invalid arguments"
+        ),
+        _outcome(ErrorCode.WRITE_PROPOSAL_REFUSED, "a write proposal did not pass validation"),
+        _outcome(
+            ErrorCode.WRITE_CONFIRMATION_REFUSED,
+            "a confirmation was refused by the write guards",
+            security_event=True,
+            warning=True,
+        ),
         _outcome(ErrorCode.CALL_REJECTED_NO_SLOT, "no call slot free; call rejected", warning=True),
         _outcome(
             ErrorCode.PRACTICE_CALL_NOT_CONNECTED,

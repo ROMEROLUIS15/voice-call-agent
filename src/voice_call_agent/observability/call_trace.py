@@ -3,9 +3,11 @@
 It carries no transcript and no raw phone number: identifiers, versions, latencies, counts.
 """
 
-from datetime import datetime
+from datetime import date, datetime, time
+from enum import StrEnum
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from voice_call_agent.observability.error_taxonomy import ErrorCode, ErrorKind
 from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
@@ -23,6 +25,31 @@ class ServiceVersions(BaseModel):
     llm_model: str
     stt_model: str
     tts_voice: str
+
+
+class WriteAction(StrEnum):
+    PROPOSE_BOOKING = "propose_booking"
+    CONFIRM_BOOKING = "confirm_booking"
+
+
+class WriteDecision(BaseModel):
+    """What the write guards decided about a proposal or a confirmation (ADR 0011).
+
+    No client name and no caller words: free text cannot be redacted reliably. The caller turn
+    count shows whether the caller spoke between a proposal and its confirmation (INV-2).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    action: WriteAction
+    outcome: str
+    """`proposed` or `booked`, or the reason it was refused or rejected."""
+    proposal_id: UUID | None
+    caller_turn: int
+    """Final caller transcripts so far in the call."""
+    service_id: str | None = None
+    day: date | None = None
+    start: time | None = None
 
 
 class TurnLatency(BaseModel):
@@ -71,6 +98,7 @@ class CallTrace(BaseModel):
     turns: list[TurnLatency]
     caller_turns: int
     errors: list[RecordedError]
+    writes: list[WriteDecision] = Field(default_factory=list)
     usage: ProviderUsage
     cost: CostEstimate
 

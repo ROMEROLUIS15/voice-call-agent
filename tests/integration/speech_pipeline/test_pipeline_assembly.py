@@ -1,7 +1,11 @@
 """The real providers' services assemble into a pipeline without touching the network."""
 
+from typing import cast
+
+import pytest
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.processors.frame_processor import FrameProcessor
+from pipecat.services.ai_service import AIService
 from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport
 
@@ -14,7 +18,9 @@ from voice_call_agent.adapters.language_model_providers.provider_selection impor
     language_model_factory,
 )
 from voice_call_agent.speech_pipeline.pipeline_assembly import (
+    AgentTools,
     SpeechServiceFactories,
+    ToolsNeedALanguageModelError,
     assemble_speech_pipeline,
 )
 
@@ -54,3 +60,18 @@ async def test_pipeline_runs_stt_llm_tts_between_the_transport_ends() -> None:
         "FrameProcessor",
         "LLMAssistantAggregator",
     ]
+
+
+async def test_tools_need_a_language_model_service() -> None:
+    settings = make_service_settings()
+    speech = settings.speech()
+    factories = SpeechServiceFactories(
+        create_stt=flux_stt_factory(speech, Language.ES),
+        create_language_model=lambda _prompt: cast(AIService, FrameProcessor()),
+        create_tts=aura_tts_factory(speech),
+        create_vad=SileroVADAnalyzer,
+    )
+    with pytest.raises(ToolsNeedALanguageModelError):
+        await assemble_speech_pipeline(
+            LoopbackTransport(), factories, "prompt", cast(AgentTools, object())
+        )

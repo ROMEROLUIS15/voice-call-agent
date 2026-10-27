@@ -6,11 +6,20 @@ from datetime import UTC, datetime
 
 from pipecat.observers.base_observer import BaseObserver
 
-from voice_call_agent.observability.call_trace import CallTrace, RecordedError, ServiceVersions
+from voice_call_agent.observability.call_trace import (
+    CallTrace,
+    RecordedError,
+    ServiceVersions,
+    WriteDecision,
+)
 from voice_call_agent.observability.cost_estimation import PriceTable, estimate_cost
 from voice_call_agent.observability.error_taxonomy import ErrorCode, ErrorSpec
 from voice_call_agent.observability.latency_tracking import CallLatencyTracker
-from voice_call_agent.observability.pipeline_observers import ProviderErrorObserver, UsageObserver
+from voice_call_agent.observability.pipeline_observers import (
+    ProviderErrorObserver,
+    SilentReplyObserver,
+    UsageObserver,
+)
 from voice_call_agent.observability.trace_context import CallTraceContext
 from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
 
@@ -29,26 +38,37 @@ class CallTraceRecorder:
         self._latency = CallLatencyTracker(context)
         self._usage = UsageObserver()
         self._errors: Counter[ErrorCode] = Counter()
+        self._writes: list[WriteDecision] = []
         self._specs: dict[ErrorCode, ErrorSpec] = {}
         self.observers: list[BaseObserver] = [
             self._latency.observer,
             self._usage,
             ProviderErrorObserver(),
+            SilentReplyObserver(),
         ]
 
     @property
     def call_id(self) -> str:
         return self._context.call_id
 
+    @property
+    def caller_turns(self) -> int:
+        """Final caller transcripts so far: the write guards read it during the call."""
+        return self._usage.caller_turns
+
+    def record_write(self, decision: WriteDecision) -> None:
+        self._writes.append(decision)
+
     def record_error(self, spec: ErrorSpec) -> None:
         self._errors[spec.code] += 1
         self._specs[spec.code] = spec
 
     def finish(self, outcome: CallOutcome | None = None) -> CallTrace:
-        """Close the trace. Unknown outcome: info only if the caller spoke, else abandoned."""
+        """Close the trace. Unknown outcome: booked if a booking was written, info only if the
+        caller spoke, else abandoned."""
         duration_s = time.monotonic() - self._started
         if outcome is None:
-            outcome = CallOutcome.INFO_ONLY if self._usage.caller_turns else CallOutcome.ABANDONED
+            outcome = self._outcome()
         return CallTrace(
             call_id=self._context.call_id,
             channel_label=self._context.channel_label,
@@ -65,6 +85,7 @@ class CallTraceRecorder:
                 RecordedError(code=code, kind=self._specs[code].kind, count=count)
                 for code, count in sorted(self._errors.items())
             ],
+            writes=list(self._writes),
             usage=self._usage.usage.model_copy(),
             cost=estimate_cost(
                 usage=self._usage.usage,
@@ -74,3 +95,8 @@ class CallTraceRecorder:
                 prices=self._prices,
             ),
         )
+
+    def _outcome(self) -> CallOutcome:
+        if any(write.outcome == "booked" for write in self._writes):
+            return CallOutcome.BOOKED
+        return CallOutcome.INFO_ONLY if self._usage.caller_turns else CallOutcome.ABANDONED

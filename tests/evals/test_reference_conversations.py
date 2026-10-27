@@ -1,12 +1,16 @@
 """The golden cases of the conversation level, through the real runner with scripted providers."""
 
+from zoneinfo import ZoneInfo
+
 import pytest
 from pipecat.services.ai_service import AIService
 
 from evals.conversation_checks import conversation_failures
-from evals.conversation_harness.conversation_driver import hold_conversation
+from evals.conversation_harness.conversation_driver import ConversationRecord, hold_conversation
+from evals.conversation_harness.schedule_conditions import HARNESS_NOW
 from evals.conversation_harness.scripted_language_model import ScriptedLanguageModel
 from evals.golden_cases import EvalLevel, GoldenCase, load_golden_dataset, runnable_cases
+from voice_call_agent.conversation_content.business_briefing import booking_prompt
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import ServiceVersions
 
@@ -27,7 +31,7 @@ async def test_reference_conversation(case: GoldenCase) -> None:
     models: list[ScriptedLanguageModel] = []
 
     def create_language_model(system_prompt: str) -> AIService:
-        models.append(ScriptedLanguageModel(system_prompt))
+        models.append(ScriptedLanguageModel(system_prompt, case.expected.tool_call))
         return models[-1]
 
     record = await hold_conversation(
@@ -37,15 +41,24 @@ async def test_reference_conversation(case: GoldenCase) -> None:
         create_language_model=create_language_model,
     )
 
-    assert conversation_failures(case, record, CONTENT.greeting) == []
+    greeting = record.business.greeting if record.business else CONTENT.greeting
+    assert conversation_failures(case, record, greeting) == []
     [model] = models
-    assert model.system_prompt == CONTENT.system_prompt
+    assert model.system_prompt == _expected_prompt(record)
     # The model hears every caller turn, in order, whatever the agent was saying.
     assert model.caller_messages == [turn.says for turn in case.turns]
     assert record.trace.services.prompt_version == CONTENT.version
 
 
-def test_the_conversation_level_covers_greeting_interruption_and_identity() -> None:
+def _expected_prompt(record: ConversationRecord) -> str:
+    """The booking prompt of the business the call resolved, or the one that books nothing."""
+    if record.business is None:
+        return CONTENT.system_prompt
+    today = HARNESS_NOW.astimezone(ZoneInfo(record.business.timezone)).date()
+    return booking_prompt(CONTENT, record.business, today)
+
+
+def test_the_conversation_level_covers_greeting_interruption_identity_and_booking() -> None:
     tags = {tag for case in CASES for tag in case.tags}
-    assert {"greeting", "interruption", "identity"} <= tags
+    assert {"greeting", "interruption", "identity", "booking"} <= tags
     assert {case.channel.value for case in CASES} == {"twilio", "whatsapp"}

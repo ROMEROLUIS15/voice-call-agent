@@ -12,7 +12,11 @@ from collections.abc import AsyncGenerator
 
 from pipecat.frames.frames import (
     Frame,
+    FunctionCallInProgressFrame,
+    FunctionCallResultFrame,
     LLMFullResponseEndFrame,
+    LLMFullResponseStartFrame,
+    LLMTextFrame,
     ProposedUserStartedSpeakingFrame,
     ProposedUserStoppedSpeakingFrame,
     STTMetadataFrame,
@@ -82,6 +86,8 @@ class RecordingTextToSpeech(TTSService):
         self.synthesized_ms = 0.0
         self.replies_completed = 0
         self.last_reply_completed_at = 0.0
+        self._reply_says_something = False
+        self._calls_in_progress: set[str] = set()
 
     @property
     def agent_lines(self) -> list[str]:
@@ -89,10 +95,26 @@ class RecordingTextToSpeech(TTSService):
         return [" ".join(pieces) for pieces in self._lines.values()]
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        self._follow_the_model(frame)
         await super().process_frame(frame, direction)
-        if isinstance(frame, LLMFullResponseEndFrame):
+        # A response that only calls a tool is not a reply: the reply follows the tool's result.
+        if (
+            isinstance(frame, LLMFullResponseEndFrame)
+            and self._reply_says_something
+            and not self._calls_in_progress
+        ):
             self.replies_completed += 1
             self.last_reply_completed_at = time.monotonic()
+
+    def _follow_the_model(self, frame: Frame) -> None:
+        if isinstance(frame, LLMFullResponseStartFrame):
+            self._reply_says_something = False
+        elif isinstance(frame, LLMTextFrame) and frame.text.strip():
+            self._reply_says_something = True
+        elif isinstance(frame, FunctionCallInProgressFrame):
+            self._calls_in_progress.add(frame.tool_call_id)
+        elif isinstance(frame, FunctionCallResultFrame):
+            self._calls_in_progress.discard(frame.tool_call_id)
 
     async def run_tts(self, text: str, context_id: str) -> AsyncGenerator[Frame | None, None]:
         self._lines.setdefault(context_id, []).append(text.strip())

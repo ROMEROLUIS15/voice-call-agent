@@ -1,7 +1,8 @@
 """Holds the conversation of one golden case through the real `PipecatConversationRunner`.
 
-Only the providers and the network are replaced: the pipeline, turn handling, interruptions,
-the call trace and its observers are the production ones. The caller waits for the agent to
+Only the providers, the network and the scheduling backend are replaced: the pipeline, turn
+handling, interruptions, the agent's tools, the write guards, the call trace and its observers
+are the production ones. The caller waits for the agent to
 finish each reply before speaking, unless the turn barges in.
 """
 
@@ -15,8 +16,10 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.services.ai_service import AIService
 
 from evals.conversation_harness.loopback_transport import LoopbackTransport
+from evals.conversation_harness.schedule_conditions import harness_clock, schedule_for
 from evals.conversation_harness.scripted_speech import RecordingTextToSpeech, ScriptedSpeechToText
 from evals.golden_cases import GoldenCase
+from voice_call_agent.call_session.business_resolution import BusinessResolved
 from voice_call_agent.call_session.session import CallChannel, CallSession
 from voice_call_agent.call_session.session_builders import (
     build_browser_session,
@@ -32,6 +35,8 @@ from voice_call_agent.call_transports.twilio_media_streams.pipecat_websocket_tra
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.observability.call_trace import CallTrace, ServiceVersions
 from voice_call_agent.observability.cost_estimation import load_price_table
+from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
+from voice_call_agent.scheduling_backend.scheduling_models import BusinessContext
 from voice_call_agent.speech_pipeline.audio_format import AudioFormat
 from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
 from voice_call_agent.speech_pipeline.pipeline_assembly import SpeechServiceFactories
@@ -62,6 +67,8 @@ class ConversationRecord:
     """What the agent was asked to say: the greeting, then one item per reply."""
     synthesized_ms: float
     played_ms: float
+    business: BusinessContext | None
+    """The business the schedule resolved for the call; `None` without a schedule."""
 
     @property
     def agent_interrupted(self) -> bool:
@@ -87,6 +94,7 @@ async def hold_conversation(
     """Call, say each of the caller's turns, wait for the last reply and hang up."""
     stt, tts, transport = ScriptedSpeechToText(), RecordingTextToSpeech(), LoopbackTransport()
     sink = _RecordingTraceSink()
+    schedule = schedule_for(case.schedule)
     runner = PipecatConversationRunner(
         factories=SpeechServiceFactories(
             create_stt=lambda: stt,
@@ -98,8 +106,11 @@ async def hold_conversation(
         services=services,
         prices=load_price_table(),
         trace_sinks=[sink],
+        scheduling_backend=schedule,
+        clock=harness_clock,
     )
     session, audio_format = _session_of(case)
+    session = await _with_business(session, schedule)
     call = asyncio.create_task(runner.run(transport, session, audio_format))
     try:
         await _converse(case, stt, tts, transport)
@@ -112,7 +123,18 @@ async def hold_conversation(
         agent_lines=tts.agent_lines,
         synthesized_ms=tts.synthesized_ms,
         played_ms=transport.output().played_ms,
+        business=session.business_context,
     )
+
+
+async def _with_business(session: CallSession, schedule: InMemorySchedule | None) -> CallSession:
+    """Resolved as an entry does at the start of the call: the practice barbershop."""
+    if schedule is None:
+        return session
+    resolution = await schedule.resolve_call_business(session)
+    if not isinstance(resolution, BusinessResolved):
+        raise ConversationStalledError(f"the schedule did not resolve the call: {resolution}")
+    return session.resolve_business(resolution.business_id, resolution.context)
 
 
 def _session_of(case: GoldenCase) -> tuple[CallSession, AudioFormat]:

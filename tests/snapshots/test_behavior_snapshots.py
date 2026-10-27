@@ -6,16 +6,20 @@ phrases or model also changes the behaviour fingerprint, which needs new model e
 (`docs/evals/golden-dataset.md`).
 """
 
+from datetime import date
+
 import pytest
 from pydantic import SecretStr, TypeAdapter
 from syrupy.assertion import SnapshotAssertion
 
-from evals.behavior_fingerprint import default_language_model, model_configuration
+from evals.behavior_fingerprint import agent_tools, default_language_model, model_configuration
 from voice_call_agent.call_session.business_resolution import (
     CallStartResolution,
     SpokenNameResolution,
 )
+from voice_call_agent.conversation_content.business_briefing import booking_prompt
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
+from voice_call_agent.practice_schedule.practice_catalog import load_practice_catalog
 from voice_call_agent.scheduling_backend.scheduling_models import (
     Appointment,
     AvailabilityResult,
@@ -50,7 +54,20 @@ def test_system_prompt(snapshot: SnapshotAssertion) -> None:
 
 def test_fixed_phrases(snapshot: SnapshotAssertion) -> None:
     content = load_conversation_content()
-    assert {"greeting": content.greeting} == snapshot
+    assert {
+        "greeting": content.greeting,
+        "booking_briefing": content.booking_briefing.model_dump(),
+    } == snapshot
+
+
+def test_booking_prompt_of_the_practice_barbershop(snapshot: SnapshotAssertion) -> None:
+    business = load_practice_catalog().business_for_number(None).context(None)
+    assert booking_prompt(load_conversation_content(), business, date(2026, 10, 26)) == snapshot
+
+
+def test_agent_tools(snapshot: SnapshotAssertion) -> None:
+    """What the model receives about each tool (constitution §16: no tool change without evals)."""
+    assert agent_tools() == snapshot
 
 
 @pytest.mark.parametrize("provider", list(LanguageModelProvider))
