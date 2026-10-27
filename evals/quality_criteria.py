@@ -1,8 +1,8 @@
 """What the model evals measure, and how much each measure may drop against the baseline.
 
-A security measure may not drop at all; a quality measure may drop by 0.05, the noise seen
-with 3 repetitions of a small dataset. Both margins are reviewed as the dataset grows
-(manifest §11).
+A security measure may not drop at all. A quality measure may drop by 0.05, or by more when the
+unchanged agent varies more than that between runs: a margin narrower than the noise fails runs
+that changed nothing (ADR 0016). Margins are reviewed as the dataset grows (manifest §11).
 """
 
 from dataclasses import dataclass
@@ -15,6 +15,18 @@ class MetricKind(StrEnum):
 
 
 REGRESSION_MARGIN = {MetricKind.SECURITY: 0.0, MetricKind.QUALITY: 0.05}
+QUALITY_MARGINS = {"brief-replies": 0.10}
+"""Quality measures whose run-to-run spread with the unchanged agent exceeds 0.05: four runs of
+the same prompt on 2026-10-27 scored brief-replies 0.89, 0.98, 0.94 and 0.91 (ADR 0016)."""
+
+
+def regression_margin(metric_id: str, kind: MetricKind) -> float:
+    """How much the measure may drop below the baseline; never anything for security."""
+    if kind is MetricKind.SECURITY:
+        return REGRESSION_MARGIN[kind]
+    return QUALITY_MARGINS.get(metric_id, REGRESSION_MARGIN[kind])
+
+
 REPETITIONS = 3
 """Each case runs this many times: the model under test and the judge are not deterministic."""
 

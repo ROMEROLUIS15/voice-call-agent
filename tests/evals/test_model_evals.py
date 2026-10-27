@@ -14,8 +14,8 @@ from evals.golden_cases import EvalLevel, load_golden_dataset, runnable_cases
 from evals.model_eval_runs import CaseRun, ModelUnderTest, aggregate_scores, run_cases
 from evals.model_evals import EXIT_CANNOT_RUN, EXIT_OK, EXIT_REGRESSION, conclude, main
 from evals.outcome_metrics import outcome_scores
-from evals.quality_criteria import MetricKind
-from evals.task_metrics import is_brief, is_speakable
+from evals.quality_criteria import QUALITY_CRITERIA, QUALITY_MARGINS, MetricKind, regression_margin
+from evals.task_metrics import TASK_METRICS, is_brief, is_speakable
 from tests.evals.eval_runs_factory import FixedScoreJudge, case_run, golden_case
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import ServiceVersions
@@ -82,21 +82,21 @@ def test_security_may_not_drop_and_quality_may_drop_by_its_margin() -> None:
             "metrics": {
                 "invents-nothing": MetricScore(kind=MetricKind.SECURITY, score=1.0),
                 "natural-spanish": MetricScore(kind=MetricKind.QUALITY, score=0.9),
-                "brief-replies": MetricScore(kind=MetricKind.QUALITY, score=0.9),
+                "admits-test-line": MetricScore(kind=MetricKind.QUALITY, score=0.9),
             }
         }
     )
     current = {
         "invents-nothing": MetricScore(kind=MetricKind.SECURITY, score=0.99),
         "natural-spanish": MetricScore(kind=MetricKind.QUALITY, score=0.86),
-        "brief-replies": MetricScore(kind=MetricKind.QUALITY, score=0.84),
+        "admits-test-line": MetricScore(kind=MetricKind.QUALITY, score=0.84),
         "speakable-replies": MetricScore(kind=MetricKind.QUALITY, score=1.0),
     }
     verdicts = {c.metric_id: c.verdict for c in compare_with_baseline(baseline, current)}
     assert verdicts == {
         "invents-nothing": Verdict.REGRESSION,
         "natural-spanish": Verdict.OK,
-        "brief-replies": Verdict.REGRESSION,
+        "admits-test-line": Verdict.REGRESSION,
         "speakable-replies": Verdict.NEW,
     }
 
@@ -177,6 +177,24 @@ def test_the_call_outcome_is_scored_against_the_case(
     case_id: str, outcome: CallOutcome | None, scores: dict[str, float]
 ) -> None:
     assert outcome_scores(golden_case(case_id), outcome) == scores
+
+
+def test_a_noisy_quality_measure_has_its_own_margin_and_security_none() -> None:
+    assert regression_margin("brief-replies", MetricKind.QUALITY) == 0.10
+    assert regression_margin("natural-spanish", MetricKind.QUALITY) == 0.05
+    assert regression_margin("brief-replies", MetricKind.SECURITY) == 0.0
+    for metric_id in QUALITY_MARGINS:  # Only quality measures may widen their margin.
+        assert metric_id in TASK_METRICS or QUALITY_CRITERIA[metric_id].kind is MetricKind.QUALITY
+    baseline = UNMEASURED.model_copy(
+        update={"metrics": {"brief-replies": MetricScore(kind=MetricKind.QUALITY, score=0.98)}}
+    )
+    [ok] = compare_with_baseline(
+        baseline, {"brief-replies": MetricScore(kind=MetricKind.QUALITY, score=0.89)}
+    )
+    [regressed] = compare_with_baseline(
+        baseline, {"brief-replies": MetricScore(kind=MetricKind.QUALITY, score=0.87)}
+    )
+    assert (ok.verdict, regressed.verdict) == (Verdict.OK, Verdict.REGRESSION)
 
 
 def test_an_unwanted_write_is_a_security_measure() -> None:
