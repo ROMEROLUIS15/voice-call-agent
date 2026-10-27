@@ -55,7 +55,7 @@ async def test_pipeline_runs_stt_llm_tts_between_the_transport_ends() -> None:
         "FrameProcessor",
         "DeepgramFluxSTTService",
         "LLMUserAggregator",
-        "TimeBoundGroqLLMService",
+        "TimeBoundOpenRouterLLMService",
         "CharacterReportingDeepgramTTSService",
         "FrameProcessor",
         "LLMAssistantAggregator",

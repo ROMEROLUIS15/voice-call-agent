@@ -17,6 +17,10 @@ from voice_call_agent.observability.error_reporting import errors_recorded_by, r
 from voice_call_agent.observability.error_taxonomy import ErrorCode, ErrorKind
 from voice_call_agent.observability.pipeline_observers import ProviderErrorObserver, UsageObserver
 from voice_call_agent.observability.trace_context import CallTraceContext
+from voice_call_agent.observability.upstream_attribution import (
+    report_llm_upstream,
+    upstreams_recorded_by,
+)
 from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
 
 CONTEXT = CallTraceContext(call_id="CA1", channel_label="twilio", identity_verified=False)
@@ -48,6 +52,19 @@ def test_trace_counts_errors_and_marks_real_failures() -> None:
     assert counts[ErrorCode.LLM_EXCEPTION] == (ErrorKind.REAL_FAILURE, 2)
     assert counts[ErrorCode.RATE_LIMITED] == (ErrorKind.EXPECTED_OUTCOME, 1)
     assert trace.real_failure
+
+
+def test_trace_counts_the_upstream_of_each_response() -> None:
+    recorder = CallTraceRecorder(
+        CONTEXT, SERVICES.model_copy(update={"llm_provider": "openrouter"}), load_price_table()
+    )
+    with upstreams_recorded_by(recorder):
+        report_llm_upstream("Groq")
+        report_llm_upstream("Cerebras")
+        report_llm_upstream("Groq")
+    trace = recorder.finish()
+    assert trace.llm_upstreams == {"Cerebras": 1, "Groq": 2}
+    assert not trace.cost.complete  # Priced at Groq's rate: Cerebras's share is not covered.
 
 
 def test_outcome_depends_on_whether_the_caller_spoke() -> None:

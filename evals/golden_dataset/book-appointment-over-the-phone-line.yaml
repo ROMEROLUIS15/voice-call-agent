@@ -6,6 +6,7 @@ status: active
 levels: [conversation, model]
 channel: twilio
 schedule: open
+business: practice-barbershop
 language: es
 turns:
   - says: Buenas, quiero un corte de cabello para mañana a las tres de la tarde. Me llamo Ana Ejemplo.
@@ -27,5 +28,5 @@ expected:
   writes: [proposed, booked]
   outcome: booked
   identity_verified: false
-  quality: [natural-spanish]
+  quality: [invents-nothing, natural-spanish]
 tags: [booking, ac-2, inv-2, inv-3]

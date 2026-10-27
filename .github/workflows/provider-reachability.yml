@@ -2,7 +2,8 @@ name: Provider reachability
 
 # Checks, on demand, that GitHub-hosted runners reach each provider the evals and the service
 # use, with one authenticated read per provider (ADR 0010). Only the HTTP status is printed,
-# never a response body. A provider whose secret is absent is skipped with a notice.
+# never a response body. A provider whose secret is absent is skipped with a notice. The last
+# job prints the Groq key's rate limits, which tell its tier (manifest §10).
 # If a provider is not reachable from GitHub-hosted runners, the maintainers weigh the other
 # options; a self-hosted runner is not one of them (public repository).
 
@@ -27,6 +28,10 @@ jobs:
             secret: GOOGLE_API_KEY
             url: https://generativelanguage.googleapis.com/v1beta/models
             header: "x-goog-api-key:"
+          - name: OpenRouter
+            secret: OPENROUTER_API_KEY
+            url: https://openrouter.ai/api/v1/key
+            header: "Authorization: Bearer"
           - name: OpenAI
             secret: OPENAI_API_KEY
             url: https://api.openai.com/v1/models
@@ -51,3 +56,25 @@ jobs:
             --max-time 15 --header "$HEADER $API_KEY" "$URL") || status="unreachable"
           echo "${{ matrix.provider.name }}: HTTP $status"
           [ "$status" = "200" ]
+
+  groq-limits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    name: Groq rate limits
+    steps:
+      - name: Limits of the key's tier
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "::notice::Groq limits skipped: the GROQ_API_KEY secret is not set."
+            exit 0
+          fi
+          # One completion of at most one token; only two rate-limit headers are printed.
+          body='{"model": "openai/gpt-oss-120b", "max_completion_tokens": 1, "messages": [{"role": "user", "content": "ok"}]}'
+          options=(--silent --max-time 30 --output /dev/null --dump-header -)
+          options+=(--header "Authorization: Bearer $GROQ_API_KEY")
+          options+=(--header "Content-Type: application/json" --data "$body")
+          headers=$(curl "${options[@]}" https://api.groq.com/openai/v1/chat/completions) || headers=""
+          echo "$headers" | grep -iE "^x-ratelimit-limit-(tokens|requests):" || {
+            echo "No rate-limit headers in the answer."; exit 1; }

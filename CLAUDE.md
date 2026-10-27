@@ -29,7 +29,7 @@ Once per clone: `uv run pre-commit install` (ruff and gitleaks then run on every
 
 And: **README and `docs/` (specs and ADRs) updated, or the summary says why not.**
 And: **negative security tests and the threat model updated if the change touches an attack surface.**
-And: **a changed snapshot is reviewed and regenerated (`uv run pytest tests/snapshots --snapshot-update`); a changed behaviour fingerprint needs the model evals and a new baseline (`uv run --env-file .env --group evals python -m evals.model_evals --write-baseline`) or, until the first baseline is measured with the booking prompt of phase 2, `--record-fingerprint` (ADR 0013).**
+And: **a changed snapshot is reviewed and regenerated (`uv run pytest tests/snapshots --snapshot-update`); a changed behaviour fingerprint needs the model evals and a new baseline (`uv run --env-file .env --group evals python -m evals.model_evals --write-baseline`, or from a runner where the network refuses Groq: `gh workflow run evals.yml --ref <branch> -f write_baseline=true`) or, until the first baseline is measured with the booking prompt of phase 2, `--record-fingerprint` (ADR 0013).**
 
 If a secret was ever tracked: `git rm --cached <file>` and rotate the secret.
 

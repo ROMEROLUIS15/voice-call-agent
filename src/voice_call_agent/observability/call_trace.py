@@ -100,6 +100,8 @@ class CallTrace(BaseModel):
     errors: list[RecordedError]
     writes: list[WriteDecision] = Field(default_factory=list)
     usage: ProviderUsage
+    llm_upstreams: dict[str, int] = Field(default_factory=dict)
+    """Responses served by each upstream provider, when the provider routes (OpenRouter)."""
     cost: CostEstimate
 
     @property
