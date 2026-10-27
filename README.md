@@ -42,14 +42,17 @@ other entries; use headphones to try interrupting the agent. Only a browser on t
 start a call, and the service refuses the setting outside development. Its latency is not a phone
 call's: the browser's audio is wideband, with echo cancellation, and stays on the machine.
 
-`SCHEDULING_BACKEND=practice` gives the calls a fictitious barbershop to book with, kept in memory
-and lost on restart (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is
-also refused outside development. With it, ask for an appointment by voice: the agent checks the
+`SCHEDULING_BACKEND=practice` gives the calls fictitious businesses to book with (a barbershop, a
+dental clinic and a spa; a practice call reaches `default_business`), kept in memory and lost on
+restart (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is also refused
+outside development. With it, ask for an appointment by voice: the agent checks the
 availability, proposes, reads the summary back and books only after you say yes (ADR 0011). Each
 decision lands in the call's trace (`writes`) with the `booked` outcome.
 
-If your network gets `403` from Groq, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`: the
-same model answers from Groq through OpenRouter, with one more hop (manifest §10).
+The language model goes through OpenRouter by default (`OPENROUTER_API_KEY`): the same
+`gpt-oss-120b`, served by Groq or, when Groq fails, by Cerebras, which also works from networks
+that Groq refuses (manifest §7, §10). Each call's trace counts the responses each one served
+(`llm_upstreams`).
 
 ### Phone-line entry (Twilio)
 
@@ -112,9 +115,16 @@ uv run pytest tests/evals tests/snapshots                         # reference co
 uv run --env-file .env --group evals python -m evals.model_evals  # real model + judge vs the baseline
 ```
 
-A change to the prompt, phrases, model or scoring changes the behaviour fingerprint. The first
+The booking cases run against every practice business, each a different kind of business, so the
+agent is shown working for any catalog, not for one; the judge reads the prompt the agent received
+and every tool result, and so checks that each fact the agent stated came from them.
+
+A change to the prompt, phrases, model, practice businesses or scoring changes the behaviour
+fingerprint. The first
 baseline is measured with the booking prompt of phase 2 (ADR 0013): until then `--record-fingerprint`
-records the new inputs; from then on `--write-baseline` stores new measurements. Details:
+records the new inputs; from then on `--write-baseline` stores new measurements. Where the network
+refuses the default provider, the evals workflow measures it from a GitHub-hosted runner
+(`gh workflow run evals.yml --ref <branch> -f write_baseline=true`). Details:
 [golden dataset](docs/evals/golden-dataset.md).
 
 Text-to-speech voices are compared on the "first token → first audio" segment of manifest §6,
@@ -133,7 +143,7 @@ Each figure states its date and what it was measured with; what is not measured 
 | Language model, time to the first token (API only; on a call the segment of manifest §6 also includes turn detection) | Groq `openai/gpt-oss-120b` with reasoning effort `low`: p50 375 ms, p95 571 ms. With Groq's default effort: 544 / 976 ms. DeepSeek `deepseek-flash`, thinking off: 776 / 937 ms | 2026-10-19; 20 streamed answers per configuration to five caller turns with fictitious data; conversation content `es-c3d0810115bd`; from a GitHub-hosted runner (pull request #3, closed without merging) |
 | Latency per segment and channel on real calls | Not measured yet | |
 | Speech-to-text on phone audio | Not measured yet | |
-| Golden dataset success | Not measured yet: the first baseline uses the booking prompt (ADR 0013) | |
+| Golden dataset success (model level, first baseline) | `invents-nothing` 1.00 (security), `natural-spanish` 1.00, `admits-test-line` 1.00, `speakable-replies` 1.00, `brief-replies` 0.98 | 2026-10-27; 14 cases, 3 repetitions (42 conversations), booking cases at a barbershop, a dental clinic and a spa; `openai/gpt-oss-120b` through OpenRouter (Groq, Cerebras as fallback; which one served each response was not in that run's report), judge `google/gemini-3.6-flash`; from a GitHub-hosted runner (evals workflow run 40578738471). A run before it scored `invents-nothing` 0.95 and found a service without a price read as free (manifest §10) |
 | Cost per call | Not measured yet; every call trace carries its estimate | |
 | Capacity per instance | Not measured yet (phase 4) | |
 
@@ -147,8 +157,9 @@ uv run pre-commit run --all-files --hook-stage manual
 
 Changes reach `main` through pull requests; CI's jobs are required checks (ADR 0012).
 `.github/workflows/evals.yml` runs the model evals when what shapes the agent's replies changes
-(skipped without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets); its check is not required, but a
+(skipped without the `OPENROUTER_API_KEY` secret, for the model and the judge); its check is not required, but a
 pull request is not merged with it failing. `.github/workflows/provider-reachability.yml` checks
-on demand that the runners reach every provider. `.github/workflows/text-to-speech-comparison.yml`
+on demand that the runners reach every provider, and prints the Groq key's rate limits, which tell
+its tier. `.github/workflows/text-to-speech-comparison.yml`
 runs the voice comparison on demand and when the comparison changes (skipped without the
 `DEEPGRAM_API_KEY` secret); the samples are the run's artifact.

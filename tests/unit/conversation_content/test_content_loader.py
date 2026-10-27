@@ -32,6 +32,6 @@ def test_the_booking_prompt_states_the_business_and_omits_missing_prices() -> No
     business = TWO_BUSINESSES.business("barbershop").context(None)
     prompt = booking_prompt(load_conversation_content(), business, MONDAY)
     assert "Barbería Uno" in prompt and "2026-10-26" in prompt
-    assert "Corte y barba [full]: 60 minutos\n" in prompt  # No price in the catalog.
+    assert "Corte y barba [full]: 60 minutos, precio no publicado" in prompt  # Said, not omitted.
     assert "Corte [haircut]: 30 minutos, precio 8.00" in prompt
     assert "sábado cerrado" in prompt

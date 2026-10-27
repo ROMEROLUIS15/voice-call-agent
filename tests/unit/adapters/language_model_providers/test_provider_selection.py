@@ -79,21 +79,26 @@ def test_selection_resolves_the_default_model_for_traces() -> None:
     assert select_language_model(_settings(LanguageModelProvider.GROQ, "custom")).model == "custom"
 
 
-def test_openrouter_sends_groqs_model_to_groq_only_with_low_effort() -> None:
+GROQ_THEN_CEREBRAS = OpenRouterLLMService.ProviderPreferences(
+    order=["groq", "cerebras"],
+    only=["groq", "cerebras"],
+    allow_fallbacks=False,
+    require_parameters=True,
+    data_collection="deny",
+)
+
+
+def test_openrouter_sends_the_model_to_groq_then_cerebras_with_low_effort() -> None:
     choice = select_language_model(_settings(LanguageModelProvider.OPENROUTER))
     assert (choice.provider, choice.model) == ("openrouter", "openai/gpt-oss-120b")
     settings = cast(OpenRouterLLMSettings, choice.create("p")._settings)
-    assert settings.provider == OpenRouterLLMService.ProviderPreferences(
-        only=["groq"], allow_fallbacks=False
-    )
+    assert settings.provider == GROQ_THEN_CEREBRAS
     assert settings.extra == {"extra_body": {"reasoning": {"effort": "low"}}}
 
 
-def test_another_openrouter_model_stays_on_groq_with_its_default_effort() -> None:
+def test_another_openrouter_model_keeps_the_route_with_its_default_effort() -> None:
     service = language_model_factory(_settings(LanguageModelProvider.OPENROUTER, "other"))("p")
     settings = cast(OpenRouterLLMSettings, service._settings)
     assert settings.model == "other"
-    assert settings.provider == OpenRouterLLMService.ProviderPreferences(
-        only=["groq"], allow_fallbacks=False
-    )
+    assert settings.provider == GROQ_THEN_CEREBRAS
     assert not settings.extra  # No reasoning effort sent.

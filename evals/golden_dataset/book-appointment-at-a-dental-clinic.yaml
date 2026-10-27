@@ -1,0 +1,32 @@
+id: book-appointment-at-a-dental-clinic
+title: A phone-line caller books at a dental clinic, with its own services, hours and 15-minute slots (AC-2)
+source: hand-written
+phase: 2
+status: active
+levels: [conversation, model]
+channel: twilio
+schedule: open
+business: practice-dental-clinic
+language: es
+turns:
+  - says: Buenos días, quisiera una limpieza dental para mañana a las diez y cuarto de la mañana. Mi nombre es Ana Ejemplo.
+  - says: Sí, por favor, confírmela.
+expected:
+  intent: book
+  data:
+    service: limpieza dental
+    day: mañana
+    time: "10:15"
+    name: Ana Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: dental-cleaning
+      day: "2026-10-27"
+      start: "10:15"
+      client_name: Ana Ejemplo
+  writes: [proposed, booked]
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, ac-2, inv-2, inv-3, any-business]
