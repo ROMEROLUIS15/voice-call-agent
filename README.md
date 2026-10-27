@@ -143,7 +143,7 @@ Each figure states its date and what it was measured with; what is not measured 
 | Language model, time to the first token (API only; on a call the segment of manifest §6 also includes turn detection) | Groq `openai/gpt-oss-120b` with reasoning effort `low`: p50 375 ms, p95 571 ms. With Groq's default effort: 544 / 976 ms. DeepSeek `deepseek-flash`, thinking off: 776 / 937 ms | 2026-10-19; 20 streamed answers per configuration to five caller turns with fictitious data; conversation content `es-c3d0810115bd`; from a GitHub-hosted runner (pull request #3, closed without merging) |
 | Latency per segment and channel on real calls | Not measured yet | |
 | Speech-to-text on phone audio | Not measured yet | |
-| Golden dataset success | Not measured yet: the first baseline uses the booking prompt (ADR 0013) | |
+| Golden dataset success (model level, first baseline) | `invents-nothing` 1.00 (security), `natural-spanish` 1.00, `admits-test-line` 1.00, `speakable-replies` 1.00, `brief-replies` 0.98 | 2026-10-27; 14 cases, 3 repetitions (42 conversations), booking cases at a barbershop, a dental clinic and a spa; `openai/gpt-oss-120b` through OpenRouter (Groq, Cerebras as fallback; which one served each response was not in that run's report), judge `google/gemini-3.6-flash`; from a GitHub-hosted runner (evals workflow run 40578738471). A run before it scored `invents-nothing` 0.95 and found a service without a price read as free (manifest §10) |
 | Cost per call | Not measured yet; every call trace carries its estimate | |
 | Capacity per instance | Not measured yet (phase 4) | |
 

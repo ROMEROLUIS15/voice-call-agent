@@ -1,5 +1,7 @@
 """The model evals report, in Markdown: for a pull request summary or a terminal."""
 
+from collections import Counter
+
 from evals.eval_baseline import EvalBaseline, MetricComparison, Verdict
 from evals.judge_scoring import JUDGE_PASS_THRESHOLD
 from evals.model_eval_runs import CaseRun
@@ -22,6 +24,7 @@ def render_report(
         f"Model under test: `{model_label}` · judge: `{judge_model}` · "
         f"{max((run.repetition for run in runs), default=0)} repetitions per case.",
         _baseline_line(baseline),
+        _upstreams_line(runs),
         "",
         f"**{'REGRESSION: ' + ', '.join(regressions) if regressions else 'No regression.'}**",
         "",
@@ -43,6 +46,20 @@ def _baseline_line(baseline: EvalBaseline) -> str:
     return (
         f"Baseline: `{setup.llm_provider} {setup.llm_model}`, judge `{setup.judge_model}`, "
         f"measured {setup.measured_at:%Y-%m-%d}."
+    )
+
+
+def _upstreams_line(runs: list[CaseRun]) -> str:
+    """Which upstream providers served the model under test, when its provider routes."""
+    served: Counter[str] = Counter()
+    for run in runs:
+        served.update(run.llm_upstreams)
+    if not served:
+        return "Upstream providers: not reported (the provider does not route)."
+    return (
+        "Upstream providers: "
+        + ", ".join(f"{name} {count}" for name, count in sorted(served.items()))
+        + " responses."
     )
 
 

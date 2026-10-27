@@ -3,7 +3,7 @@
 import asyncio
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from statistics import mean
 from typing import Protocol
 
@@ -43,6 +43,8 @@ class CaseRun:
     failure: str | None = None
     turns: tuple[SpokenTurn, ...] = ()
     """The call in order, as the judge read it."""
+    llm_upstreams: dict[str, int] = field(default_factory=dict)
+    """Responses served by each upstream provider of the model under test."""
 
 
 @dataclass(frozen=True)
@@ -99,6 +101,7 @@ async def _run_case(
         task_scores=task_scores(record.agent_lines[1:]),
         judge_scores=await judge.score(case, record),
         turns=record.turns,
+        llm_upstreams=record.trace.llm_upstreams,
     )
 
 

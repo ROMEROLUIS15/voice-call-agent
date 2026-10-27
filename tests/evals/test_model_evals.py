@@ -1,5 +1,6 @@
 """The model evals pipeline, with a scripted model and a fixed judge instead of providers."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ from pipecat.services.ai_service import AIService
 
 from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, ScriptedLanguageModel
 from evals.eval_baseline import EvalBaseline, MetricScore, Verdict, compare_with_baseline
+from evals.eval_report import render_report
 from evals.eval_settings import ModelEvalSettings
 from evals.golden_cases import EvalLevel, load_golden_dataset, runnable_cases
 from evals.model_eval_runs import CaseRun, ModelUnderTest, aggregate_scores, run_cases
@@ -157,6 +159,19 @@ def test_the_evals_run_with_every_provider_the_service_accepts(
     monkeypatch.setenv(f"{provider.value.upper()}_API_KEY", "test-key")
     model = ModelEvalSettings().language_model()
     assert model is not None and model.provider is provider
+
+
+def test_the_report_counts_the_upstreams_that_served_the_model() -> None:
+    groq = replace(case_run("booking-request-on-the-test-line", {}), llm_upstreams={"Groq": 3})
+    mixed = replace(groq, llm_upstreams={"Groq": 1, "Cerebras": 1})
+    report = render_report(
+        model_label="openrouter m",
+        judge_model="j",
+        baseline=UNMEASURED,
+        comparisons=[],
+        runs=[groq, mixed],
+    )
+    assert "Upstream providers: Cerebras 1, Groq 4 responses." in report
 
 
 def test_the_evals_need_both_keys() -> None:
