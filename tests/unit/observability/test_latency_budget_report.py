@@ -39,6 +39,7 @@ def test_summary_is_per_channel_and_checks_the_budget() -> None:
     assert twilio_total.within_budget  # p50 1000 ≤ 1000, p95 1100 ≤ 1600
     assert not whatsapp_total.within_budget  # p95 2000 > 1600
     assert "whatsapp: 1 calls, 3 turns" in render_budget_table(summaries)
+    assert render_budget_table(summaries).isascii()  # Printable on a Windows console.
 
 
 def test_call_without_turns_still_counts() -> None:
