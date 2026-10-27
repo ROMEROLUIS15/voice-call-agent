@@ -155,7 +155,7 @@ uv run pre-commit run --all-files --hook-stage manual
 
 Changes reach `main` through pull requests; CI's jobs are required checks (ADR 0012).
 `.github/workflows/evals.yml` runs the model evals when what shapes the agent's replies changes
-(skipped without the `GROQ_API_KEY` and `GOOGLE_API_KEY` secrets); its check is not required, but a
+(skipped without the `GROQ_API_KEY` and `OPENROUTER_API_KEY` secrets, the second for the judge); its check is not required, but a
 pull request is not merged with it failing. `.github/workflows/provider-reachability.yml` checks
 on demand that the runners reach every provider. `.github/workflows/text-to-speech-comparison.yml`
 runs the voice comparison on demand and when the comparison changes (skipped without the

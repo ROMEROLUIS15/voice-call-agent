@@ -92,6 +92,8 @@ QUALITY_CRITERIA: dict[str, QualityCriterion] = {
                 "American Spanish, without regional slang.",
                 "Check that it is warm and polite.",
                 "Check that each of its turns responds to what the caller has just said.",
+                "Judge only the language, the tone and whether each turn responds: whether what "
+                "it says is true is another criterion, not this one.",
             ),
         ),
     )
