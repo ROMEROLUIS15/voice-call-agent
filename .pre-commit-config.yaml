@@ -53,3 +53,12 @@ repos:
         entry: gitleaks git --redact --verbose
         pass_filenames: false
         stages: [manual]
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        # Without the shellcheck and pyflakes integrations: they run only where those tools are
+        # installed, unpinned, so the same workflow would get different verdicts (ADR 0008).
+        args: ["-shellcheck=", "-pyflakes="]
+        stages: [manual]
