@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 
+from voice_call_agent.call_session.business_resolution import BusinessResolved, BusinessResolver
 from voice_call_agent.call_session.session import CallSession
 from voice_call_agent.call_session.session_builders import build_browser_session
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
@@ -24,6 +25,10 @@ from voice_call_agent.call_transports.pipecat_webrtc_transport import (
 )
 from voice_call_agent.observability.error_reporting import report_error
 from voice_call_agent.observability.error_taxonomy import ErrorCode
+from voice_call_agent.scheduling_backend.scheduling_errors import (
+    SchedulingBackendError,
+    SchedulingBackendUnavailableError,
+)
 from voice_call_agent.speech_pipeline.conversation_runner import ConversationRunner
 
 PRACTICE_PAGE_PATH = "/practice"
@@ -39,6 +44,7 @@ PRACTICE_PAGE_POLICY = (
 def build_practice_router(
     supervisor: CallSupervisor,
     conversation_runner: ConversationRunner,
+    business_resolver: BusinessResolver | None,
     connect_timeout_seconds: float = CONNECT_TIMEOUT_SECONDS,
 ) -> APIRouter:
     """Router of the practice entry. Reads the page once, at startup."""
@@ -46,6 +52,7 @@ def build_practice_router(
     endpoints = BrowserPracticeEndpoints(
         supervisor,
         conversation_runner,
+        business_resolver,
         page=(page / "index.html").read_text(encoding="utf-8"),
         script=(page / "call.js").read_text(encoding="utf-8"),
         connect_timeout_seconds=connect_timeout_seconds,
@@ -64,6 +71,7 @@ class BrowserPracticeEndpoints:
         self,
         supervisor: CallSupervisor,
         conversation_runner: ConversationRunner,
+        business_resolver: BusinessResolver | None,
         *,
         page: str,
         script: str,
@@ -71,6 +79,7 @@ class BrowserPracticeEndpoints:
     ) -> None:
         self._supervisor = supervisor
         self._conversation_runner = conversation_runner
+        self._business_resolver = business_resolver
         self._page = page
         self._script = script
         self._connect_timeout_seconds = connect_timeout_seconds
@@ -109,10 +118,34 @@ class BrowserPracticeEndpoints:
             if not await wait_until_connected(connection, self._connect_timeout_seconds):
                 report_error(ErrorCode.PRACTICE_CALL_NOT_CONNECTED, call_id=session.call_id)
                 return
+            session = await self._with_business(session)
             transport = build_webrtc_transport(connection)
             await self._conversation_runner.run(transport, session, WEBRTC_AUDIO_FORMAT)
         finally:
             await close_peer(connection)
+
+    async def _with_business(self, session: CallSession) -> CallSession:
+        """The session with the business the backend resolves for it, when there is a backend.
+
+        The call has no dialed number, so the backend decides (the practice schedule picks its
+        default business). Unresolved, the call goes on without a business and nothing can be
+        written (constitution §3).
+        """
+        if self._business_resolver is None:
+            return session
+        try:
+            resolution = await self._business_resolver.resolve_call_business(session)
+        except SchedulingBackendError as error:
+            code = (
+                ErrorCode.SCHEDULING_BACKEND_UNAVAILABLE
+                if isinstance(error, SchedulingBackendUnavailableError)
+                else ErrorCode.SCHEDULING_BACKEND_REJECTED
+            )
+            report_error(code, error=error, call_id=session.call_id)
+            return session
+        if isinstance(resolution, BusinessResolved):
+            return session.resolve_business(resolution.business_id)
+        return session
 
 
 def _is_loopback(host: str | None) -> bool:

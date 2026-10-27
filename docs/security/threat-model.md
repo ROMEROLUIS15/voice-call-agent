@@ -89,7 +89,7 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 
 | Id | Threat | Mitigation | Proof | Status |
 |---|---|---|---|---|
-| T-16 | A call of business A reads or writes business B's data (S5, S7) | The business is resolved once from the call (INV-1); requests carry `call_sid`, never a business; Cronix derives it server-side and enforces row-level security | `test_tenant_boundary.py`, `test_tenant_isolation.py`; Cronix's isolation tests (contract §8) | P (adapter and agent tools: phases 1–2) |
+| T-16 | A call of business A reads or writes business B's data (S5, S7) | The business is resolved once from the call (INV-1); requests carry `call_sid`, never a business; Cronix derives it server-side and enforces row-level security | `test_tenant_boundary.py`, `test_tenant_isolation.py` (against the practice schedule, which follows the contract's tenancy); Cronix's isolation tests (contract §8) | P (adapter and agent tools: phases 1–2) |
 | T-17 | The LLM or the caller injects a business id into a request (S5) | Request models forbid unknown fields; port methods take no tenant argument | `test_a_tenant_proposed_by_the_llm_never_reaches_a_request` | M |
 | T-18 | Spoofed caller ID reschedules or cancels someone's appointment (S1) | Second factor on the phone line (INV-4); otherwise a message is taken | `CallSession.identity_verified` tests | P (phase 3) |
 | T-35 | Spoofed caller ID reveals whose number it is or their appointments (S1, S7) | Without verified identity Cronix sends no client name and reads appointments only with the second factor (constitution §4, contract §4.1 and §4.3); the agent greets by name only on verified calls | `no-personal-data-without-identity-on-the-phone-line` (pending golden case) | F (phases 2–3) |
@@ -161,3 +161,4 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-20 | WhatsApp entry paused: S3 and S4 not exposed while it is not configured | S3, S4 |
 | 2026-10-26 | Text-to-speech comparison workflow with the Deepgram secret; T-32 covers it | S12 |
 | 2026-10-26 | Browser practice entry for development (S13, T-37 to T-41, R-09); Groq reachable through OpenRouter, restricted to Groq | S6, S13 |
+| 2026-10-26 | Practice schedule: fictitious businesses in memory, refused at startup outside development (`test_the_practice_schedule_is_refused_in_production`); the tenant isolation tests run against it | S7, S13 |
