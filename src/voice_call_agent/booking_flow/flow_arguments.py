@@ -13,11 +13,14 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema
 
-ClockTime = Annotated[
-    time, WithJsonSchema({"type": "string", "pattern": r"^([01][0-9]|2[0-3]):[0-5][0-9]$"})
-]
-"""A time as HH:MM. Not JSON Schema's `format: time` (RFC 3339 wants seconds and an offset):
-providers that validate tool calls against the schema reject the model's "15:00" (manifest §10)."""
+ClockTime = Annotated[time, WithJsonSchema({"type": "string"})]
+"""A time as HH:MM, checked by the code, not by the schema: a provider that validates tool calls
+against the schema ends the turn on a mismatch (a `format`, a `pattern`, an `enum`) and the agent
+falls silent (manifest §10). The code answers `invalid_arguments` instead and the model corrects
+itself."""
+
+CalendarDay = Annotated[date, WithJsonSchema({"type": "string"})]
+"""A day as YYYY-MM-DD, checked by the code for the same reason."""
 
 
 class _Arguments(BaseModel):
@@ -26,7 +29,7 @@ class _Arguments(BaseModel):
 
 class CheckAvailabilityArguments(_Arguments):
     service_id: str = Field(description="The service's id, from the brackets in the service list.")
-    day: date = Field(description="The day, as YYYY-MM-DD.")
+    day: CalendarDay = Field(description="The day, as YYYY-MM-DD.")
     start: ClockTime | None = Field(
         default=None, description="The time the caller asked for, as HH:MM, if they named one."
     )

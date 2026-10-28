@@ -131,3 +131,19 @@ async def test_a_line_the_code_says_is_spoken_and_never_waited_for() -> None:
     await action["handler"](dict(action), _Manager())  # type: ignore[arg-type,call-arg]
     [frame] = queued
     assert isinstance(frame, TTSSpeakFrame) and frame.text == "Hola."
+
+
+def test_no_schema_constraint_a_provider_could_reject_a_turn_on() -> None:
+    for function in booking_functions().values():
+        for spec in function["properties"].values():
+            types = spec.get("anyOf", [spec])
+            assert all(not {"format", "pattern", "enum"} & set(t) for t in types), spec
+
+
+async def test_a_time_said_in_words_is_answered_with_the_field_to_correct() -> None:
+    graph, _ = _graph(await guarded_call())
+    check = _functions(graph.initial_node())["check_availability"]
+    result, node = await _run(
+        check, service_id="haircut", day=TUESDAY.isoformat(), start="seven am"
+    )
+    assert (result, node) == ({"status": "invalid_arguments", "fields": ["start"]}, None)
