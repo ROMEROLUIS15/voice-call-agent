@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 from pipecat.services.ai_service import AIService
 
+from evals import model_evals as model_evals_module
 from evals.behavior_fingerprint import behavior_fingerprint, behavior_inputs
 from evals.conversation_harness.call_transcript import SpokenTurn
 from evals.conversation_harness.conversation_driver import ConversationRecord
@@ -15,6 +16,7 @@ from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, S
 from evals.conversation_harness.scripted_speech import RecordedToolCall
 from evals.eval_baseline import (
     EvalBaseline,
+    MeasurementSetup,
     MetricScore,
     Verdict,
     compare_with_baseline,
@@ -30,7 +32,7 @@ from evals.outcome_metrics import outcome_scores
 from evals.quality_criteria import QUALITY_CRITERIA, QUALITY_MARGINS, MetricKind, regression_margin
 from evals.task_metrics import TASK_METRICS, is_brief, is_speakable
 from tests.call_trace_factory import make_call_trace
-from tests.evals.eval_runs_factory import FixedScoreJudge, case_run, golden_case
+from tests.evals.eval_runs_factory import MEASURED_AT, FixedScoreJudge, case_run, golden_case
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import ServiceVersions, WriteAction, WriteDecision
 from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
@@ -392,4 +394,32 @@ def test_a_pull_request_measures_only_when_the_behaviour_changed(
     save_baseline(EvalBaseline(fingerprint="measured-before", inputs=inputs), changed)
     assert main(["--only-if-changed", "--compare-with", str(unchanged)]) == EXIT_OK
     # A changed fingerprint goes on to measure, and without the keys it cannot run.
+    monkeypatch.setattr(model_evals_module, "BASELINE_PATH", changed)
     assert main(["--only-if-changed", "--compare-with", str(changed)]) == EXIT_CANNOT_RUN
+
+
+def test_a_change_that_carries_its_measured_baseline_is_not_measured_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    inputs = behavior_inputs()
+    base = tmp_path / "base.json"
+    save_baseline(EvalBaseline(fingerprint="measured-before", inputs=inputs), base)
+    carried = tmp_path / "carried.json"
+    setup = MeasurementSetup(
+        llm_provider="openrouter",
+        llm_model="m",
+        judge_model="j",
+        repetitions=3,
+        measured_at=MEASURED_AT,
+    )
+    fingerprint = behavior_fingerprint(inputs)
+    save_baseline(
+        EvalBaseline(fingerprint=fingerprint, inputs=inputs, measured_with=setup), carried
+    )
+    monkeypatch.setattr(model_evals_module, "BASELINE_PATH", carried)
+    assert main(["--only-if-changed", "--compare-with", str(base)]) == EXIT_OK
+    # Only recorded, not measured: it is measured.
+    save_baseline(EvalBaseline(fingerprint=fingerprint, inputs=inputs), carried)
+    assert main(["--only-if-changed", "--compare-with", str(base)]) == EXIT_CANNOT_RUN
