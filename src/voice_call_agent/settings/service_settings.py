@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Self
 
 from limits import parse
-from pydantic import HttpUrl, SecretStr, model_validator
+from pydantic import Field, HttpUrl, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from voice_call_agent.settings.sections import (
@@ -50,6 +50,8 @@ class ServiceSettings(BaseSettings):
 
     deepgram_api_key: SecretStr
     stt_model: str = "flux-general-multi"
+    stt_eot_threshold: float = Field(default=0.8, ge=0.5, le=1.0)
+    """Flux's end-of-turn confidence: higher waits longer before answering (manifest §10)."""
     tts_voice: str = "aura-2-selena-es"
 
     llm_provider: LanguageModelProvider = LanguageModelProvider.OPENROUTER
@@ -153,6 +155,7 @@ class ServiceSettings(BaseSettings):
         return SpeechSettings(
             deepgram_api_key=self.deepgram_api_key,
             stt_model=self.stt_model,
+            eot_threshold=self.stt_eot_threshold,
             tts_voice=self.tts_voice,
         )
 

@@ -72,7 +72,10 @@ class ConversationRecord:
 
     trace: CallTrace
     agent_lines: list[str]
-    """What the agent was asked to say: the greeting, then one item per model response."""
+    """What the agent was asked to say: the greeting, then one item per model response or line
+    the code says (a proposal's read-back)."""
+    code_lines: list[str]
+    """The lines the code said after the greeting, not the model."""
     turns: tuple[SpokenTurn, ...]
     """The call in order: the agent's lines, with the tools called before each, and the
     caller's turns where the caller said them."""
@@ -83,6 +86,12 @@ class ConversationRecord:
     played_ms: float
     business: BusinessContext | None
     """The business the schedule resolved for the call; `None` without a schedule."""
+
+    @property
+    def model_replies(self) -> list[str]:
+        """What the model said: every line after the greeting that the code did not say."""
+        said_by_code = set(self.code_lines)
+        return [line for line in self.agent_lines[1:] if " ".join(line.split()) not in said_by_code]
 
     @property
     def agent_interrupted(self) -> bool:
@@ -152,6 +161,7 @@ async def hold_conversation(
     return ConversationRecord(
         trace=trace,
         agent_lines=tts.agent_lines,
+        code_lines=tts.code_lines,
         turns=call_transcript(tts.agent_lines, tts.tool_calls, caller_turns),
         system_prompt=model.system_prompt,
         synthesized_ms=tts.synthesized_ms,

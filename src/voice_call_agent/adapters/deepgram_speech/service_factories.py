@@ -10,13 +10,16 @@ from pipecat.services.tts_service import TTSService
 from pipecat.transcriptions.language import Language
 
 from voice_call_agent.settings.sections import SpeechSettings
+from voice_call_agent.speech_pipeline.spoken_text import SPOKEN_TEXT_TRANSFORMS
 
 
 def flux_stt_factory(settings: SpeechSettings, language: Language) -> Callable[[], STTService]:
     """Flux with built-in turn detection.
 
     Non-English speech needs the multilingual model (`flux-general-multi`): `flux-general-en`
-    only understands English and rejects `language_hint`.
+    only understands English and rejects `language_hint`. `eot_threshold` is the confidence Flux
+    needs to end the caller's turn: Deepgram's default, 0.7, can end it on a short word followed by
+    a pause, before the rest of the sentence (manifest §10).
     """
     api_key = settings.deepgram_api_key.get_secret_value()
 
@@ -24,7 +27,9 @@ def flux_stt_factory(settings: SpeechSettings, language: Language) -> Callable[[
         return DeepgramFluxSTTService(
             api_key=api_key,
             settings=DeepgramFluxSTTService.Settings(
-                model=settings.stt_model, language_hints=[language]
+                model=settings.stt_model,
+                language_hints=[language],
+                eot_threshold=settings.eot_threshold,
             ),
         )
 
@@ -46,12 +51,15 @@ class CharacterReportingDeepgramTTSService(DeepgramTTSService):
 
 
 def aura_tts_factory(settings: SpeechSettings) -> Callable[[], TTSService]:
-    """Aura-2 over WebSocket; the voice (`aura-2-*-es`) sets the language."""
+    """Aura-2 over WebSocket; the voice (`aura-2-*-es`) sets the language. It never speaks the
+    marks that have no sound (`speech_pipeline.spoken_text`)."""
     api_key = settings.deepgram_api_key.get_secret_value()
 
     def create() -> TTSService:
         return CharacterReportingDeepgramTTSService(
-            api_key=api_key, settings=DeepgramTTSService.Settings(voice=settings.tts_voice)
+            api_key=api_key,
+            settings=DeepgramTTSService.Settings(voice=settings.tts_voice),
+            text_transforms=SPOKEN_TEXT_TRANSFORMS,
         )
 
     return create

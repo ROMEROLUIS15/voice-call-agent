@@ -1,15 +1,15 @@
-"""The arguments of each tool, defined once: the schema the model receives is generated from them.
+"""The arguments of each booking function, defined once: the schema the model receives is
+generated from them, and the code validates every call against them.
 
-`extra="forbid"`: an argument the tool does not take, such as a business id the model made up,
-makes the call invalid instead of travelling with it (constitution §15).
+`extra="forbid"`: an argument the function does not take, such as a business id the model made
+up, makes the call invalid instead of travelling with it (constitution §15).
 
 Descriptions are in English: they describe an interface to the model, not what it says to the
-caller; how to use the tools is in the locale's booking prompt.
+caller; what each step asks for is in the locale's booking flow texts.
 """
 
 from datetime import date, time
 from typing import Annotated
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema
 
@@ -32,16 +32,13 @@ class CheckAvailabilityArguments(_Arguments):
     )
 
 
+class SelectStartArguments(_Arguments):
+    start: ClockTime = Field(description="One of the free start times offered, as HH:MM.")
+
+
 class ProposeBookingArguments(_Arguments):
-    service_id: str = Field(description="The service's id, from the brackets in the service list.")
-    day: date = Field(description="The day, as YYYY-MM-DD.")
-    start: ClockTime = Field(description="The start time, as HH:MM in 24-hour time.")
     client_name: str = Field(
-        min_length=1, max_length=120, description="The name the appointment is booked under."
-    )
-
-
-class ConfirmBookingArguments(_Arguments):
-    proposal_id: UUID = Field(
-        description="The proposal_id that propose_booking returned, once the caller accepted it."
+        min_length=1,
+        max_length=120,
+        description="The first and last name of the person the appointment is for.",
     )

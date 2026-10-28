@@ -1,13 +1,18 @@
 """The model evals pipeline, with a scripted model and a fixed judge instead of providers."""
 
 from dataclasses import replace
+from datetime import date, time
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from pipecat.services.ai_service import AIService
 
 from evals.behavior_fingerprint import behavior_fingerprint, behavior_inputs
+from evals.conversation_harness.call_transcript import SpokenTurn
+from evals.conversation_harness.conversation_driver import ConversationRecord
 from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, ScriptedLanguageModel
+from evals.conversation_harness.scripted_speech import RecordedToolCall
 from evals.eval_baseline import (
     EvalBaseline,
     MetricScore,
@@ -24,9 +29,10 @@ from evals.model_evals import EXIT_CANNOT_RUN, EXIT_OK, EXIT_REGRESSION, conclud
 from evals.outcome_metrics import outcome_scores
 from evals.quality_criteria import QUALITY_CRITERIA, QUALITY_MARGINS, MetricKind, regression_margin
 from evals.task_metrics import TASK_METRICS, is_brief, is_speakable
+from tests.call_trace_factory import make_call_trace
 from tests.evals.eval_runs_factory import FixedScoreJudge, case_run, golden_case
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
-from voice_call_agent.observability.call_trace import ServiceVersions
+from voice_call_agent.observability.call_trace import ServiceVersions, WriteAction, WriteDecision
 from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
 from voice_call_agent.settings.sections import LanguageModelProvider
 
@@ -58,6 +64,7 @@ def _scripted_model() -> ModelUnderTest:
         ("Tenemos:\n- corte\n- barba", False),
         ("**Listo**", False),
         ("¡Perfecto! 😊", False),
+        ("¿A qué hora te gustaría? (esperando respuesta)", False),
     ],
 )
 def test_speakable_replies(reply: str, speakable: bool) -> None:
@@ -216,20 +223,104 @@ def test_the_evals_run_with_every_provider_the_service_accepts(
     assert model is not None and model.provider is provider
 
 
+ASKED = ("haircut", date(2026, 10, 27), time(15, 0), "Ana Ejemplo")
+"""What `book-appointment-over-whatsapp` asks for."""
+
+
+def _record(
+    outcome: CallOutcome,
+    booking: tuple[str, date, time, str] | None = None,
+    refusals: tuple[str, ...] = (),
+) -> ConversationRecord:
+    writes = [
+        WriteDecision(
+            action=WriteAction.CONFIRM_BOOKING, outcome=refusal, proposal_id=None, caller_turn=1
+        )
+        for refusal in refusals
+    ]
+    calls: list[RecordedToolCall] = []
+    if booking is not None:
+        service_id, day, start, name = booking
+        proposal_id = uuid4()
+        writes.append(
+            WriteDecision(
+                action=WriteAction.CONFIRM_BOOKING,
+                outcome="booked",
+                proposal_id=proposal_id,
+                caller_turn=2,
+                service_id=service_id,
+                day=day,
+                start=start,
+            )
+        )
+        arguments: dict[str, object] = {"client_name": name}
+        calls.append(RecordedToolCall("propose_booking", arguments, {"status": "proposed"}))
+    trace = make_call_trace().model_copy(update={"outcome": outcome, "writes": writes})
+    return ConversationRecord(
+        trace=trace,
+        agent_lines=[],
+        code_lines=[],
+        turns=(SpokenTurn("assistant", "", tuple(calls)),),
+        system_prompt="",
+        synthesized_ms=0.0,
+        played_ms=0.0,
+        business=None,
+    )
+
+
+BOOKED_AS_ASKED = {"bookings-completed": 1.0, "confirms-after-the-answer": 1.0}
+
+
 @pytest.mark.parametrize(
-    ("case_id", "outcome", "scores"),
+    ("case_id", "record", "scores"),
     [
-        ("book-appointment-over-whatsapp", CallOutcome.BOOKED, {"bookings-completed": 1.0}),
-        ("book-appointment-over-whatsapp", CallOutcome.INFO_ONLY, {"bookings-completed": 0.0}),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, ASKED),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 1.0},
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, (*ASKED[:1], date(2026, 10, 28), *ASKED[2:])),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 0.0},  # Another day.
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, (*ASKED[:3], "Otra Persona")),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 0.0},  # Another name.
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, ASKED, refusals=("caller_has_not_answered",)),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 1.0, "confirms-after-the-answer": 0.0},
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.INFO_ONLY),
+            {"bookings-completed": 0.0, "confirms-after-the-answer": 1.0},
+        ),
         ("book-appointment-over-whatsapp", None, {"bookings-completed": 0.0}),  # It stalled.
-        ("no-write-without-confirmation", CallOutcome.INFO_ONLY, {"no-unwanted-write": 1.0}),
-        ("no-write-without-confirmation", CallOutcome.BOOKED, {"no-unwanted-write": 0.0}),
+        (
+            "no-write-without-confirmation",
+            _record(CallOutcome.INFO_ONLY),
+            {"no-unwanted-write": 1.0, "confirms-after-the-answer": 1.0},
+        ),
+        (
+            "no-write-without-confirmation",
+            _record(CallOutcome.BOOKED, ASKED),
+            {"no-unwanted-write": 0.0, "confirms-after-the-answer": 1.0},
+        ),
+        (
+            "booking-request-on-the-test-line",
+            _record(CallOutcome.INFO_ONLY),
+            {"no-unwanted-write": 1.0},
+        ),
     ],
 )
-def test_the_call_outcome_is_scored_against_the_case(
-    case_id: str, outcome: CallOutcome | None, scores: dict[str, float]
+def test_what_the_call_wrote_is_scored_against_the_case(
+    case_id: str, record: ConversationRecord | None, scores: dict[str, float]
 ) -> None:
-    assert outcome_scores(golden_case(case_id), outcome) == scores
+    assert outcome_scores(golden_case(case_id), record) == scores
 
 
 def test_a_noisy_quality_measure_has_its_own_margin_and_security_none() -> None:
