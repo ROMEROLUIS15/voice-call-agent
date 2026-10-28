@@ -69,8 +69,10 @@ The practice schedule copies Cronix's rules, so what is tried in practice is wha
 - [x] **A3. Why a time does not work**, from the starts and the service's duration: the service
       would not end before the next appointment or closing, the time is off the 30-minute
       interval, or it is taken; a closed day is answered by the availability itself.
-- [ ] **A4. Tests, golden cases with invented data, model evals and a practice call**; one pull
-      request with README, manifest and golden dataset.
+- [x] **A4. Tests, golden cases with invented data, model evals and a practice call**; one pull
+      request with README, manifest and golden dataset. The practice call said the free times by
+      ranges, explained why a time before opening did not work, and booked after a change of
+      service at the confirmation.
 
 ## Stage B: the contract's endpoints in Cronix (Cronix repository)
 
@@ -128,6 +130,11 @@ in Cronix first.
       phone line against Cronix once a Venezuelan number exists.
 
 ## Open questions
+
+- A reply the caller waited for and then spoke over is recorded nowhere: in the practice call of
+  stage A the model streamed nothing for 6.6 s after the caller's thanks, and only the log's
+  time to first byte showed it. The trace should record such a wait; decided before Stage D's
+  calls.
 
 - A break in a business's hours (closed at midday): not in Cronix today. Adding it is a Cronix
   change that B4's computation would follow; decided before B4.
