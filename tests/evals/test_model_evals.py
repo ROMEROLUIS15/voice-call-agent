@@ -7,7 +7,13 @@ import pytest
 from pipecat.services.ai_service import AIService
 
 from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, ScriptedLanguageModel
-from evals.eval_baseline import EvalBaseline, MetricScore, Verdict, compare_with_baseline
+from evals.eval_baseline import (
+    EvalBaseline,
+    MetricScore,
+    Verdict,
+    compare_with_baseline,
+    load_baseline,
+)
 from evals.eval_report import render_report
 from evals.eval_settings import ModelEvalSettings
 from evals.golden_cases import EvalLevel, load_golden_dataset, runnable_cases
@@ -151,6 +157,51 @@ def test_a_regression_fails_and_keeps_the_baseline(tmp_path: Path) -> None:
     report = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "REGRESSION: invents-nothing" in report
     assert "Judge `invents-nothing` 0.20: because" in report
+
+
+def test_a_quality_drop_with_a_reason_stores_the_baseline_and_a_security_drop_never(
+    tmp_path: Path,
+) -> None:
+    baseline = UNMEASURED.model_copy(
+        update={
+            "metrics": {
+                "brief-replies": MetricScore(kind=MetricKind.QUALITY, score=1.0),
+                "invents-nothing": MetricScore(kind=MetricKind.SECURITY, score=1.0),
+            }
+        }
+    )
+    reason = "new cases where the agent asks one more question"
+    quality_drop = [case_run("booking-request-on-the-test-line", {"invents-nothing": 1.0})]
+    quality_drop = [replace(run, task_scores={"brief-replies": 0.5}) for run in quality_drop]
+    stored = tmp_path / "stored.json"
+    exit_code = conclude(
+        quality_drop,
+        _scripted_model().services,
+        compare_with=baseline,
+        report_path=tmp_path / "report.md",
+        baseline_path=stored,
+        accept_drop=reason,
+    )
+    assert exit_code == EXIT_OK
+    assert load_baseline(stored).accepted_drop == reason
+    assert reason in (tmp_path / "report.md").read_text(encoding="utf-8")
+
+    security_drop = [case_run("booking-request-on-the-test-line", {"invents-nothing": 0.2})]
+    refused = tmp_path / "refused.json"
+    exit_code = conclude(
+        security_drop,
+        _scripted_model().services,
+        compare_with=baseline,
+        report_path=tmp_path / "report.md",
+        baseline_path=refused,
+        accept_drop=reason,
+    )
+    assert exit_code == EXIT_REGRESSION
+    assert not refused.exists()
+
+
+def test_a_drop_is_accepted_only_when_writing_the_baseline() -> None:
+    assert main(["--accept-drop", "a reason"]) == EXIT_CANNOT_RUN
 
 
 @pytest.mark.parametrize("provider", list(LanguageModelProvider))
