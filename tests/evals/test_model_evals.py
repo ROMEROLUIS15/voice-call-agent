@@ -1,15 +1,22 @@
 """The model evals pipeline, with a scripted model and a fixed judge instead of providers."""
 
 from dataclasses import replace
+from datetime import date, time
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from pipecat.services.ai_service import AIService
 
+from evals import model_evals as model_evals_module
 from evals.behavior_fingerprint import behavior_fingerprint, behavior_inputs
+from evals.conversation_harness.call_transcript import SpokenTurn
+from evals.conversation_harness.conversation_driver import ConversationRecord
 from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, ScriptedLanguageModel
+from evals.conversation_harness.scripted_speech import RecordedToolCall
 from evals.eval_baseline import (
     EvalBaseline,
+    MeasurementSetup,
     MetricScore,
     Verdict,
     compare_with_baseline,
@@ -24,9 +31,10 @@ from evals.model_evals import EXIT_CANNOT_RUN, EXIT_OK, EXIT_REGRESSION, conclud
 from evals.outcome_metrics import outcome_scores
 from evals.quality_criteria import QUALITY_CRITERIA, QUALITY_MARGINS, MetricKind, regression_margin
 from evals.task_metrics import TASK_METRICS, is_brief, is_speakable
-from tests.evals.eval_runs_factory import FixedScoreJudge, case_run, golden_case
+from tests.call_trace_factory import make_call_trace
+from tests.evals.eval_runs_factory import MEASURED_AT, FixedScoreJudge, case_run, golden_case
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
-from voice_call_agent.observability.call_trace import ServiceVersions
+from voice_call_agent.observability.call_trace import ServiceVersions, WriteAction, WriteDecision
 from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
 from voice_call_agent.settings.sections import LanguageModelProvider
 
@@ -58,6 +66,7 @@ def _scripted_model() -> ModelUnderTest:
         ("Tenemos:\n- corte\n- barba", False),
         ("**Listo**", False),
         ("¡Perfecto! 😊", False),
+        ("¿A qué hora te gustaría? (esperando respuesta)", False),
     ],
 )
 def test_speakable_replies(reply: str, speakable: bool) -> None:
@@ -216,20 +225,104 @@ def test_the_evals_run_with_every_provider_the_service_accepts(
     assert model is not None and model.provider is provider
 
 
+ASKED = ("haircut", date(2026, 10, 27), time(15, 0), "Ana Ejemplo")
+"""What `book-appointment-over-whatsapp` asks for."""
+
+
+def _record(
+    outcome: CallOutcome,
+    booking: tuple[str, date, time, str] | None = None,
+    refusals: tuple[str, ...] = (),
+) -> ConversationRecord:
+    writes = [
+        WriteDecision(
+            action=WriteAction.CONFIRM_BOOKING, outcome=refusal, proposal_id=None, caller_turn=1
+        )
+        for refusal in refusals
+    ]
+    calls: list[RecordedToolCall] = []
+    if booking is not None:
+        service_id, day, start, name = booking
+        proposal_id = uuid4()
+        writes.append(
+            WriteDecision(
+                action=WriteAction.CONFIRM_BOOKING,
+                outcome="booked",
+                proposal_id=proposal_id,
+                caller_turn=2,
+                service_id=service_id,
+                day=day,
+                start=start,
+            )
+        )
+        arguments: dict[str, object] = {"client_name": name}
+        calls.append(RecordedToolCall("propose_booking", arguments, {"status": "proposed"}))
+    trace = make_call_trace().model_copy(update={"outcome": outcome, "writes": writes})
+    return ConversationRecord(
+        trace=trace,
+        agent_lines=[],
+        code_lines=[],
+        turns=(SpokenTurn("assistant", "", tuple(calls)),),
+        system_prompt="",
+        synthesized_ms=0.0,
+        played_ms=0.0,
+        business=None,
+    )
+
+
+BOOKED_AS_ASKED = {"bookings-completed": 1.0, "confirms-after-the-answer": 1.0}
+
+
 @pytest.mark.parametrize(
-    ("case_id", "outcome", "scores"),
+    ("case_id", "record", "scores"),
     [
-        ("book-appointment-over-whatsapp", CallOutcome.BOOKED, {"bookings-completed": 1.0}),
-        ("book-appointment-over-whatsapp", CallOutcome.INFO_ONLY, {"bookings-completed": 0.0}),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, ASKED),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 1.0},
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, (*ASKED[:1], date(2026, 10, 28), *ASKED[2:])),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 0.0},  # Another day.
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, (*ASKED[:3], "Otra Persona")),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 0.0},  # Another name.
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, ASKED, refusals=("caller_has_not_answered",)),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 1.0, "confirms-after-the-answer": 0.0},
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.INFO_ONLY),
+            {"bookings-completed": 0.0, "confirms-after-the-answer": 1.0},
+        ),
         ("book-appointment-over-whatsapp", None, {"bookings-completed": 0.0}),  # It stalled.
-        ("no-write-without-confirmation", CallOutcome.INFO_ONLY, {"no-unwanted-write": 1.0}),
-        ("no-write-without-confirmation", CallOutcome.BOOKED, {"no-unwanted-write": 0.0}),
+        (
+            "no-write-without-confirmation",
+            _record(CallOutcome.INFO_ONLY),
+            {"no-unwanted-write": 1.0, "confirms-after-the-answer": 1.0},
+        ),
+        (
+            "no-write-without-confirmation",
+            _record(CallOutcome.BOOKED, ASKED),
+            {"no-unwanted-write": 0.0, "confirms-after-the-answer": 1.0},
+        ),
+        (
+            "booking-request-on-the-test-line",
+            _record(CallOutcome.INFO_ONLY),
+            {"no-unwanted-write": 1.0},
+        ),
     ],
 )
-def test_the_call_outcome_is_scored_against_the_case(
-    case_id: str, outcome: CallOutcome | None, scores: dict[str, float]
+def test_what_the_call_wrote_is_scored_against_the_case(
+    case_id: str, record: ConversationRecord | None, scores: dict[str, float]
 ) -> None:
-    assert outcome_scores(golden_case(case_id), outcome) == scores
+    assert outcome_scores(golden_case(case_id), record) == scores
 
 
 def test_a_noisy_quality_measure_has_its_own_margin_and_security_none() -> None:
@@ -301,4 +394,32 @@ def test_a_pull_request_measures_only_when_the_behaviour_changed(
     save_baseline(EvalBaseline(fingerprint="measured-before", inputs=inputs), changed)
     assert main(["--only-if-changed", "--compare-with", str(unchanged)]) == EXIT_OK
     # A changed fingerprint goes on to measure, and without the keys it cannot run.
+    monkeypatch.setattr(model_evals_module, "BASELINE_PATH", changed)
     assert main(["--only-if-changed", "--compare-with", str(changed)]) == EXIT_CANNOT_RUN
+
+
+def test_a_change_that_carries_its_measured_baseline_is_not_measured_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    inputs = behavior_inputs()
+    base = tmp_path / "base.json"
+    save_baseline(EvalBaseline(fingerprint="measured-before", inputs=inputs), base)
+    carried = tmp_path / "carried.json"
+    setup = MeasurementSetup(
+        llm_provider="openrouter",
+        llm_model="m",
+        judge_model="j",
+        repetitions=3,
+        measured_at=MEASURED_AT,
+    )
+    fingerprint = behavior_fingerprint(inputs)
+    save_baseline(
+        EvalBaseline(fingerprint=fingerprint, inputs=inputs, measured_with=setup), carried
+    )
+    monkeypatch.setattr(model_evals_module, "BASELINE_PATH", carried)
+    assert main(["--only-if-changed", "--compare-with", str(base)]) == EXIT_OK
+    # Only recorded, not measured: it is measured.
+    save_baseline(EvalBaseline(fingerprint=fingerprint, inputs=inputs), carried)
+    assert main(["--only-if-changed", "--compare-with", str(base)]) == EXIT_CANNOT_RUN

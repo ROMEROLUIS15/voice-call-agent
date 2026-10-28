@@ -1,15 +1,16 @@
 """Load the caller-facing content of a locale.
 
 Code is English; what the agent says to the caller lives in `<locale>/system_prompt.md`,
-`<locale>/booking_prompt.md` and `<locale>/phrases.toml` next to this module (constitution:
-language policy).
+`<locale>/booking_prompt.md`, `<locale>/booking_flow.toml` and `<locale>/phrases.toml` next to
+this module (constitution: language policy).
 """
 
 import hashlib
 import tomllib
 from importlib import resources
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 DEFAULT_LOCALE = "es"
 _PACKAGE = __name__.rpartition(".")[0]
@@ -30,6 +31,67 @@ class BookingBriefing(BaseModel):
     price: str
     no_price: str
     """For a service whose business publishes no price."""
+    calendar_day: str
+    """A day of the calendar of the coming days, with its date for the tools."""
+    calendar_today: str
+    calendar_tomorrow: str
+    calendar_closed: str
+
+
+class SpokenMoments(BaseModel):
+    """How a date and a time are said aloud, in words: the read-back, a day in a tool's result."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    numbers: tuple[str, ...] = Field(min_length=60, max_length=60)
+    """0 to 59, for day numbers and minutes."""
+    day: str
+    hours: tuple[str, ...] = Field(min_length=12, max_length=12)
+    """The hour on a 12-hour clock, with its article; index 0 is twelve."""
+    on_the_hour: str
+    past_the_hour: str
+    minute_names: dict[int, str]
+    """Minutes said by name instead of by number (a quarter, a half)."""
+    day_parts: tuple[tuple[int, str], ...] = Field(min_length=1)
+    """The part of the day from each hour on, in order; the first starts at hour 0."""
+
+    @model_validator(mode="after")
+    def _every_hour_has_a_day_part(self) -> Self:
+        starts = [start for start, _ in self.day_parts]
+        if starts[0] != 0 or starts != sorted(set(starts)) or starts[-1] > 23:
+            raise ValueError("day parts start at hour 0 and go up within the day")
+        return self
+
+
+class BookingTasks(BaseModel):
+    """What the model does at each step of the booking flow (ADR 0019)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    request: str
+    choose_time: str
+    """Takes `{service_name}`, `{day}`, `{free_times}` and `{requested}`."""
+    name: str
+    """Takes `{service_name}`, `{day}` and `{time}`."""
+    confirm: str
+    booked: str
+    not_booked: str
+
+
+class BookingChoices(BaseModel):
+    """How the choose_time task lists the free times."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    free_time: str
+    requested_taken: str
+
+
+class BookingFlowTexts(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    tasks: BookingTasks
+    choices: BookingChoices
 
 
 class ConversationContent(BaseModel):
@@ -43,7 +105,11 @@ class ConversationContent(BaseModel):
     booking_prompt: str
     """For calls whose business the backend resolved; filled in by `business_briefing`."""
     greeting: str
+    read_back: str
+    """The proposal as the code reads it back before the caller's yes (ADR 0019)."""
     booking_briefing: BookingBriefing
+    spoken_moments: SpokenMoments
+    booking_flow: BookingFlowTexts
 
     @property
     def version(self) -> str:
@@ -55,7 +121,9 @@ class ConversationContent(BaseModel):
 
 class _Phrases(BaseModel):
     greeting: str
+    read_back: str
     booking_briefing: BookingBriefing
+    spoken_moments: SpokenMoments
 
 
 class UnsupportedLocaleError(Exception):
@@ -71,6 +139,9 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         phrases = _Phrases.model_validate(
             tomllib.loads((root / "phrases.toml").read_text(encoding="utf-8"))
         )
+        booking_flow = BookingFlowTexts.model_validate(
+            tomllib.loads((root / "booking_flow.toml").read_text(encoding="utf-8"))
+        )
     except (FileNotFoundError, tomllib.TOMLDecodeError, ValidationError) as error:
         raise UnsupportedLocaleError(f"Incomplete conversation content for '{locale}'") from error
     return ConversationContent(
@@ -78,5 +149,8 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         system_prompt=system_prompt,
         booking_prompt=booking_prompt,
         greeting=phrases.greeting,
+        read_back=phrases.read_back,
         booking_briefing=phrases.booking_briefing,
+        spoken_moments=phrases.spoken_moments,
+        booking_flow=booking_flow,
     )

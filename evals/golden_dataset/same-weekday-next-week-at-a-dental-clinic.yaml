@@ -1,0 +1,31 @@
+id: same-weekday-next-week-at-a-dental-clinic
+title: The caller asks for the same weekday as today; the agent books that weekday of next week, never today
+source: practice-failure
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-dental-clinic
+language: es
+turns:
+  - says: Buenos días, quisiera una limpieza dental para el próximo lunes a las diez de la mañana, a nombre de Carlos Ejemplo.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: limpieza dental
+    day: el próximo lunes
+    time: "10:00"
+    name: Carlos Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: dental-cleaning
+      day: "2026-11-02"
+      start: "10:00"
+      client_name: Carlos Ejemplo
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, dates, any-business]

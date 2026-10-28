@@ -3,9 +3,7 @@
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
 
-from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.vad_analyzer import VADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -14,23 +12,18 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.services.ai_service import AIService
-from pipecat.services.llm_service import LLMService
 from pipecat.services.stt_service import STTService
 from pipecat.services.tts_service import TTSService
 from pipecat.transports.base_transport import BaseTransport
 
 
-class AgentTools(Protocol):
-    """The tools a call's model can use, and their handlers."""
+@dataclass(frozen=True)
+class AssembledPipeline:
+    """A call's pipeline, with the pieces a Pipecat Flows graph drives (ADR 0019)."""
 
-    @property
-    def schema(self) -> ToolsSchema: ...
-
-    def register(self, llm: LLMService) -> None: ...
-
-
-class ToolsNeedALanguageModelError(TypeError):
-    """The language model factory built a service that cannot call tools."""
+    pipeline: Pipeline
+    language_model: AIService
+    context_aggregator: LLMContextAggregatorPair
 
 
 @dataclass(frozen=True)
@@ -52,34 +45,33 @@ async def assemble_speech_pipeline(
     transport: BaseTransport,
     factories: SpeechServiceFactories,
     system_prompt: str,
-    tools: AgentTools | None = None,
     context: LLMContext | None = None,
-) -> Pipeline:
-    """Build the pipeline of one call; with `tools`, its model can call them. `context` is the
-    conversation the model sees, for whoever needs it once the call ends."""
+) -> AssembledPipeline:
+    """Build the pipeline of one call. `context` is the conversation the model sees, for
+    whoever needs it once the call ends; a booking flow sets its functions."""
     # Building the VAD loads its ONNX model (~150 ms measured): keep it off the event loop,
     # where other calls are streaming audio.
     vad = await asyncio.to_thread(factories.create_vad)
     language_model = factories.create_language_model(system_prompt)
-    context = context if context is not None else LLMContext()
-    if tools is not None:
-        if not isinstance(language_model, LLMService):
-            raise ToolsNeedALanguageModelError(type(language_model).__name__)
-        tools.register(language_model)
-        context.set_tools(tools.schema)
     # Turn detection is the STT's (Flux applies its own strategies). The local VAD only emits
     # the "user stopped speaking" frame each turn's latency is measured from.
-    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
-        context, user_params=LLMUserAggregatorParams(vad_analyzer=vad)
+    # Each node of a flow changes the functions the model may call; Pipecat then tells the model
+    # which were added or removed, so it does not answer as if a missing one had run, and the
+    # transcript shows what it was offered at each step.
+    aggregators = LLMContextAggregatorPair(
+        context if context is not None else LLMContext(),
+        user_params=LLMUserAggregatorParams(vad_analyzer=vad),
+        add_tool_change_messages=True,
     )
-    return Pipeline(
+    pipeline = Pipeline(
         [
             transport.input(),
             factories.create_stt(),
-            user_aggregator,
+            aggregators.user(),
             language_model,
             factories.create_tts(),
             transport.output(),
-            assistant_aggregator,
+            aggregators.assistant(),
         ]
     )
+    return AssembledPipeline(pipeline, language_model, aggregators)

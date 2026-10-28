@@ -10,7 +10,7 @@ The repository also built its own versions of pieces Pipecat ships: a conversati
 
 ## Decision
 *   **Pipecat's documented patterns come first.** Its built-ins (Flows, Evals, observers, turn and mute strategies, OpenTelemetry tracing) are used before any code of our own. Own code exists only for a gap Pipecat leaves, and says at the code which gap it fills.
-*   **The conversation is a Pipecat Flows graph**, written in Python: its nodes depend on the business's catalog and on the availability the backend returns, and its functions need strict schemas, which are Pipecat's own reasons to build a flow in code rather than in a config. Each node has one task and only its functions. The code states the facts the model gets wrong when it works them out (the calendar of the coming days, dates and times said aloud) and reads the proposal back in a confirmation node that waits for the caller (`tts_say`, `respond_immediately=False`); transitions follow the functions' results. The write guard of ADR 0011 still validates every write, and the model still judges the caller's yes by calling the confirmation function, which only the confirmation node offers.
+*   **The conversation is a Pipecat Flows graph**, written in Python: its nodes depend on the business's catalog and on the availability the backend returns, and its functions need strict schemas, which are Pipecat's own reasons to build a flow in code rather than in a config. Each node has one task and only its functions. The code states the facts the model gets wrong when it works them out (the calendar of the coming days, dates and times said aloud) and reads the proposal back in a confirmation node that waits for the caller (a pre-action that says it, `respond_immediately=False`); transitions follow the functions' results. The write guard of ADR 0011 still validates every write, and the model still judges the caller's yes by calling the confirmation function, which only the confirmation node offers.
 *   **Migration order:** the booking conversation as a Flows graph; Pipecat Evals with scripted and simulated scenarios in place of the conversation harness, keeping the checks of what each call wrote; Pipecat's observers, turn events and tracing in place of own observability where they cover it; then the model, chosen with simulated scenarios.
 
 ## Alternatives considered
@@ -21,3 +21,6 @@ The repository also built its own versions of pieces Pipecat ships: a conversati
 ## Consequences
 *   Easier: small prompts per node; a function cannot be called outside its node; Pipecat's improvements reach pieces we no longer maintain.
 *   Harder: the booking conversation and the evals are rewritten; Flows and Evals change with Pipecat, read in its changelog at each upgrade; a graph is more code to read than one prompt.
+
+## Changes
+2026-10-28 · The code's lines (the greeting, the read-back) are a custom pre-action instead of Flows' `tts_say`: Flows waits for `tts_say` to finish before applying the node, and a caller who speaks over it drops the frame it waits for (Pipecat issue #5263), so the confirmation node never applied. A start is taken only after the caller answers the offer.

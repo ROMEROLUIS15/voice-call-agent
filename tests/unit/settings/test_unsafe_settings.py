@@ -65,3 +65,12 @@ def test_conversation_transcripts_are_refused_in_production() -> None:
     ).conversation_transcripts()
     assert transcripts is not None
     assert transcripts.directory.name == "conversation_transcripts"
+
+
+def test_the_log_file_is_refused_in_production() -> None:
+    with pytest.raises(ValidationError, match="LOG_FILE_PATH"):
+        make_service_settings(log_file_path="var/service.log")
+    log = make_service_settings(
+        log_file_path="var/service.log", environment="development"
+    ).logging_output()
+    assert log.file_path is not None and log.file_level == "DEBUG"

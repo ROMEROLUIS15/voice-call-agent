@@ -33,7 +33,7 @@ from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBacken
 
 
 def clock_time(moment: time) -> str:
-    """HH:MM: how the model reads and writes times (`agent_tools.tool_arguments.ClockTime`)."""
+    """HH:MM: how the model reads and writes times (`booking_flow.flow_arguments.ClockTime`)."""
     return moment.strftime("%H:%M")
 
 
@@ -129,6 +129,10 @@ class BookingGuard:
         self._on_decision = on_decision
         self._pending: dict[UUID, _Proposal] = {}
         self._confirmed: dict[UUID, str] = {}
+
+    def caller_turns(self) -> int:
+        """How many turns the caller has finished in this call."""
+        return self._caller_turns()
 
     async def propose(
         self, service_id: str, day: date, start: time, client_name: str
