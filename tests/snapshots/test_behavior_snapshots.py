@@ -56,8 +56,15 @@ def test_fixed_phrases(snapshot: SnapshotAssertion) -> None:
     content = load_conversation_content()
     assert {
         "greeting": content.greeting,
+        "read_back": content.read_back,
         "booking_briefing": content.booking_briefing.model_dump(),
+        "spoken_moments": content.spoken_moments.model_dump(),
     } == snapshot
+
+
+def test_booking_flow_tasks(snapshot: SnapshotAssertion) -> None:
+    """What the model is told at each step of the booking flow (ADR 0019)."""
+    assert load_conversation_content().booking_flow.model_dump() == snapshot
 
 
 @pytest.mark.parametrize("business_id", [b.id for b in load_practice_catalog().businesses])

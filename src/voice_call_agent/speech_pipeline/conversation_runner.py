@@ -4,14 +4,16 @@ This module does not know which channel the call came from (INV-8): it receives 
 transport already built by `call_transports/`, the `CallSession` and that transport's audio format.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, date, datetime
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
+from pipecat.flows import FlowManager
 from pipecat.frames.frames import TTSSpeakFrame
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.services.llm_service import LLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.workers.runner import WorkerRunner
 
@@ -38,6 +40,7 @@ from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBacken
 from voice_call_agent.speech_pipeline.audio_format import AudioFormat
 from voice_call_agent.speech_pipeline.call_plan import CallPlan, plan_call
 from voice_call_agent.speech_pipeline.pipeline_assembly import (
+    AssembledPipeline,
     SpeechServiceFactories,
     assemble_speech_pipeline,
 )
@@ -121,11 +124,11 @@ class PipecatConversationRunner:
         plan: CallPlan,
         conversation: LLMContext,
     ) -> None:
-        pipeline = await assemble_speech_pipeline(
-            transport, self._factories, plan.system_prompt, plan.tools, conversation
+        assembled = await assemble_speech_pipeline(
+            transport, self._factories, plan.system_prompt, conversation
         )
         worker = PipelineWorker(
-            pipeline,
+            assembled.pipeline,
             params=PipelineParams(
                 audio_in_sample_rate=audio_format.input_sample_rate_hz,
                 audio_out_sample_rate=audio_format.output_sample_rate_hz,
@@ -136,7 +139,8 @@ class PipecatConversationRunner:
         )
         # Signals belong to the HTTP server, which drains calls before stopping.
         runner = WorkerRunner(handle_sigint=False, handle_sigterm=False)
-        self._greet_on_connect_and_stop_on_hang_up(transport, worker, runner, plan.greeting)
+        start = _conversation_start(plan, assembled, worker, transport)
+        _start_on_connect_and_stop_on_hang_up(transport, runner, start)
         await runner.add_workers(worker)
         await runner.run()
 
@@ -157,18 +161,50 @@ class PipecatConversationRunner:
                 error=error,
             )
 
-    def _greet_on_connect_and_stop_on_hang_up(
-        self,
-        transport: BaseTransport,
-        worker: PipelineWorker,
-        runner: WorkerRunner,
-        greeting: str,
-    ) -> None:
-        async def greet(_transport: BaseTransport, _client: object) -> None:
+
+class FlowNeedsALanguageModelError(TypeError):
+    """The language model factory built a service that cannot call functions."""
+
+
+def _conversation_start(
+    plan: CallPlan,
+    assembled: AssembledPipeline,
+    worker: PipelineWorker,
+    transport: BaseTransport,
+) -> Callable[[], Awaitable[None]]:
+    """What happens when the caller connects: the booking flow's first node, which says the
+    business's greeting, or the generic greeting of a call that books nothing."""
+    if plan.booking_flow is None:
+        greeting = plan.greeting
+
+        async def greet() -> None:
             await worker.queue_frames([TTSSpeakFrame(greeting)])
 
-        async def stop(_transport: BaseTransport, _client: object) -> None:
-            await runner.cancel()
+        return greet
+    if not isinstance(assembled.language_model, LLMService):
+        raise FlowNeedsALanguageModelError(type(assembled.language_model).__name__)
+    flows = FlowManager(
+        worker=worker,
+        llm=assembled.language_model,
+        context_aggregator=assembled.context_aggregator,
+        transport=transport,
+    )
+    initial_node = plan.booking_flow.initial_node()
 
-        transport.add_event_handler("on_client_connected", greet)
-        transport.add_event_handler("on_client_disconnected", stop)
+    async def start_flow() -> None:
+        await flows.initialize(initial_node)
+
+    return start_flow
+
+
+def _start_on_connect_and_stop_on_hang_up(
+    transport: BaseTransport, runner: WorkerRunner, start: Callable[[], Awaitable[None]]
+) -> None:
+    async def on_connect(_transport: BaseTransport, _client: object) -> None:
+        await start()
+
+    async def stop(_transport: BaseTransport, _client: object) -> None:
+        await runner.cancel()
+
+    transport.add_event_handler("on_client_connected", on_connect)
+    transport.add_event_handler("on_client_disconnected", stop)

@@ -22,6 +22,8 @@ class SpeechSettings(_Section):
 
     deepgram_api_key: SecretStr
     stt_model: str
+    eot_threshold: float
+    """Confidence the speech-to-text needs to end the caller's turn."""
     tts_voice: str
 
 

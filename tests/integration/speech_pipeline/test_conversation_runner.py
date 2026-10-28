@@ -3,6 +3,7 @@
 import asyncio
 from typing import cast
 
+import pytest
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.processors.filters.identity_filter import IdentityFilter
 from pipecat.processors.frame_processor import FrameProcessor
@@ -13,6 +14,8 @@ from pipecat.services.tts_service import TTSService
 from evals.conversation_harness.loopback_transport import LoopbackTransport
 from tests.browser_peer import reported_error_codes
 from tests.call_trace_factory import SERVICES
+from tests.practice_catalogs import barbershop_phone_call, schedule
+from voice_call_agent.call_session.business_resolution import BusinessResolved
 from voice_call_agent.call_session.session_builders import build_twilio_session
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import CallTrace
@@ -23,7 +26,10 @@ from voice_call_agent.scheduling_backend.scheduling_errors import (
 from voice_call_agent.scheduling_backend.scheduling_models import CallOutcome
 from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBackend
 from voice_call_agent.speech_pipeline.audio_format import AudioFormat
-from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
+from voice_call_agent.speech_pipeline.conversation_runner import (
+    FlowNeedsALanguageModelError,
+    PipecatConversationRunner,
+)
 from voice_call_agent.speech_pipeline.pipeline_assembly import SpeechServiceFactories
 
 
@@ -98,3 +104,22 @@ async def test_a_failure_closing_the_backend_call_is_reported() -> None:
     with reported_error_codes() as codes:
         await runner._close_backend_call(session, CallOutcome.INFO_ONLY)
     assert codes == ["SCHEDULING_BACKEND_UNAVAILABLE"]
+
+
+async def test_a_booking_flow_needs_a_language_model_that_calls_functions() -> None:
+    practice = schedule()
+    session = barbershop_phone_call("CA-flow")
+    resolution = await practice.resolve_call_business(session)
+    assert isinstance(resolution, BusinessResolved)
+    runner = PipecatConversationRunner(
+        factories=_pass_through_factories(),  # A pass-through processor stands for the model.
+        content=load_conversation_content(),
+        services=SERVICES,
+        prices=load_price_table(),
+        trace_sinks=[],
+        scheduling_backend=practice,
+    )
+    audio = AudioFormat(input_sample_rate_hz=8000, output_sample_rate_hz=8000)
+    resolved = session.resolve_business(resolution.business_id, resolution.context)
+    with pytest.raises(FlowNeedsALanguageModelError):
+        await runner.run(LoopbackTransport(), resolved, audio)

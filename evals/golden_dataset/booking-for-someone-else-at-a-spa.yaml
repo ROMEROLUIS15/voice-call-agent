@@ -1,0 +1,32 @@
+id: booking-for-someone-else-at-a-spa
+title: The caller books for another person; the agent asks that person's name before proposing
+source: practice-failure
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-spa
+language: es
+turns:
+  - says: Hola, quiero reservar una manicura para otra persona el miércoles a las cinco de la tarde.
+  - says: Se llama Marta Ejemplo.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: manicura
+    day: miércoles
+    time: "17:00"
+    name: Marta Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: manicure
+      day: "2026-10-28"
+      start: "17:00"
+      client_name: Marta Ejemplo
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, names, any-business]

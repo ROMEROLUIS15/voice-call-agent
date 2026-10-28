@@ -1,6 +1,6 @@
 """The booking prompt of one call: the locale's template filled in with the call's business."""
 
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from voice_call_agent.conversation_content.content_loader import (
     BookingBriefing,
@@ -13,6 +13,8 @@ from voice_call_agent.scheduling_backend.scheduling_models import (
 )
 
 _WEEKDAY_FIELDS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+CALENDAR_DAYS = 14
+"""Today and the next thirteen days: two weeks cover a weekday of next week on any day."""
 
 
 def booking_prompt(content: ConversationContent, business: BusinessContext, today: date) -> str:
@@ -25,8 +27,30 @@ def booking_prompt(content: ConversationContent, business: BusinessContext, toda
         business_name=business.name,
         today=_today(briefing, today),
         opening_hours="; ".join(_opening_hours(briefing, business)),
+        calendar="\n".join(f"- {line}" for line in _calendar(briefing, business, today)),
         services="\n".join(f"- {_service(briefing, service)}" for service in business.services),
     )
+
+
+def _calendar(briefing: BookingBriefing, business: BusinessContext, today: date) -> list[str]:
+    """Each coming day with its weekday and its date: the model looks a day up instead of
+    computing it, which it gets wrong (manifest §10)."""
+    notes = {0: briefing.calendar_today, 1: briefing.calendar_tomorrow}
+    lines = []
+    for offset in range(CALENDAR_DAYS):
+        day = today + timedelta(days=offset)
+        closed = getattr(business.weekly_hours, _WEEKDAY_FIELDS[day.weekday()]) is None
+        lines.append(
+            briefing.calendar_day.format(
+                weekday=briefing.weekdays[day.weekday()],
+                day=day.day,
+                month=briefing.months[day.month - 1],
+                note=notes.get(offset, ""),
+                iso_date=day.isoformat(),
+                closed=briefing.calendar_closed if closed else "",
+            )
+        )
+    return lines
 
 
 def _today(briefing: BookingBriefing, today: date) -> str:

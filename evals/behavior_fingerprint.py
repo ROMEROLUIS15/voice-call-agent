@@ -19,7 +19,7 @@ from evals.judge_scoring import JUDGE_MODEL
 from voice_call_agent.adapters.language_model_providers.provider_selection import (
     language_model_factory,
 )
-from voice_call_agent.agent_tools.booking_tools import TOOL_NAMES, tool_schema
+from voice_call_agent.booking_flow.booking_graph import booking_functions
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.practice_schedule.practice_catalog import load_practice_catalog
 from voice_call_agent.settings.sections import LanguageModelProvider, LanguageModelSettings
@@ -66,8 +66,9 @@ def model_configuration(settings: LanguageModelSettings) -> dict[str, str]:
 
 
 def agent_tools() -> dict[str, object]:
-    """Each tool the model can call, as it receives it: name, description and arguments."""
-    return {name: tool_schema(name).to_default_dict() for name in TOOL_NAMES}
+    """Each function of the booking flow, as the model receives it: name, description and
+    arguments (ADR 0019)."""
+    return dict(booking_functions())
 
 
 def behavior_inputs() -> dict[str, str]:

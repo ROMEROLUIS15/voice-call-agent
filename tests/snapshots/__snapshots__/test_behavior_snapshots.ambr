@@ -1,167 +1,206 @@
 # serializer version: 1
 # name: test_agent_tools
   dict({
-    'check_availability': dict({
-      'description': 'Free start times of one day for one service, and whether the time the caller asked for is free. Call it before offering or accepting a time.',
-      'name': 'check_availability',
-      'parameters': dict({
-        'properties': dict({
-          'day': dict({
-            'description': 'The day, as YYYY-MM-DD.',
-            'format': 'date',
-            'type': 'string',
-          }),
-          'service_id': dict({
-            'description': "The service's id, from the brackets in the service list.",
-            'type': 'string',
-          }),
-          'start': dict({
-            'anyOf': list([
-              dict({
-                'pattern': '^([01][0-9]|2[0-3]):[0-5][0-9]$',
-                'type': 'string',
-              }),
-              dict({
-                'type': 'null',
-              }),
-            ]),
-            'default': None,
-            'description': 'The time the caller asked for, as HH:MM, if they named one.',
-          }),
-        }),
-        'required': list([
-          'service_id',
-          'day',
-        ]),
-        'type': 'object',
+    'change_request': dict({
+      'description': 'The caller wants to change something, hesitates or says no.',
+      'properties': dict({
       }),
+      'required': list([
+      ]),
+    }),
+    'check_availability': dict({
+      'description': 'Free start times of one day for one service, and whether the time the caller asked for is free. Call it as soon as the service and the day are known.',
+      'properties': dict({
+        'day': dict({
+          'description': 'The day, as YYYY-MM-DD.',
+          'format': 'date',
+          'type': 'string',
+        }),
+        'service_id': dict({
+          'description': "The service's id, from the brackets in the service list.",
+          'type': 'string',
+        }),
+        'start': dict({
+          'anyOf': list([
+            dict({
+              'pattern': '^([01][0-9]|2[0-3]):[0-5][0-9]$',
+              'type': 'string',
+            }),
+            dict({
+              'type': 'null',
+            }),
+          ]),
+          'default': None,
+          'description': 'The time the caller asked for, as HH:MM, if they named one.',
+        }),
+      }),
+      'required': list([
+        'day',
+        'service_id',
+      ]),
     }),
     'confirm_booking': dict({
-      'description': 'Book a proposal, only after the caller accepted it unchanged. Report the real result.',
-      'name': 'confirm_booking',
-      'parameters': dict({
-        'properties': dict({
-          'proposal_id': dict({
-            'description': 'The proposal_id that propose_booking returned, once the caller accepted it.',
-            'format': 'uuid',
-            'type': 'string',
-          }),
-        }),
-        'required': list([
-          'proposal_id',
-        ]),
-        'type': 'object',
+      'description': 'Book the proposal the caller just heard, only if they accept it unchanged.',
+      'properties': dict({
       }),
+      'required': list([
+      ]),
+    }),
+    'new_request': dict({
+      'description': 'The caller wants another appointment.',
+      'properties': dict({
+      }),
+      'required': list([
+      ]),
     }),
     'propose_booking': dict({
-      'description': 'Propose a booking once the service, day, time and name are known. Read the summary it returns to the caller and ask whether they confirm it.',
-      'name': 'propose_booking',
-      'parameters': dict({
-        'properties': dict({
-          'client_name': dict({
-            'description': 'The name the appointment is booked under.',
-            'maxLength': 120,
-            'minLength': 1,
-            'type': 'string',
-          }),
-          'day': dict({
-            'description': 'The day, as YYYY-MM-DD.',
-            'format': 'date',
-            'type': 'string',
-          }),
-          'service_id': dict({
-            'description': "The service's id, from the brackets in the service list.",
-            'type': 'string',
-          }),
-          'start': dict({
-            'description': 'The start time, as HH:MM in 24-hour time.',
-            'pattern': '^([01][0-9]|2[0-3]):[0-5][0-9]$',
-            'type': 'string',
-          }),
+      'description': 'Propose the booking of the chosen service, day and time under the name of the person it is for. The system then reads it to the caller and asks whether it is right.',
+      'properties': dict({
+        'client_name': dict({
+          'description': 'The first and last name of the person the appointment is for.',
+          'maxLength': 120,
+          'minLength': 1,
+          'type': 'string',
         }),
-        'required': list([
-          'service_id',
-          'day',
-          'start',
-          'client_name',
-        ]),
-        'type': 'object',
       }),
+      'required': list([
+        'client_name',
+      ]),
+    }),
+    'select_start': dict({
+      'description': 'Record the start time the caller chose, one of the free times offered.',
+      'properties': dict({
+        'start': dict({
+          'description': 'One of the free start times offered, as HH:MM.',
+          'pattern': '^([01][0-9]|2[0-3]):[0-5][0-9]$',
+          'type': 'string',
+        }),
+      }),
+      'required': list([
+        'start',
+      ]),
+    }),
+  })
+# ---
+# name: test_booking_flow_tasks
+  dict({
+    'choices': dict({
+      'free_time': '{spoken} ({clock})',
+      'requested_taken': 'La hora que pidió, {time}, no está libre. ',
+    }),
+    'tasks': dict({
+      'booked': 'La cita quedó agendada. Díselo en una frase y pregunta si necesita algo más. Si quiere otra cita, llama a new_request; si no, despídete con calidez.',
+      'choose_time': 'Tu tarea ahora: elegir la hora. Para {service_name} el {day} hay estas horas libres: {free_times}. {requested}Ofrece una o dos de esas horas, las más cercanas a lo que pidió la persona. En cuanto elija una, llama a select_start con ella sin anunciarlo. Si prefiere otro día u otro servicio, llama a check_availability.',
+      'confirm': 'Tu tarea ahora: la confirmación. El sistema acaba de leerle a la persona el resumen de la cita y le preguntó si está bien. Si lo acepta sin cambios, llama a confirm_booking. Si quiere cambiar algo, duda o dice que no, llama a change_request. No repitas el resumen.',
+      'name': 'Tu tarea ahora: el nombre. Está libre {service_name}, el {day}, a {time}. Si la persona ya dijo el nombre y apellido de quien va a la cita, llama a propose_booking con ese nombre de inmediato. Si no, pregúntaselo; si la cita es para otra persona, pregunta el nombre de esa persona. No anuncies la propuesta: el sistema se la lee.',
+      'not_booked': 'No se pudo completar: la agenda no responde en este momento. Díselo con calma, sugiere llamar más tarde y despídete. No digas que hay una cita agendada.',
+      'request': 'Tu tarea ahora: averiguar qué servicio quiere la persona y para qué día. Responde sus preguntas sobre servicios, precios y horario con la información que tienes. Busca el día en el calendario, nunca calcules una fecha: "el próximo lunes" es el primer lunes después de hoy, nunca hoy. Si el día de la semana y la fecha que dice la persona no coinciden en el calendario, pregúntale cuál de los dos quiere. En cuanto sepas el servicio y el día, llama a check_availability sin anunciarlo; pasa start si dijo una hora. Si un resultado dice que ese día no se atiende, no tiene horas libres o que el horario ya no está libre, díselo y pide otro día u otra hora.',
     }),
   })
 # ---
 # name: test_booking_prompt_of_each_practice_business[practice-barbershop]
   '''
-  Eres la recepcionista telefónica de Barbería La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno.
+  Eres la recepcionista telefónica de Barbería La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno.
   
-  Tu respuesta se convierte en voz: no uses listas, emojis, asteriscos ni otros símbolos. Escribe los números, las fechas y las horas como se dicen ("el martes veintisiete a las tres y media de la tarde").
+  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
   
   Hoy es lunes 26 de octubre de 2026 (2026-10-26). Horario de atención: lunes de 09:00 a 18:00; martes de 09:00 a 18:00; miércoles de 09:00 a 18:00; jueves de 09:00 a 18:00; viernes de 09:00 a 18:00; sábado de 09:00 a 14:00; domingo cerrado.
   
-  Servicios (el identificador entre corchetes es para las herramientas):
+  Calendario de los próximos días (después de los dos puntos, la fecha para las funciones):
+  - lunes 26 de octubre (hoy): 2026-10-26
+  - martes 27 de octubre (mañana): 2026-10-27
+  - miércoles 28 de octubre: 2026-10-28
+  - jueves 29 de octubre: 2026-10-29
+  - viernes 30 de octubre: 2026-10-30
+  - sábado 31 de octubre: 2026-10-31
+  - domingo 1 de noviembre: 2026-11-01, cerrado
+  - lunes 2 de noviembre: 2026-11-02
+  - martes 3 de noviembre: 2026-11-03
+  - miércoles 4 de noviembre: 2026-11-04
+  - jueves 5 de noviembre: 2026-11-05
+  - viernes 6 de noviembre: 2026-11-06
+  - sábado 7 de noviembre: 2026-11-07
+  - domingo 8 de noviembre: 2026-11-08, cerrado
+  
+  Servicios (el identificador entre corchetes es para las funciones):
   - Corte de cabello [haircut]: 30 minutos, precio 8.00
   - Corte y barba [haircut-and-beard]: 60 minutos, precio 12.00
   - Afeitado [shave]: 30 minutos, precio 6.00
   
-  Para agendar una cita:
-  1. Averigua qué servicio, qué día y a qué hora quiere la persona, y a nombre de quién va la cita. Pregunta solo lo que falte, de a una cosa por vez.
-  2. Antes de ofrecer o aceptar una hora, consulta la disponibilidad con la herramienta. Nunca inventes horarios, servicios ni precios: usa solo lo que está en esta lista y lo que devuelven las herramientas.
-  3. Cuando tengas servicio, día, hora y nombre, propón la cita con la herramienta de proponer. Lee en voz alta el resumen que devuelve (servicio, día, hora y nombre) y pregunta si lo confirma.
-  4. Confirma la cita con la herramienta de confirmar solo si la persona acepta esa propuesta sin cambios. Si duda, cambia algo o dice que no, no confirmes: ajusta y vuelve a proponer, o despídete. Si la confirmación vuelve rechazada porque la persona todavía no respondió a esa propuesta, no falló nada: léele el resumen de la propuesta pendiente y pregúntale si la confirma.
-  5. Di el resultado real que devuelve la herramienta. Si el horario se ocupó, ofrece otro disponible. Si la agenda no responde, di que no pudiste agendar y sugiere llamar más tarde. Nunca digas que una cita quedó agendada si la herramienta no lo confirmó.
-  
-  En las herramientas usa las fechas con el formato año-mes-día (2026-10-27) y las horas de 24 horas (15:30). Los identificadores (de servicio, de propuesta o de cita) son solo para las herramientas: nunca los digas.
+  Usa siempre las funciones disponibles para avanzar. Nunca inventes servicios, precios, horarios ni citas: usa solo esta información y lo que devuelven las funciones. Los identificadores nunca se dicen.
   '''
 # ---
 # name: test_booking_prompt_of_each_practice_business[practice-dental-clinic]
   '''
-  Eres la recepcionista telefónica de Consultorio Odontológico La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno.
+  Eres la recepcionista telefónica de Consultorio Odontológico La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno.
   
-  Tu respuesta se convierte en voz: no uses listas, emojis, asteriscos ni otros símbolos. Escribe los números, las fechas y las horas como se dicen ("el martes veintisiete a las tres y media de la tarde").
+  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
   
   Hoy es lunes 26 de octubre de 2026 (2026-10-26). Horario de atención: lunes de 08:00 a 16:00; martes de 08:00 a 16:00; miércoles de 08:00 a 16:00; jueves de 08:00 a 16:00; viernes de 08:00 a 16:00; sábado cerrado; domingo cerrado.
   
-  Servicios (el identificador entre corchetes es para las herramientas):
+  Calendario de los próximos días (después de los dos puntos, la fecha para las funciones):
+  - lunes 26 de octubre (hoy): 2026-10-26
+  - martes 27 de octubre (mañana): 2026-10-27
+  - miércoles 28 de octubre: 2026-10-28
+  - jueves 29 de octubre: 2026-10-29
+  - viernes 30 de octubre: 2026-10-30
+  - sábado 31 de octubre: 2026-10-31, cerrado
+  - domingo 1 de noviembre: 2026-11-01, cerrado
+  - lunes 2 de noviembre: 2026-11-02
+  - martes 3 de noviembre: 2026-11-03
+  - miércoles 4 de noviembre: 2026-11-04
+  - jueves 5 de noviembre: 2026-11-05
+  - viernes 6 de noviembre: 2026-11-06
+  - sábado 7 de noviembre: 2026-11-07, cerrado
+  - domingo 8 de noviembre: 2026-11-08, cerrado
+  
+  Servicios (el identificador entre corchetes es para las funciones):
   - Limpieza dental [dental-cleaning]: 45 minutos, precio 25.00
   - Consulta de evaluación [first-assessment]: 30 minutos, precio no publicado
   - Blanqueamiento dental [teeth-whitening]: 90 minutos, precio 120.00
   
-  Para agendar una cita:
-  1. Averigua qué servicio, qué día y a qué hora quiere la persona, y a nombre de quién va la cita. Pregunta solo lo que falte, de a una cosa por vez.
-  2. Antes de ofrecer o aceptar una hora, consulta la disponibilidad con la herramienta. Nunca inventes horarios, servicios ni precios: usa solo lo que está en esta lista y lo que devuelven las herramientas.
-  3. Cuando tengas servicio, día, hora y nombre, propón la cita con la herramienta de proponer. Lee en voz alta el resumen que devuelve (servicio, día, hora y nombre) y pregunta si lo confirma.
-  4. Confirma la cita con la herramienta de confirmar solo si la persona acepta esa propuesta sin cambios. Si duda, cambia algo o dice que no, no confirmes: ajusta y vuelve a proponer, o despídete. Si la confirmación vuelve rechazada porque la persona todavía no respondió a esa propuesta, no falló nada: léele el resumen de la propuesta pendiente y pregúntale si la confirma.
-  5. Di el resultado real que devuelve la herramienta. Si el horario se ocupó, ofrece otro disponible. Si la agenda no responde, di que no pudiste agendar y sugiere llamar más tarde. Nunca digas que una cita quedó agendada si la herramienta no lo confirmó.
-  
-  En las herramientas usa las fechas con el formato año-mes-día (2026-10-27) y las horas de 24 horas (15:30). Los identificadores (de servicio, de propuesta o de cita) son solo para las herramientas: nunca los digas.
+  Usa siempre las funciones disponibles para avanzar. Nunca inventes servicios, precios, horarios ni citas: usa solo esta información y lo que devuelven las funciones. Los identificadores nunca se dicen.
   '''
 # ---
 # name: test_booking_prompt_of_each_practice_business[practice-spa]
   '''
-  Eres la recepcionista telefónica de Spa La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno.
+  Eres la recepcionista telefónica de Spa La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno.
   
-  Tu respuesta se convierte en voz: no uses listas, emojis, asteriscos ni otros símbolos. Escribe los números, las fechas y las horas como se dicen ("el martes veintisiete a las tres y media de la tarde").
+  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
   
   Hoy es lunes 26 de octubre de 2026 (2026-10-26). Horario de atención: lunes cerrado; martes de 10:00 a 19:00; miércoles de 10:00 a 19:00; jueves de 10:00 a 19:00; viernes de 10:00 a 19:00; sábado de 10:00 a 19:00; domingo de 10:00 a 15:00.
   
-  Servicios (el identificador entre corchetes es para las herramientas):
+  Calendario de los próximos días (después de los dos puntos, la fecha para las funciones):
+  - lunes 26 de octubre (hoy): 2026-10-26, cerrado
+  - martes 27 de octubre (mañana): 2026-10-27
+  - miércoles 28 de octubre: 2026-10-28
+  - jueves 29 de octubre: 2026-10-29
+  - viernes 30 de octubre: 2026-10-30
+  - sábado 31 de octubre: 2026-10-31
+  - domingo 1 de noviembre: 2026-11-01
+  - lunes 2 de noviembre: 2026-11-02, cerrado
+  - martes 3 de noviembre: 2026-11-03
+  - miércoles 4 de noviembre: 2026-11-04
+  - jueves 5 de noviembre: 2026-11-05
+  - viernes 6 de noviembre: 2026-11-06
+  - sábado 7 de noviembre: 2026-11-07
+  - domingo 8 de noviembre: 2026-11-08
+  
+  Servicios (el identificador entre corchetes es para las funciones):
   - Masaje relajante [relaxing-massage]: 60 minutos, precio 35.00
   - Limpieza facial [facial-cleansing]: 50 minutos, precio 28.00
   - Manicura [manicure]: 40 minutos, precio 12.00
   
-  Para agendar una cita:
-  1. Averigua qué servicio, qué día y a qué hora quiere la persona, y a nombre de quién va la cita. Pregunta solo lo que falte, de a una cosa por vez.
-  2. Antes de ofrecer o aceptar una hora, consulta la disponibilidad con la herramienta. Nunca inventes horarios, servicios ni precios: usa solo lo que está en esta lista y lo que devuelven las herramientas.
-  3. Cuando tengas servicio, día, hora y nombre, propón la cita con la herramienta de proponer. Lee en voz alta el resumen que devuelve (servicio, día, hora y nombre) y pregunta si lo confirma.
-  4. Confirma la cita con la herramienta de confirmar solo si la persona acepta esa propuesta sin cambios. Si duda, cambia algo o dice que no, no confirmes: ajusta y vuelve a proponer, o despídete. Si la confirmación vuelve rechazada porque la persona todavía no respondió a esa propuesta, no falló nada: léele el resumen de la propuesta pendiente y pregúntale si la confirma.
-  5. Di el resultado real que devuelve la herramienta. Si el horario se ocupó, ofrece otro disponible. Si la agenda no responde, di que no pudiste agendar y sugiere llamar más tarde. Nunca digas que una cita quedó agendada si la herramienta no lo confirmó.
-  
-  En las herramientas usa las fechas con el formato año-mes-día (2026-10-27) y las horas de 24 horas (15:30). Los identificadores (de servicio, de propuesta o de cita) son solo para las herramientas: nunca los digas.
+  Usa siempre las funciones disponibles para avanzar. Nunca inventes servicios, precios, horarios ni citas: usa solo esta información y lo que devuelven las funciones. Los identificadores nunca se dicen.
   '''
 # ---
 # name: test_fixed_phrases
   dict({
     'booking_briefing': dict({
+      'calendar_closed': ', cerrado',
+      'calendar_day': '{weekday} {day} de {month}{note}: {iso_date}{closed}',
+      'calendar_today': ' (hoy)',
+      'calendar_tomorrow': ' (mañana)',
       'closed_day': '{weekday} cerrado',
       'months': tuple(
         'enero',
@@ -193,6 +232,114 @@
       ),
     }),
     'greeting': 'Hola, gracias por llamar. ¿En qué te puedo ayudar?',
+    'read_back': 'Para confirmar: {service}, el {day}, a {time}, a nombre de {name}. ¿Está bien así?',
+    'spoken_moments': dict({
+      'day': '{weekday} {day} de {month}',
+      'day_parts': tuple(
+        tuple(
+          0,
+          'de la madrugada',
+        ),
+        tuple(
+          6,
+          'de la mañana',
+        ),
+        tuple(
+          12,
+          'del mediodía',
+        ),
+        tuple(
+          13,
+          'de la tarde',
+        ),
+        tuple(
+          20,
+          'de la noche',
+        ),
+      ),
+      'hours': tuple(
+        'las doce',
+        'la una',
+        'las dos',
+        'las tres',
+        'las cuatro',
+        'las cinco',
+        'las seis',
+        'las siete',
+        'las ocho',
+        'las nueve',
+        'las diez',
+        'las once',
+      ),
+      'minute_names': dict({
+        15: 'cuarto',
+        30: 'media',
+      }),
+      'numbers': tuple(
+        'cero',
+        'uno',
+        'dos',
+        'tres',
+        'cuatro',
+        'cinco',
+        'seis',
+        'siete',
+        'ocho',
+        'nueve',
+        'diez',
+        'once',
+        'doce',
+        'trece',
+        'catorce',
+        'quince',
+        'dieciséis',
+        'diecisiete',
+        'dieciocho',
+        'diecinueve',
+        'veinte',
+        'veintiuno',
+        'veintidós',
+        'veintitrés',
+        'veinticuatro',
+        'veinticinco',
+        'veintiséis',
+        'veintisiete',
+        'veintiocho',
+        'veintinueve',
+        'treinta',
+        'treinta y uno',
+        'treinta y dos',
+        'treinta y tres',
+        'treinta y cuatro',
+        'treinta y cinco',
+        'treinta y seis',
+        'treinta y siete',
+        'treinta y ocho',
+        'treinta y nueve',
+        'cuarenta',
+        'cuarenta y uno',
+        'cuarenta y dos',
+        'cuarenta y tres',
+        'cuarenta y cuatro',
+        'cuarenta y cinco',
+        'cuarenta y seis',
+        'cuarenta y siete',
+        'cuarenta y ocho',
+        'cuarenta y nueve',
+        'cincuenta',
+        'cincuenta y uno',
+        'cincuenta y dos',
+        'cincuenta y tres',
+        'cincuenta y cuatro',
+        'cincuenta y cinco',
+        'cincuenta y seis',
+        'cincuenta y siete',
+        'cincuenta y ocho',
+        'cincuenta y nueve',
+      ),
+      'on_the_hour': '{hour} {day_part}',
+      'past_the_hour': '{hour} y {minutes} {day_part}',
+    }),
   })
 # ---
 # name: test_model_configuration[google]

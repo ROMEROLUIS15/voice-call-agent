@@ -48,8 +48,9 @@ dental clinic and a spa), kept in memory and lost on restart
 (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is also refused outside
 development. Each business has a fictitious number: pick it on the page before starting the call,
 and the call reaches that business as a phone-line call reaches the number it dials (ADR 0017).
-Ask for an appointment by voice: the agent checks the availability, proposes, reads the summary
-back and books only after you say yes (ADR 0011). Each decision lands in the call's trace
+Ask for an appointment by voice: the conversation is a Pipecat Flows graph (ADR 0019), one step
+at a time: the agent checks the availability, asks for a time among the free ones and for the name,
+the service reads the summary back, and the agent books only after you say yes (ADR 0011). Each decision lands in the call's trace
 (`writes`) with the `booked` outcome.
 
 With `CONVERSATION_TRANSCRIPTS_DIR` set, each call also leaves a text file named after the call:

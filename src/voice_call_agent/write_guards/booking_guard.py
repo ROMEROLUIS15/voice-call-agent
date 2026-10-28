@@ -33,7 +33,7 @@ from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBacken
 
 
 def clock_time(moment: time) -> str:
-    """HH:MM: how the model reads and writes times (`agent_tools.tool_arguments.ClockTime`)."""
+    """HH:MM: how the model reads and writes times (`booking_flow.flow_arguments.ClockTime`)."""
     return moment.strftime("%H:%M")
 
 
