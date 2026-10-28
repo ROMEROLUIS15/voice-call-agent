@@ -1,6 +1,6 @@
 # ADR 0010: Golden dataset and evals at two levels, with a judge model
 
-*   **Status:** Accepted, amended by 0013 and 0016
+*   **Status:** Accepted, amended by 0013 and 0016, changed 2026-10-28
 *   **Date:** 2026-10-19
 
 ## Context
@@ -25,3 +25,6 @@ What the agent says depends on the prompt, the fixed phrases, the language model
 ## Consequences
 *   Easier: a behaviour change shows up as a failing reference conversation, a snapshot diff or a fingerprint mismatch; model regressions are measured against a baseline with explicit margins.
 *   Harder: a prompt, model or scoring change needs a run with real keys (15 conversations and 36 judge scores today) to store a new baseline; editing a scoring file changes the fingerprint even for a comment. The judge has its own bias, calibrated against human labels in phase 5. Until the CI secrets exist, the baseline is recorded unmeasured and nothing is compared.
+
+## Changes
+2026-10-28 · The CI run follows this decision exactly: on a pull request the model evals measure only when the behaviour fingerprint differs from the base commit's baseline (`--only-if-changed`), and they no longer run again on `main` after the merge, which measured the same code. A path filter alone had started paid runs for changes that left the fingerprint as it was, and every merge repeated one: about half of the provider credits spent in the first two days of measured runs went to such runs (pull request #23).

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from pipecat.services.ai_service import AIService
 
+from evals.behavior_fingerprint import behavior_fingerprint, behavior_inputs
 from evals.conversation_harness.scripted_language_model import SCRIPTED_REPLY, ScriptedLanguageModel
 from evals.eval_baseline import (
     EvalBaseline,
@@ -13,6 +14,7 @@ from evals.eval_baseline import (
     Verdict,
     compare_with_baseline,
     load_baseline,
+    save_baseline,
 )
 from evals.eval_report import render_report
 from evals.eval_settings import ModelEvalSettings
@@ -285,3 +287,18 @@ def test_the_baseline_is_measured_with_the_default_model_only(
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-judge-key")
     monkeypatch.setenv("LLM_MODEL", "another-model")
     assert main(["--write-baseline"]) == EXIT_CANNOT_RUN
+
+
+def test_a_pull_request_measures_only_when_the_behaviour_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    inputs = behavior_inputs()
+    unchanged = tmp_path / "unchanged.json"
+    save_baseline(EvalBaseline(fingerprint=behavior_fingerprint(inputs), inputs=inputs), unchanged)
+    changed = tmp_path / "changed.json"
+    save_baseline(EvalBaseline(fingerprint="measured-before", inputs=inputs), changed)
+    assert main(["--only-if-changed", "--compare-with", str(unchanged)]) == EXIT_OK
+    # A changed fingerprint goes on to measure, and without the keys it cannot run.
+    assert main(["--only-if-changed", "--compare-with", str(changed)]) == EXIT_CANNOT_RUN

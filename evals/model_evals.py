@@ -7,7 +7,9 @@ conversations (task metrics and the judge) and compares them with a baseline. Ne
 the model's provider and `OPENROUTER_API_KEY` for the judge. Exit code: 0 no regression,
 1 regression, 2 the evals could not run (a missing key, or a provider that failed during the run).
 With `--write-baseline --accept-drop REASON`, a drop of quality measures only is stored with its
-reason: a change that adds harder cases is not blocked by its own cases.
+reason: a change that adds harder cases is not blocked by its own cases. With `--only-if-changed`
+(pull requests), nothing runs when the behaviour fingerprint equals the baseline's: the change
+cannot have moved what the evals measure, and a run costs provider credits.
 """
 
 import argparse
@@ -76,6 +78,11 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
         metavar="REASON",
         help="with --write-baseline, store it although quality measures dropped, for this reason",
     )
+    parser.add_argument(
+        "--only-if-changed",
+        action="store_true",
+        help="run only when the behaviour fingerprint differs from the compared baseline's",
+    )
     return parser.parse_args(argv)
 
 
@@ -83,6 +90,9 @@ def main(argv: list[str] | None = None) -> int:
     arguments = _arguments(argv)
     if arguments.record_fingerprint:
         return record_unmeasured_fingerprint(BASELINE_PATH)
+    if arguments.only_if_changed and not behavior_changed(load_baseline(arguments.compare_with)):
+        print("Nothing to measure: the behaviour fingerprint equals the baseline's.")
+        return EXIT_OK
     settings = ModelEvalSettings()
     model = settings.language_model()
     if model is None or settings.openrouter_api_key is None:
@@ -114,6 +124,11 @@ def main(argv: list[str] | None = None) -> int:
         baseline_path=BASELINE_PATH if arguments.write_baseline else None,
         accept_drop=arguments.accept_drop,
     )
+
+
+def behavior_changed(baseline: EvalBaseline) -> bool:
+    """Whether what shapes the agent's replies differs from what the baseline was measured with."""
+    return behavior_fingerprint(behavior_inputs()) != baseline.fingerprint
 
 
 def model_under_test(choice: LanguageModelChoice) -> ModelUnderTest:
