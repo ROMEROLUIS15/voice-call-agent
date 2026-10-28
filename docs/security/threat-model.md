@@ -177,5 +177,5 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-27 | The four alerts exist as Sentry monitors on the production environment (T-34) | S9, S11 |
 | 2026-10-27 | Practice lines (`GET /practice/lines`, a dialed number in the offer; T-39, T-42) and conversation transcripts in development (T-44), ADR 0017 | S9, S13 |
 | 2026-10-27 | R-08: the code reads the proposal back (ADR 0019); `books-what-was-asked` (security) measures that a booking holds what the caller asked, and `confirms-after-the-answer` that the model does not confirm for the caller | S5, S7 |
-| 2026-10-27 | The booking conversation is a Pipecat Flows graph (ADR 0019): each node offers only its functions, the services and the free starts are strict enums, and the confirmation is offered only after the code read the proposal back (T-21) | S5, S7 |
+| 2026-10-27 | The booking conversation is a Pipecat Flows graph (ADR 0019): each node offers only its functions, the code checks the service and the start against the catalog and the free starts, and the confirmation is offered only after the code read the proposal back (T-21) | S5, S7 |
 | 2026-10-27 | actionlint joins the quality gate (security job): T-32 relied on it, but no hook or job ran it | S12 |

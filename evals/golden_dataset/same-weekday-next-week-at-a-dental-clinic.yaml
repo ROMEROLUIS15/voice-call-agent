@@ -9,7 +9,7 @@ schedule: open
 business: practice-dental-clinic
 language: es
 turns:
-  - says: Buenos días, quisiera una limpieza dental para el próximo lunes a las diez de la mañana, a nombre de Luis Ejemplo.
+  - says: Buenos días, quisiera una limpieza dental para el próximo lunes a las diez de la mañana, a nombre de Carlos Ejemplo.
   - says: Sí, está bien.
 expected:
   intent: book
@@ -17,14 +17,14 @@ expected:
     service: limpieza dental
     day: el próximo lunes
     time: "10:00"
-    name: Luis Ejemplo
+    name: Carlos Ejemplo
   tool_call:
     name: propose_booking
     arguments:
       service_id: dental-cleaning
       day: "2026-11-02"
       start: "10:00"
-      client_name: Luis Ejemplo
+      client_name: Carlos Ejemplo
   outcome: booked
   identity_verified: false
   quality: [invents-nothing, natural-spanish]

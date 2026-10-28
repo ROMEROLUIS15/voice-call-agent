@@ -51,7 +51,8 @@ async def test_the_call_starts_with_the_greeting_and_waits_for_the_caller() -> N
     assert node.get("respond_immediately") is False
     [check] = _functions(node).values()
     assert check.name == "check_availability"
-    assert check.properties["service_id"]["enum"] == ["haircut", "full"]
+    # No enums: a provider that validates them silences the turn; the code checks the service.
+    assert "enum" not in check.properties["service_id"]
 
 
 async def test_choosing_a_time_offers_only_the_free_starts() -> None:
@@ -61,7 +62,7 @@ async def test_choosing_a_time_offers_only_the_free_starts() -> None:
     assert node is not None and node.get("name") == Step.CHOOSE_TIME.value
     functions = _functions(node)
     assert set(functions) == {"select_start", "check_availability"}
-    assert "11:00" in functions["select_start"].properties["start"]["enum"]
+    assert "enum" not in functions["select_start"].properties["start"]
     [task] = node.get("task_messages", [])
     assert "las once de la mañana (11:00)" in str(task["content"])
 
@@ -70,7 +71,8 @@ async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> No
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]
     _, name_node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), start="15:30")
-    assert name_node is not None and set(_functions(name_node)) == {"propose_booking"}
+    assert name_node is not None
+    assert set(_functions(name_node)) == {"propose_booking", "check_availability"}
     _, confirm = await _run(_functions(name_node)["propose_booking"], client_name="Ana Ejemplo")
     assert confirm is not None and confirm.get("name") == Step.CONFIRM.value
     assert confirm.get("respond_immediately") is False

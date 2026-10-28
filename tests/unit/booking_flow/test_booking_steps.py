@@ -115,6 +115,20 @@ async def test_the_proposal_is_validated_and_confirmed_only_after_the_caller_ans
     ]
 
 
+async def test_a_new_availability_check_drops_what_the_earlier_request_left_pending() -> None:
+    steps = _steps(await guarded_call())
+    await steps.check_availability({**HAIRCUT, "start": "11:00"})
+    await steps.propose_booking({"client_name": "Ana Ejemplo"})
+    outcome = await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
+    assert outcome.next_step is Step.NAME and steps.proposal is None
+    assert steps.slot is not None and steps.slot.service.id == "full"
+    closed = await steps.check_availability(
+        {"service_id": "haircut", "day": (TUESDAY + timedelta(days=5)).isoformat()}
+    )
+    assert closed.next_step is None and steps.slot is None
+    assert (await steps.propose_booking({"client_name": "Ana Ejemplo"})).next_step is Step.REQUEST
+
+
 async def test_a_change_of_mind_goes_back_to_the_request_with_nothing_pending() -> None:
     steps = _steps(await guarded_call())
     await steps.check_availability({**HAIRCUT, "start": "11:00"})
