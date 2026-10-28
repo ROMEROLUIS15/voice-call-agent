@@ -150,6 +150,17 @@ Measured with real calls, per turn and **per channel**:
 
 If a backend query may exceed 1 s, the agent says a short holding phrase instead of staying silent.
 
+**§6 segments from Pipecat's contributions** (`LatencyBreakdown.contributions[].key`):
+
+| Segment | Keys |
+|---|---|
+| End of speech → final transcript | `endpointing_wait`, `transcription` |
+| Transcript → first token | `turn_detection`, `llm_inference`, `turn_completion`, `awaiting_speakable_text`, `waiting_for_user`, `llm_tool_call`, `function_handler` |
+| First token → first audio | `sentence_aggregation`, `speech_synthesis`, `output_transport` |
+| Other (no owner) | the rest, e.g. `pipeline` |
+
+**Finding of the reference conversations:** Pipecat's `UserBotLatencyObserver` discards a turn's measurement when the interruption that starts the turn arrives after the VAD's end of speech. On a call Flux starts the turn while the caller speaks, so production is not affected; the harness models a caller who speaks for a while between start and end of turn.
+
 ## 7. v1 stack
 
 | Layer | Choice | Reason |
@@ -250,6 +261,9 @@ Cross-cutting decisions are ADRs in `docs/adr/`:
 *   [ADR 0012](../../adr/0012-pull-requests-with-required-checks.md) · Changes reach `main` through pull requests with required checks.
 *   [ADR 0013](../../adr/0013-evals-fingerprint-of-what-the-evals-measure.md) · Evals fingerprint of what the evals measure, and the first baseline with the booking prompt (amends ADR 0010).
 *   [ADR 0015](../../adr/0015-browser-practice-entry-for-development.md) · Browser practice entry for development (amends ADR 0004).
+*   [ADR 0016](../../adr/0016-quality-margins-from-measured-noise.md) · Quality margins from the measured noise between runs (amends ADR 0010).
+*   [ADR 0017](../../adr/0017-practice-lines-and-conversation-transcripts.md) · Practice lines and conversation transcripts in development (amends ADR 0015).
+*   [ADR 0019](../../adr/0019-pipecat-first-the-conversation-is-a-flows-graph.md) · Pipecat first: the conversation is a Pipecat Flows graph (changes ADR 0011).
 
 Decisions local to this module:
 
@@ -295,59 +309,28 @@ Observability and quality (stage 1):
 *   **A security criterion counts as met or not met** (judge score ≥ 0.5), so judge noise alone does not fail a run with no margin; quality criteria are averaged.
 *   **Per-call identifiers tag issues, transactions and logs, never metrics**: one value per call would explode the metrics' cardinality.
 
-## 12. Phase 0 status
+## 12. Status
 
-**Done (2026-10-18):** skeleton with the structure of §3 (uv, FastAPI, `pipecat-ai==1.12.0`, pytest, `mypy --strict`, ruff, CI); phone entry (signature, TwiML `<Connect><Stream>`, stream admission token, handshake timeout, μ-law 8 kHz transport, busy rejection when full, own hang-up with timeout); WhatsApp entry (subscription check, `X-Hub-Signature-256` over the raw body, `calls` filtering, admission against the concurrency limit with Graph API `reject`, WebRTC acceptance with Pipecat's `WhatsAppClient`); common Flux → LLM → Aura-2 pipeline with a fixed greeting; test prompt that confirms no appointment and invents no data; `SchedulingBackend` and `BusinessResolver` ports with their domain models; concurrency limit, readiness and graceful drain; HTTP hardening (security headers, closed CORS, trusted hosts, body limit, generic errors, no documentation in production), replay protection and rate limits on both entries, tenant boundary tests; security checks (bandit, pip-audit, gitleaks) shared by pre-commit and CI; structured JSON logging with redaction; per-turn, per-segment latency summarized against §6 (`python -m voice_call_agent.observability.latency_budget_report`).
+The current state; what changed, when and why is in the pull requests and in git (constitution §8).
 
-**Done (2026-10-19), stage 1 — observability and quality:** error taxonomy with codes and kinds, `report_error` everywhere (an architecture test forbids silent handlers); one `CallTrace` per call with versions (prompt and phrases version, model, STT model, voice), per-segment latency, usage, estimated cost from a versioned price table, and errors by code, published to `var/call_traces.jsonl` and to Sentry (transaction per call, span per turn, latency distributions), privacy-first configuration with scrubbing; alert rules defined (`docs/observability/alerts.md`); golden dataset in YAML with 7 active and 9 pending cases; reference conversations through the real runner (greeting, barge-in, identity per channel); model evals with task metrics and a Gemini judge against `evals/baseline.json`, behaviour fingerprint test and syrupy snapshots; `evals.yml` and `provider-reachability.yml` workflows.
+**Phase:** 0 is open (the Venezuelan number is missing), and phase 2 started before phase 1: the agent books by voice against the practice schedule, before the Cronix contract exists.
 
-**Finding of the reference conversations:** Pipecat's `UserBotLatencyObserver` discards a turn's measurement when the interruption that starts the turn arrives after the VAD's end of speech. On a call Flux starts the turn while the caller speaks, so production is not affected; the harness models a caller who speaks for a while between start and end of turn. `agent_tools/`, `write_guards/` and `adapters/cronix_scheduling_api/` exist empty until their phases.
+**What works today:**
 
-**§6 segments from Pipecat's contributions** (`LatencyBreakdown.contributions[].key`):
-
-| Segment | Keys |
-|---|---|
-| End of speech → final transcript | `endpointing_wait`, `transcription` |
-| Transcript → first token | `turn_detection`, `llm_inference`, `turn_completion`, `awaiting_speakable_text`, `waiting_for_user`, `llm_tool_call`, `function_handler` |
-| First token → first audio | `sentence_aggregation`, `speech_synthesis`, `output_transport` |
-| Other (no owner) | the rest, e.g. `pipeline` |
+*   **Entries:** the phone line (Twilio Media Streams: signature, admission token, handshake timeout, busy rejection, own hang-up); WhatsApp Calling (signature, call filtering, admission, accept and reject through the Graph API), paused (§10); the browser practice entry for development, with a fictitious line per practice business (ADR 0015, ADR 0017).
+*   **Pipeline:** Flux (`flux-general-multi`) → `gpt-oss-120b` through OpenRouter (Groq, then Cerebras) → Aura-2, on Pipecat 1.14.0; call slots per instance, readiness, graceful shutdown and explicit timeouts.
+*   **Booking** against the practice schedule: availability, a proposal validated by the write guard, the caller's confirmation and the write, once (ADR 0011).
+*   **Observability:** error codes reported through `report_error`; a call trace per call (versions, latency per segment from Pipecat's latency breakdown, usage, estimated cost, write decisions); Sentry issues, transactions and metrics, with the alerts as production monitors (`docs/observability/alerts.md`); transcripts in development (ADR 0017).
+*   **Evals:** the golden dataset, reference conversations on every change and model evals against the baseline in CI (ADR 0010, ADR 0013, ADR 0016).
+*   **Security:** HTTP hardening, replay protection, rate limits, tenant isolation tests, the threat model, the quality gate in CI and `main` only through pull requests (ADR 0012).
 
 **Pending to close phase 0** (needs accounts and real calls): a Venezuelan number on the phone line (§10); 20 measured calls on the phone line; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute on the phone line. The WhatsApp entry is paused (§10): its measured calls, how it coexists with the message webhook and the multi-instance `terminate` risk wait until Meta enables *Calling* on the number.
 
-**Changed (2026-10-19), balance between the agent and the code:** v1 narrowed to booking (§2); writes validated by code and confirmed by the caller, with the yes judged by the model (INV-2, INV-3, ADR 0011), without mention guards nor a call state machine; `dialog_state/` removed and `intent_understanding/` renamed `agent_tools/`; AC-9 without a message; on the phone line no name and no appointments without the second factor (INV-4); changes reach `main` through pull requests (ADR 0012); the evals fingerprint covers only what the model evals exercise, and the first baseline waits for the booking prompt (ADR 0013).
+**Next (ADR 0019):**
 
-**Measured (2026-10-19), language model:** time to the first token of Groq `openai/gpt-oss-120b` (default and low reasoning effort) and DeepSeek `deepseek-flash` from a GitHub-hosted runner; low effort is the only configuration within §6 and is now the default (§7, `README.md` "Measured results").
+1.  The booking conversation as a Pipecat Flows graph: one task and its functions per node, the calendar and the dates said aloud by the code, the proposal read back by the code in a confirmation node that waits for the caller.
+2.  Pipecat Evals with scripted and simulated scenarios in place of the conversation harness, keeping the checks of what each call wrote.
+3.  Pipecat's observers, turn events and tracing in place of own observability where they cover it; latency per segment already comes from Pipecat's breakdown.
+4.  The model, chosen with simulated scenarios: `gpt-oss-120b` against stronger models, accuracy against time to the first token.
 
-**Found (2026-10-20), WhatsApp number:** its messaging limit is 250 daily recipients and *Calling* needs 2,000; the WhatsApp entry is paused and the phone line, with Venezuelan numbers, is the main path (§10).
-
-**Changed (2026-10-23), dependencies:** `pipecat-ai` 1.12.0 → 1.14.0, the first release that accepts Pillow 13, which fixes Pillow's advisories (the service decodes no images, but pip-audit blocks them); `certifi` 2026.10.23 drops CA certificates with compromised keys, and `setuptools` 84.2.1 and `virtualenv` 21.14.13 fix advisories. Pipecat 1.14 also keeps what the caller said when a Flux connection drops mid-turn (the turn ends with the transcript so far) and masks credentials in its error frames. It adds `use_provider_thinking_default`: with Google as the provider, Pipecat now sends the model's lowest thinking setting (`minimal` for its default `gemini-3.6-flash`); Groq is unaffected, its effort stays explicit (§7). Snapshots regenerated and fingerprint recorded (ADR 0013).
-
-**Found (2026-10-23), Venezuelan numbers:** neither Twilio nor Telnyx sells them; the paths left are a +58 800 number requested from Twilio support or a number provider's Venezuelan number delivered over SIP, one per business (§10). A business can keep its published number by forwarding it, once Venezuelan carriers confirm it works (§10).
-
-**Added (2026-10-26), text-to-speech comparison:** `evals/text_to_speech_comparison/` times every Spanish voice of Aura-2 and Flux TTS on the "first token → first audio" segment of §6 and keeps phone-quality samples (μ-law at 8 kHz) of fixed replies, to choose the voice by ear; `.github/workflows/text-to-speech-comparison.yml` runs it from a GitHub-hosted runner. The price table gains Flux TTS. The engine is measured without a phone number while the Venezuelan one is obtained; the 20 calls on the real route stay pending.
-
-**Added (2026-10-26), browser practice entry (ADR 0015):** `call_transports/browser_webrtc/` serves `/practice`, where a browser on the developer's machine calls the agent over WebRTC through the same runner, pipeline and call trace (channel `browser`, no telephony cost). Development only and loopback clients only; refused offers, peers that never connect and closing are covered by negative tests and the threat model (S13). `LLM_PROVIDER=openrouter` reaches Groq's model from networks Groq refuses. Checked end to end on a local machine: an aiortc peer playing the browser heard the greeting 4.4 s after its offer (connection, pipeline start and the first speech included), and its hang-up freed the call slot. The first practice call with a person's voice followed the same day: 2 turns, 2.4 s and 1.03 s from end of speech to first audio, through a VPN and OpenRouter (not representative).
-
-**Fixed (2026-10-26), cost of the voice:** the first practice call's trace showed `tts_characters: 0` although the agent spoke: Pipecat's WebSocket Aura-2 service reports no usage. The Deepgram adapter now reports the characters it sends (§11). Call traces written before this fix leave the voice out of their estimated cost.
-
-**Added (2026-10-26), practice schedule (phase 2 begins):** `practice_schedule/` implements `SchedulingBackend` and `BusinessResolver` in memory over a fictitious barbershop (Caracas time, three services, Monday to Saturday); `SCHEDULING_BACKEND=practice`, refused outside development. A browser practice call resolves to it at call start, so its trace carries the business. `tzdata` joins the dependencies: Windows has no time zone database for `zoneinfo`. The tenant isolation tests run against it, replacing a test double. Nothing books yet: the agent's tools and the booking prompt come next.
-
-**Added (2026-10-26), booking (phase 2):** the agent books by voice against the practice schedule: `agent_tools/` (availability, proposal, confirmation), `write_guards/booking_guard.py` (ADR 0011), the booking prompt with the business's catalog and today's date, the business's greeting, write decisions and the `booked` outcome in the call trace, the backend's call record closed at the end. Reference conversations run AC-1, AC-2, AC-4 and AC-9 through the real runner with a scripted model that calls the tools; AC-3 joins the model evals. Checked with the real model (Groq's `gpt-oss-120b` through OpenRouter, from a local machine): it reads availability, proposes, reads the summary back, confirms after the caller's yes and books; with "no sé, déjame pensarlo" it proposes and writes nothing. That check found the two provider behaviours of §10. The behaviour fingerprint is recorded unmeasured (ADR 0013).
-
-**Added (2026-10-27), baseline from a runner:** `--write-baseline` measures only with the default provider, which refuses the development machine's network, and CI only compared. The evals workflow, run on demand with `write_baseline`, now measures the baseline from a GitHub-hosted runner and keeps it as an artifact to commit in the pull request (`docs/evals/golden-dataset.md`).
-
-**Changed (2026-10-27), evals for any business:** the first measurement from a runner showed that the evals measured one catalog and that the judge could not check the facts the agent states. The practice schedule gains a dental clinic and a spa next to the barbershop (other services, durations that are not a multiple of the slot, a service without a price, a closed Monday); every booking case names its business and the model-level cases must cover all of them. The judge reads the prompt the model received and each tool result, and the call in the order it happened (a line said before a tool call no longer shifts the transcript); `invents-nothing` now means: no booking announced and no fact stated that the caller, the prompt or a tool result did not give. A provider failing during a run (a rate limit, the judge's outage) stops it with exit code 2 instead of being scored. The judge follows written evaluation steps, and the model evals accept every provider the service does (`LLM_PROVIDER=openrouter` failed with a `KeyError`). A catalog tool was tried and dropped (§11). The judge's Gemini key was on the free tier, 20 requests per day for `gemini-3.6-flash`, and a run needs about 80: the judge now reaches the same model through OpenRouter (§11). The behaviour fingerprint includes the practice businesses. Groq's free tier cannot run the model evals nor serve real calls (§10).
-
-**Changed (2026-10-27), the language model's route:** Groq's developer tier closed, so the service reaches `gpt-oss-120b` through OpenRouter by default, routed to Groq and, when Groq fails, to Cerebras; the call trace counts the responses each upstream served (`llm_upstreams`), and the model evals need only `OPENROUTER_API_KEY` (§7, §11). `provider-reachability.yml` prints the Groq key's limits.
-
-**Measured (2026-10-27), first evals baseline:** from a GitHub-hosted runner through OpenRouter: `invents-nothing` 1.00, `natural-spanish` 1.00, `admits-test-line` 1.00, `speakable-replies` 1.00, `brief-replies` 0.98 (14 cases, 3 repetitions, three kinds of business). The run before it scored `invents-nothing` 0.95 and found a service without a price read as free (§10), fixed before measuring again. R-07 is closed.
-
-**Corrected (2026-10-27), Venezuelan numbers:** Twilio has no voice-enabled Venezuelan numbers, so the +58 800 number through Twilio support recorded on 2026-10-23 is not a path; the one left is a number provider's Venezuelan number over SIP (§10).
-
-**Fixed (2026-10-27), a refused confirmation and an unscored write:** a confirmation refused because the caller had not answered the proposal now carries that proposal, and the prompt has the agent read it back (§10). The model evals gain two measures from the call trace: `no-unwanted-write` (security), which R-08 claimed but nothing scored, and `bookings-completed`. The measurement of this change failed on `brief-replies` (0.98 to 0.91) although nothing about brevity changed: the measure's spread between runs exceeds its margin, so quality margins now follow the measured noise (ADR 0016). Measured again from the runner: no regression; `no-unwanted-write` and `bookings-completed` 1.00, `brief-replies` 0.93.
-
-**Added (2026-10-27), error tracking live:** the Sentry project receives the service's issues, call transactions and metrics, and the four alerts of `docs/observability/alerts.md` exist as monitors on the production environment, each checked against real events first.
-
-**Added (2026-10-27), practice lines and conversation transcripts (ADR 0017):** the first practice calls with a person's voice reached only the barbershop and could not be read back: the call trace showed the booking and each turn's latency, not what was asked nor answered, so the repetitions and the imprecise change of service reported after a call had no evidence to fix them from. Each practice business now has a fictitious line the practice page dials, resolved like a phone-line call's dialed number; and with `CONVERSATION_TRANSCRIPTS_DIR` (development only) each call leaves a text file with its prompt, the caller's turns as heard, the agent's lines as spoken and each tool call with its result. The reference conversations check the transcript of every case. No change to what the model receives: the behaviour fingerprint is unchanged.
-
-**Next:** practice calls through the browser entry tune the prompt and the pipeline while the Venezuelan number is obtained; then the WhatsApp entry with a Meta test number (§10). Phase 0's **first real call over the phone line, measured per segment**, waits for the Venezuelan number. There is no separate AI engineering stage: each practice joins the feature that needs it (§9.1, constitution §17).
+Then the WhatsApp entry with a Meta test number (§10); phase 0's first real call over the phone line, measured per segment, waits for the Venezuelan number.

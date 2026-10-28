@@ -16,8 +16,13 @@ def render_report(
     baseline: EvalBaseline,
     comparisons: list[MetricComparison],
     runs: list[CaseRun],
+    accepted_drop: str | None = None,
 ) -> str:
+    """`accepted_drop`: why the quality drops below were accepted into the new baseline."""
     regressions = [c.metric_id for c in comparisons if c.verdict is Verdict.REGRESSION]
+    verdict = f"REGRESSION: {', '.join(regressions)}" if regressions else "No regression."
+    if regressions and accepted_drop is not None:
+        verdict = f"Quality drop accepted ({', '.join(regressions)}): {accepted_drop}"
     lines = [
         "# Model evals",
         "",
@@ -26,7 +31,7 @@ def render_report(
         _baseline_line(baseline),
         _upstreams_line(runs),
         "",
-        f"**{'REGRESSION: ' + ', '.join(regressions) if regressions else 'No regression.'}**",
+        f"**{verdict}**",
         "",
         "| Measure | Kind | Baseline | Now | Allowed drop | Verdict |",
         "|---|---|---|---|---|---|",

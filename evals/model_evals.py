@@ -6,6 +6,8 @@ Runs every active model-level golden case with the configured language model, sc
 conversations (task metrics and the judge) and compares them with a baseline. Needs the key of
 the model's provider and `OPENROUTER_API_KEY` for the judge. Exit code: 0 no regression,
 1 regression, 2 the evals could not run (a missing key, or a provider that failed during the run).
+With `--write-baseline --accept-drop REASON`, a drop of quality measures only is stored with its
+reason: a change that adds harder cases is not blocked by its own cases.
 """
 
 import argparse
@@ -41,7 +43,7 @@ from evals.model_eval_runs import (
     aggregate_scores,
     run_cases,
 )
-from evals.quality_criteria import REPETITIONS
+from evals.quality_criteria import REPETITIONS, MetricKind
 from voice_call_agent.adapters.language_model_providers.provider_selection import (
     LanguageModelChoice,
     select_language_model,
@@ -69,6 +71,11 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help="record the behaviour inputs without measuring; only while never measured",
     )
+    parser.add_argument(
+        "--accept-drop",
+        metavar="REASON",
+        help="with --write-baseline, store it although quality measures dropped, for this reason",
+    )
     return parser.parse_args(argv)
 
 
@@ -86,6 +93,9 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.write_baseline and _differs_from_default(model):
         print("Cannot write the baseline: it is measured with the default model only.")
         return EXIT_CANNOT_RUN
+    if arguments.accept_drop and not arguments.write_baseline:
+        print("--accept-drop only applies to --write-baseline.")
+        return EXIT_CANNOT_RUN
     under_test = model_under_test(select_language_model(model))
     judge = ConversationJudge(settings.openrouter_api_key.get_secret_value())
     try:
@@ -102,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         compare_with=load_baseline(arguments.compare_with),
         report_path=arguments.report,
         baseline_path=BASELINE_PATH if arguments.write_baseline else None,
+        accept_drop=arguments.accept_drop,
     )
 
 
@@ -128,29 +139,48 @@ def conclude(
     compare_with: EvalBaseline,
     report_path: Path,
     baseline_path: Path | None,
+    accept_drop: str | None = None,
 ) -> int:
-    """Score, compare and report; store the new baseline in `baseline_path` if given."""
+    """Score, compare and report; store the new baseline in `baseline_path` if given.
+
+    A regression keeps the old baseline, unless only quality measures dropped and `accept_drop`
+    says why: a security measure may never drop (constitution §16).
+    """
     scores = aggregate_scores(runs)
     comparisons = compare_with_baseline(compare_with, scores)
+    regressions = [c for c in comparisons if c.verdict is Verdict.REGRESSION]
+    accepted = bool(regressions) and accept_drop is not None and baseline_path is not None
+    accepted = accepted and all(c.kind is MetricKind.QUALITY for c in regressions)
     report = render_report(
         model_label=f"{services.llm_provider} {services.llm_model}",
         judge_model=JUDGE_MODEL,
         baseline=compare_with,
         comparisons=comparisons,
         runs=runs,
+        accepted_drop=accept_drop if accepted else None,
     )
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report, encoding="utf-8")
     print(report)
-    if any(comparison.verdict is Verdict.REGRESSION for comparison in comparisons):
+    if regressions and not accepted:
         return EXIT_REGRESSION
     if baseline_path is not None:
-        baseline = measured_baseline(scores, services.llm_provider, services.llm_model)
+        baseline = measured_baseline(
+            scores,
+            services.llm_provider,
+            services.llm_model,
+            accept_drop if accepted else None,
+        )
         save_baseline(baseline, baseline_path)
     return EXIT_OK
 
 
-def measured_baseline(scores: dict[str, MetricScore], provider: str, model: str) -> EvalBaseline:
+def measured_baseline(
+    scores: dict[str, MetricScore],
+    provider: str,
+    model: str,
+    accepted_drop: str | None = None,
+) -> EvalBaseline:
     inputs = behavior_inputs()
     return EvalBaseline(
         fingerprint=behavior_fingerprint(inputs),
@@ -163,6 +193,7 @@ def measured_baseline(scores: dict[str, MetricScore], provider: str, model: str)
             measured_at=datetime.now(UTC),
         ),
         metrics=scores,
+        accepted_drop=accepted_drop,
     )
 
 

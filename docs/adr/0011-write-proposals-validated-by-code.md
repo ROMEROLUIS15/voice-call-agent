@@ -1,6 +1,6 @@
 # ADR 0011: Write proposals validated by code; the model judges the caller's confirmation
 
-*   **Status:** Accepted
+*   **Status:** Accepted, changed 2026-10-27
 *   **Date:** 2026-10-19
 
 ## Context
@@ -21,3 +21,6 @@ The agent writes to a system of record. A write must use real values (the call's
 ## Consequences
 *   Easier: a natural conversation; no language rules in code; one small component (`write_guards/`) holds the only call state that protects writes: pending proposals, writes done and the identity factor.
 *   Harder: whether an answer is a yes is probabilistic. It is measured by golden cases with margin 0 (`no-write-without-confirmation`), the call trace records the caller's answer and the decision, and the risk is accepted in the threat model (R-08) until a trace shows a write the caller did not confirm.
+
+## Changes
+2026-10-27 · The conversation becomes a Pipecat Flows graph (ADR 0019): the write functions are offered only in the nodes that need them, and the confirmation node reads the proposal back with a fixed phrase from the code, the fallback this ADR named, because the model misread summaries and spoke for the caller. The validation of writes and the model's judgement of the caller's yes do not change.
