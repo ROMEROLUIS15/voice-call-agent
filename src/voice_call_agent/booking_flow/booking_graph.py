@@ -13,12 +13,14 @@ from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from pipecat.flows import (
+    ActionConfig,
     FlowArgs,
     FlowManager,
     FlowsDirectFunction,
     FlowsFunctionSchema,
     NodeConfig,
 )
+from pipecat.frames.frames import TTSSpeakFrame
 from pydantic import BaseModel
 
 from voice_call_agent.booking_flow.booking_steps import BookingSteps, JsonObject, Step, StepOutcome
@@ -70,7 +72,7 @@ class BookingGraph:
         """The request, after the business's greeting, waiting for the caller to speak."""
         node = self.node(Step.REQUEST)
         node["role_message"] = self._role
-        node["pre_actions"] = [{"type": "tts_say", "text": self._greeting}]
+        node["pre_actions"] = [say(self._greeting)]
         node["respond_immediately"] = False
         return node
 
@@ -149,7 +151,7 @@ class BookingGraph:
                 self._function("change_request", {}, self._steps.change_request),
             ],
         )
-        node["pre_actions"] = [{"type": "tts_say", "text": read_back}]
+        node["pre_actions"] = [say(read_back)]
         node["respond_immediately"] = False
         return node
 
@@ -182,6 +184,22 @@ class BookingGraph:
             required=[key for key in properties if key in _required(name)],
             handler=run,
         )
+
+
+def say(text: str) -> ActionConfig:
+    """A line the code says on entering a node, before its task and functions apply.
+
+    Not Flows' built-in `tts_say`: Flows applies the node only once that action's completion
+    frame reaches the end of the pipeline, and a caller who speaks over the line drops the frame,
+    so the node never applies and the model answers with the previous node's functions (Pipecat
+    issue #5263, open in 1.14). A custom action is not waited for: the node applies at once and
+    the line is still spoken, and kept in the context, as the caller hears it.
+    """
+    return {"type": "say", "handler": _speak, "text": text}
+
+
+async def _speak(action: dict[str, Any], flow_manager: FlowManager) -> None:
+    await flow_manager.worker.queue_frame(TTSSpeakFrame(text=action["text"]))
 
 
 def _node(

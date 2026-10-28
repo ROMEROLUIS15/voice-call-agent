@@ -35,6 +35,7 @@ Talk to the agent from a browser on your own machine, with no phone number (ADR 
 ```bash
 # in .env: ENVIRONMENT=development, BROWSER_PRACTICE_ENABLED=true, SCHEDULING_BACKEND=practice
 # and, to read each call back, CONVERSATION_TRANSCRIPTS_DIR=var/conversation_transcripts
+# and LOG_FILE_PATH=var/service.log
 uv run voice-call-agent      # then open http://localhost:8000/practice
 ```
 
@@ -57,6 +58,9 @@ With `CONVERSATION_TRANSCRIPTS_DIR` set, each call also leaves a text file named
 the prompt the model received, then what was said, with your turns as the speech-to-text heard
 them, the agent's lines as far as they were spoken and each tool call with its result. It keeps
 what you say, so the service refuses it outside development, and it never leaves the machine.
+With `LOG_FILE_PATH` set, the service also keeps its log in that file, at `DEBUG` by default:
+the flow's transitions and what the model received on each turn, for what a transcript cannot
+show. It is refused outside development too (ADR 0017).
 
 The language model goes through OpenRouter by default (`OPENROUTER_API_KEY`): the same
 `gpt-oss-120b`, served by Groq or, when Groq fails, by Cerebras, which also works from networks

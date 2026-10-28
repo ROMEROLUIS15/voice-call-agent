@@ -94,7 +94,8 @@ def _assert_the_kept_transcript_shows_what_was_said(
     assert transcript.system_prompt == record.system_prompt
     lines = transcript.lines
     if not record.agent_interrupted:  # An interrupted line keeps only what was spoken.
-        assert lines[0] == f"agent: {greeting}"
+        # The first node's task may come before it: the greeting enters the context as spoken.
+        assert next(line for line in lines if line.startswith("agent: ")) == f"agent: {greeting}"
     callers = [line for line in lines if line.startswith("caller: ")]
     assert callers == [f"caller: {turn.says}" for turn in case.turns]
     tools = [line.split()[2] for line in lines if line.startswith("agent called ")]

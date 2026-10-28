@@ -86,9 +86,13 @@ async def test_a_backend_that_does_not_answer_ends_in_not_booked() -> None:
     assert codes == ["SCHEDULING_BACKEND_UNAVAILABLE"]
 
 
-async def test_only_an_offered_start_can_be_chosen() -> None:
-    steps = _steps(await guarded_call())
+async def test_only_an_offered_start_can_be_chosen_once_the_caller_answers() -> None:
+    call = await guarded_call()
+    steps = _steps(call)
     await steps.check_availability(HAIRCUT)
+    early = await steps.select_start({"start": "11:00"})
+    assert (early.next_step, early.result["status"]) == (None, "waiting_for_the_choice")
+    call.caller_speaks()
     refused = await steps.select_start({"start": "03:00"})
     chosen = await steps.select_start({"start": "11:00"})
     assert (refused.next_step, refused.result["status"]) == (None, "not_offered")

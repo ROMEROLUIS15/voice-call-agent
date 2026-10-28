@@ -2,6 +2,7 @@ import json
 import logging
 import sys
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from loguru import logger
@@ -38,3 +39,17 @@ def test_records_below_the_level_are_dropped(capsys: pytest.CaptureFixture[str])
     configure_logging(LogSettings(level="WARNING", output_format=LogFormat.TEXT))
     logging.getLogger("aiortc").info("ice candidate")
     assert "ice candidate" not in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("restore_standard_logging")
+def test_the_development_log_file_keeps_its_own_level(tmp_path: Path) -> None:
+    path = tmp_path / "logs" / "service.log"
+    configure_logging(
+        LogSettings(
+            level="WARNING", output_format=LogFormat.TEXT, file_path=path, file_level="DEBUG"
+        )
+    )
+    logger.debug("node set")
+    logger.complete()  # The file is written from a background thread.
+    logger.remove()
+    assert "node set" in path.read_text(encoding="utf-8")

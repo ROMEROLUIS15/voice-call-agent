@@ -130,6 +130,10 @@ class BookingGuard:
         self._pending: dict[UUID, _Proposal] = {}
         self._confirmed: dict[UUID, str] = {}
 
+    def caller_turns(self) -> int:
+        """How many turns the caller has finished in this call."""
+        return self._caller_turns()
+
     async def propose(
         self, service_id: str, day: date, start: time, client_name: str
     ) -> Proposed | ProposalRefused:
