@@ -90,7 +90,7 @@ uv run --env-file .env --group evals python -m evals.model_evals --write-baselin
 
 The model evals need the key of the configured provider (`LLM_PROVIDER`, OpenRouter by default) and `OPENROUTER_API_KEY` for the judge (`google/gemini-3.6-flash` through OpenRouter). They exit with 0 (no regression), 1 (regression) or 2 (could not run: a missing key, or a provider that failed during the run, such as the model's rate limit or the judge's outage, since those conversations would measure the provider; nothing is scored or stored), write a Markdown report (`var/evals/report.md`) and print it. `--write-baseline` stores the scores only without a regression and only for the default model. `--record-fingerprint` records the inputs without measuring, allowed only while the baseline has never been measured.
 
-On a network that refuses the default provider (Groq refuses some VPN exits), the baseline is measured from a GitHub-hosted runner instead, on the pull request's branch, and committed in that pull request:
+On a network that refuses the default provider, the baseline is measured from a GitHub-hosted runner instead, on the pull request's branch, and committed in that pull request:
 
 ```bash
 gh workflow run evals.yml --ref <branch> -f write_baseline=true
