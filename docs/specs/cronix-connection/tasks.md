@@ -95,10 +95,12 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
       drop past times; the SQL `fn_get_available_slots`, which nothing called, is dropped. The
       phone endpoints will use the same resolver. Tried locally: 849 function tests, pgTAP
       164/164, type check clean.
-- [ ] **B5. The business's currency**, set by the owner with the hours, stored and returned with
-      the catalog.
-- [ ] **B6. The dialed number**: how a phone line's number reaches its business (a setting like
-      WhatsApp's `wa_phone_number_id`).
+- [ ] **B5. The business's currency**: `settings.currency` (ISO 4217), set by the owner in the
+      dashboard's settings next to the hours; USD when absent, as the reports already assume, so no
+      existing business changes until its owner chooses; returned with the catalog.
+- [ ] **B6. The dialed number**: a table of phone lines, each number unique and pointing at one
+      business, readable only by the service; lines are added with SQL when a number is bought, no
+      screen yet.
 - [ ] **B7. The v1 endpoints** of the contract, thin over the functions above, with the business
       always from `call_sid`: start of call, business, availability, booking, end of call.
 - [ ] **B8. Tests**: pgTAP for the functions and isolation between businesses, `deno test` for the
@@ -152,3 +154,7 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
   stays with Cronix's multi-employee work.
 - 2026-10-28 · What has to change in Cronix is tracked here, not in Cronix's own specs, unless the
   change is large.
+- 2026-10-28 · Currency in the business's settings, USD when absent (B5); phone lines in their own
+  table with a unique number (B6); the v1 endpoints serve the phone line only, WhatsApp's choice of
+  business by name waits for Meta's calling (B7); Cronix returns the business's name and the agent
+  builds the greeting with its own phrase, no recording for now (the contract changes, C1).
