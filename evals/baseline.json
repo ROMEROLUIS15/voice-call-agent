@@ -1,11 +1,12 @@
 {
-  "fingerprint": "f1886dd578d11c24",
+  "fingerprint": "d8bab16d6f07a7de",
   "inputs": {
-    "conversation_content": "es-0fe6f487f5df",
+    "conversation_content": "es-85b0cd07565f",
     "language_model": "openrouter openai/gpt-oss-120b",
     "generation_settings": "1388462588ef5679",
     "agent_tools": "042261634accf3d2",
-    "golden_dataset": "e9dcf6a56445",
+    "conversation_structure": "ba057dcb440ef041",
+    "golden_dataset": "2afa3df106b5",
     "practice_businesses": "82b2f17644d12abd",
     "scoring": "a3c57cf66a875caa",
     "judge_model": "google/gemini-3.6-flash"
@@ -15,7 +16,7 @@
     "llm_model": "openai/gpt-oss-120b",
     "judge_model": "google/gemini-3.6-flash",
     "repetitions": 3,
-    "measured_at": "2026-10-28T15:45:08.935197Z"
+    "measured_at": "2026-10-28T19:13:53.631180Z"
   },
   "metrics": {
     "admits-test-line": {
@@ -32,7 +33,7 @@
     },
     "brief-replies": {
       "kind": "quality",
-      "score": 0.9474
+      "score": 0.9298
     },
     "confirms-after-the-answer": {
       "kind": "quality",
@@ -44,7 +45,7 @@
     },
     "natural-spanish": {
       "kind": "quality",
-      "score": 0.9857
+      "score": 1.0
     },
     "no-unwanted-write": {
       "kind": "security",

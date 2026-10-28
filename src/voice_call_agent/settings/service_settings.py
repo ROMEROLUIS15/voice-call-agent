@@ -101,6 +101,8 @@ class ServiceSettings(BaseSettings):
     sentry_traces_sample_rate: float = 1.0
     log_level: str = "INFO"
     log_format: LogFormat = LogFormat.JSON
+    log_file_path: Path | None = None
+    log_file_level: str = "DEBUG"
 
     @model_validator(mode="after")
     def _check_groups(self) -> Self:
@@ -139,6 +141,11 @@ class ServiceSettings(BaseSettings):
             raise UnsafeSettingsError(
                 "CONVERSATION_TRANSCRIPTS_DIR needs ENVIRONMENT=development: transcripts keep "
                 "what callers say"
+            )
+        if self.log_file_path is not None and self.environment is DeploymentEnvironment.PRODUCTION:
+            raise UnsafeSettingsError(
+                "LOG_FILE_PATH needs ENVIRONMENT=development: Pipecat logs conversation content "
+                "at DEBUG"
             )
         if "*" in _comma_separated(self.cors_allowed_origins):
             raise UnsafeSettingsError("CORS_ALLOWED_ORIGINS must list explicit origins, never '*'")
@@ -244,7 +251,12 @@ class ServiceSettings(BaseSettings):
         )
 
     def logging_output(self) -> LogSettings:
-        return LogSettings(level=self.log_level, output_format=self.log_format)
+        return LogSettings(
+            level=self.log_level,
+            output_format=self.log_format,
+            file_path=self.log_file_path,
+            file_level=self.log_file_level,
+        )
 
     def _llm_api_key(self) -> SecretStr | None:
         keys = {

@@ -78,6 +78,8 @@ class TimeChoice:
     day: date
     starts: list[time]
     taken: time | None
+    offered_at_turn: int
+    """The caller's turns when the starts were offered: a start is chosen only after another."""
 
 
 class BookingSteps:
@@ -117,6 +119,9 @@ class BookingSteps:
             return call
         if self.choice is None or call.start not in self.choice.starts:
             return StepOutcome({"status": "not_offered"}, None)
+        if self._guard.caller_turns() <= self.choice.offered_at_turn:
+            # The model picked a time the caller has not chosen yet: the caller chooses it.
+            return StepOutcome({"status": "waiting_for_the_choice"}, None)
         self.slot = Slot(self.choice.service, self.choice.day, call.start)
         return StepOutcome({"status": "selected", "start": clock_time(call.start)}, Step.NAME)
 
@@ -155,7 +160,9 @@ class BookingSteps:
             self.slot = Slot(service, call.day, call.start)
             status = {"status": "available", **day, "start": clock_time(call.start)}
             return StepOutcome(status, Step.NAME)
-        self.choice = TimeChoice(service, call.day, result.slots, call.start)
+        self.choice = TimeChoice(
+            service, call.day, result.slots, call.start, self._guard.caller_turns()
+        )
         starts = [clock_time(start) for start in result.slots]
         return StepOutcome(
             {"status": "choose_time", **day, "free_starts": starts}, Step.CHOOSE_TIME
@@ -167,7 +174,13 @@ class BookingSteps:
             self.proposal = result
             return StepOutcome({"status": "proposed"}, Step.CONFIRM)
         if result.reason is ProposalRefusal.SLOT_NOT_OFFERED and result.available_starts:
-            self.choice = TimeChoice(slot.service, slot.day, result.available_starts, slot.start)
+            self.choice = TimeChoice(
+                slot.service,
+                slot.day,
+                result.available_starts,
+                slot.start,
+                self._guard.caller_turns(),
+            )
             return StepOutcome({"status": "slot_taken"}, Step.CHOOSE_TIME)
         return StepOutcome({"status": result.reason.value}, Step.REQUEST)
 

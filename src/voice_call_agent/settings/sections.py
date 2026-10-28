@@ -110,10 +110,13 @@ class LogFormat(StrEnum):
 
 
 class LogSettings(_Section):
-    """Log level and format."""
+    """Log level and format, and the development log file if any."""
 
     level: str
     output_format: LogFormat
+    file_path: Path | None = None
+    """Development only: a copy of the log at `file_level`, which may hold conversation content."""
+    file_level: str = "DEBUG"
 
 
 class DeploymentEnvironment(StrEnum):

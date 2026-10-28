@@ -55,9 +55,13 @@ async def assemble_speech_pipeline(
     language_model = factories.create_language_model(system_prompt)
     # Turn detection is the STT's (Flux applies its own strategies). The local VAD only emits
     # the "user stopped speaking" frame each turn's latency is measured from.
+    # Each node of a flow changes the functions the model may call; Pipecat then tells the model
+    # which were added or removed, so it does not answer as if a missing one had run, and the
+    # transcript shows what it was offered at each step.
     aggregators = LLMContextAggregatorPair(
         context if context is not None else LLMContext(),
         user_params=LLMUserAggregatorParams(vad_analyzer=vad),
+        add_tool_change_messages=True,
     )
     pipeline = Pipeline(
         [

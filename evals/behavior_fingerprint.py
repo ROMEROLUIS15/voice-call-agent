@@ -2,7 +2,8 @@
 
 The baseline records the inputs it was measured with; `tests/evals/test_behavior_fingerprint.py`
 fails when they change, so no change to the prompt, the phrases, the model, its generation
-settings, the dataset, the businesses it runs against or the metrics lands without new evals
+settings, the conversation's structure (the flow's nodes and the pipeline's context handling),
+the dataset, the businesses it runs against or the metrics lands without new evals
 (constitution §16). Only what the
 model evals exercise counts: they run with scripted speech, so the speech-to-text model and the
 voice are left out (ADR 0013).
@@ -26,6 +27,14 @@ from voice_call_agent.settings.sections import LanguageModelProvider, LanguageMo
 from voice_call_agent.settings.service_settings import ServiceSettings
 
 _EVALS_DIR = Path(__file__).parent
+_PACKAGE_DIR = Path(__file__).parent.parent / "src" / "voice_call_agent"
+_STRUCTURE_SOURCES = (
+    "booking_flow/booking_graph.py",
+    "booking_flow/booking_steps.py",
+    "speech_pipeline/pipeline_assembly.py",
+)
+"""What the model is offered at each step and what it gets back: the flow's nodes, their
+functions and results, and how the pipeline keeps the context."""
 _SCORING_SOURCES = (
     "quality_criteria.py",
     "task_metrics.py",
@@ -79,6 +88,9 @@ def behavior_inputs() -> dict[str, str]:
         "language_model": f"{configuration['llm_provider']} {configuration['model']}",
         "generation_settings": _digest(configuration),
         "agent_tools": _digest({name: json.dumps(tool) for name, tool in agent_tools().items()}),
+        "conversation_structure": _digest(
+            {name: _normalized(_PACKAGE_DIR / name) for name in _STRUCTURE_SOURCES}
+        ),
         "golden_dataset": golden_dataset_version(),
         # The booking prompt the model receives is built from these businesses.
         "practice_businesses": _digest({"catalog": _practice_catalog_the_model_sees()}),
