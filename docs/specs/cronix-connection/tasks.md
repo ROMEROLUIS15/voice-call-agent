@@ -21,8 +21,12 @@ Read from the Cronix repository on 2026-10-28; each fact names where it lives th
   the browser's time zone instead (`voice-worker/index.ts`).
 - **Services**: `services` with `duration_min`, `price` (a number) and `is_active`. **No currency
   anywhere**: the reports format prices as USD (`lib/utils/report-pdf-generator.ts`).
-- **One calendar per business**: any appointment of the business blocks the time, whoever it is
-  assigned to (`appointments.assigned_user_id` is not used for availability).
+- **Overlaps depend on the channel.** WhatsApp's functions check the whole business; the
+  dashboard's voice agent checks only the assigned staff member when there is one; in the
+  dashboard the owner may confirm an overlap (`appointments.is_dual_booking`). Production holds
+  thousands of legitimate overlaps between staff members, so a database rule per business is not
+  possible; a rule per staff member waits for Cronix's multi-employee work, with the meaning of
+  `is_dual_booking` and of appointments without staff decided there (`modulo-voice-agent`).
 - **Free starts** every 30 minutes, where the service ends by closing and overlaps no appointment.
   Three implementations, which differ:
 
@@ -38,8 +42,9 @@ Read from the Cronix repository on 2026-10-28; each fact names where it lives th
   digits, replaced when a name arrives), checks the overlap, then inserts the appointment as
   `confirmed` with a note naming WhatsApp. A conflict comes back as free text (`Slot no
   disponible.`); an unknown service as `SERVICE_NOT_FOUND`.
-- **The overlap check is not atomic**: it reads, then inserts, with no lock, exclusion constraint
-  or unique index on appointments. Two bookings at the same moment can both succeed.
+- **The overlap check was not atomic**: it read, then inserted, with no lock, exclusion
+  constraint or unique index on appointments, so two bookings at the same moment could both
+  succeed (B3 closes it for the booking functions).
 - **Business by phone**: `fn_get_business_by_phone` matches `businesses.phone_digits` (the
   business's own number) or `settings.wa_phone_number_id`. A phone line's dialed number is neither
   today.
@@ -55,8 +60,8 @@ Read from the Cronix repository on 2026-10-28; each fact names where it lives th
 The practice schedule copies Cronix's rules, so what is tried in practice is what Cronix does.
 
 - [ ] **A1. The practice schedule follows Cronix**: starts every 30 minutes, the service ending
-      by closing, one calendar per business, hours as `[open, close]` per weekday, past times
-      dropped.
+      by closing, overlaps checked for the whole business as WhatsApp's booking does, hours as
+      `[open, close]` per weekday, past times dropped.
 - [ ] **A2. Free times by ranges.** Consecutive starts form a range that ends when the service
       would end after its last start; when few starts are left, they are said one by one (how few
       is decided here). The time-choice task offers the ranges nearest to what the caller asked
@@ -77,9 +82,13 @@ in Cronix first.
       production project.
 - [ ] **B2. The spec in Cronix**: a module for the phone endpoints, with the contract's
       invariants, errors and isolation, read against `modulo-whatsapp-citas` and `modulo-citas-core`.
-- [ ] **B3. Bookings that cannot overlap**: the database refuses two overlapping appointments of a
-      business (an exclusion constraint or a lock per business), for every channel; the conflict
-      answered as a code, not free text. A safety fix that does not wait for the phone line.
+- [ ] **B3. Bookings that cannot overlap at the same moment** (Cronix pull request #29):
+      `fn_book_appointment_wa` and `fn_reschedule_appointment_wa` take a lock per business before
+      their overlap check, so a second booking of the same time waits and sees the first; the
+      booking answers `SLOT_CONFLICT`, as the reschedule did. Tried in the local Cronix: pgTAP
+      164/164, and two connections booking one time at once left one appointment, the second
+      answered `SLOT_CONFLICT` after waiting 2.35 s. Ticked when merged and deployed (migration
+      first, then the Edge Functions). The phone endpoints book through the same function.
 - [ ] **B4. One computation of free starts**, the one the booking also applies (statuses, past
       times, opening hours, hours never set), used by WhatsApp, the dashboard's agent and the phone
       endpoints.
@@ -129,3 +138,9 @@ in Cronix first.
   one the model assumes (B5, C4).
 - 2026-10-28 · Cronix's data and rules are the source of truth; the agent adopts them and is tried
   against a local Cronix, never production.
+- 2026-10-28 · Simultaneous bookings are closed with a lock per business in Cronix's booking
+  functions (B3), not with a database rule: it changes no rule of what overlaps, touches no
+  existing appointment and leaves the owner's confirmed overlaps alone. The rule per staff member
+  stays with Cronix's multi-employee work.
+- 2026-10-28 · What has to change in Cronix is tracked here, not in Cronix's own specs, unless the
+  change is large.
