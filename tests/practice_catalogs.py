@@ -28,7 +28,6 @@ TWO_BUSINESSES = PracticeCatalog.model_validate(
                 "name": "Barbería Uno",
                 "timezone": "America/Caracas",
                 "greeting": "Hola, Barbería Uno.",
-                "slot_minutes": 30,
                 "services": [
                     {"id": "haircut", "name": "Corte", "duration_min": 30, "price": "8.00"},
                     {"id": "full", "name": "Corte y barba", "duration_min": 60, "price": None},
@@ -40,7 +39,6 @@ TWO_BUSINESSES = PracticeCatalog.model_validate(
                 "name": "Spa Dos",
                 "timezone": "America/Caracas",
                 "greeting": "Hola, Spa Dos.",
-                "slot_minutes": 60,
                 "dialed_numbers": [SPA_NUMBER],
                 "services": [
                     {"id": "massage", "name": "Masaje", "duration_min": 60, "price": None}

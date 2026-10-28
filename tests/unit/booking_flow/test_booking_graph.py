@@ -24,6 +24,7 @@ def _graph(call: GuardedCall) -> tuple[BookingGraph, BookingSteps]:
         backend=call.backend,
         guard=call.guard,
         content=CONTENT,
+        weekly_hours=TWO_BUSINESSES.business("barbershop").weekly_hours,
     )
     return BookingGraph(steps=steps, content=CONTENT, role=ROLE, greeting=GREETING), steps
 
@@ -63,7 +64,7 @@ async def test_the_call_starts_with_the_greeting_and_waits_for_the_caller() -> N
     assert "enum" not in check.properties["service_id"]
 
 
-async def test_choosing_a_time_offers_only_the_free_starts() -> None:
+async def test_choosing_a_time_says_the_free_starts_as_ranges() -> None:
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]
     _, node = await _run(check, service_id="haircut", day=TUESDAY.isoformat())
@@ -72,7 +73,9 @@ async def test_choosing_a_time_offers_only_the_free_starts() -> None:
     assert set(functions) == {"select_start", "check_availability"}
     assert "enum" not in functions["select_start"].properties["start"]
     [task] = node.get("task_messages", [])
-    assert "las once de la mañana (11:00)" in str(task["content"])
+    content = str(task["content"])
+    assert "(09:00 a 17:30), con inicio cada 30 minutos." in content
+    assert "las once de la mañana" not in content  # Ranges, not every start.
 
 
 async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> None:

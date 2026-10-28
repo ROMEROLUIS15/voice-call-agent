@@ -54,6 +54,7 @@ def plan_call(
         backend=backend,
         guard=guard,
         content=content,
+        weekly_hours=business.weekly_hours,
     )
     role = booking_prompt(content, business, today_in(business.timezone))
     return CallPlan(
