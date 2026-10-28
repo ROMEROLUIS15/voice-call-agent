@@ -65,7 +65,7 @@ No task is finished without updating the manifest if a contract, invariant or fl
 *   **Cronix's WhatsApp number is shared by every business** (routing by `#slug`, session or the client's phone). A call has no slug: if the business cannot be resolved, the agent asks for it.
 *   **The phone line has one number per business:** the dialed number identifies the business before the greeting. Neither Twilio nor Telnyx sells Venezuelan numbers (verified 2026-10-23); a business may keep its published number by forwarding it, once Venezuelan carriers confirm it works (manifest §10).
 *   **Identity:** Meta verifies the number on WhatsApp; the phone line's caller ID can be spoofed → reading appointments, rescheduling or cancelling over Twilio requires a second factor, and the caller is greeted by name only on WhatsApp.
-*   **Cronix's booking logic** creates the client if missing and checks conflicts atomically, but reports a conflict as free text; the contract's endpoint translates it to `SLOT_CONFLICT`.
+*   **Cronix's booking logic** finds or creates the client by phone and checks for an overlapping appointment, but not atomically (it reads, then inserts, with no lock nor constraint: two bookings at once can both succeed), and reports a conflict as free text; making it atomic and answering `SLOT_CONFLICT` is part of connecting to Cronix (`docs/specs/cronix-connection/tasks.md`).
 *   **Supabase Edge Functions** do not work for the call in progress (duration limit, no persistent connection). They do work for the contract's short endpoints.
 *   **Typical cascaded latency:** 600–1,200 ms to first audio; the project's target is ≤ 1.0 s p50.
 
