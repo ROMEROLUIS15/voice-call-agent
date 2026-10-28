@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from tests.app_builder import AppUnderTest
 from tests.browser_peer import browser_offer, reported_error_codes
+from tests.practice_catalogs import SPA_LINE, schedule
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
 
 PRACTICE = {"environment": "development", "browser_practice_enabled": True}
@@ -61,8 +62,9 @@ async def test_an_offer_without_audio_is_refused_and_frees_its_slot() -> None:
         {"type": "offer"},
         {"sdp": "m=audio " + "x" * 40_000, "type": "offer"},
         {"sdp": "m=audio 9 UDP/TLS/RTP/SAVPF 111", "type": "offer", "pc_id": "reuse-me"},
+        {"sdp": "m=audio 9 UDP/TLS/RTP/SAVPF 111", "type": "offer", "dialed_number": "+1" * 9},
     ],
-    ids=["not-an-offer", "no-sdp", "oversized-sdp", "unknown-field"],
+    ids=["not-an-offer", "no-sdp", "oversized-sdp", "unknown-field", "oversized-number"],
 )
 async def test_a_malformed_offer_is_refused_without_details(body: dict[str, str]) -> None:
     app_under_test = AppUnderTest()
@@ -94,3 +96,26 @@ async def test_offers_are_rate_limited() -> None:
     async with _local_client(app_under_test, webhook_rate_limit="2/minute") as client:
         statuses = [(await client.post("/practice/offer", json=body)).status_code for _ in range(3)]
     assert statuses == [400, 400, 429]
+
+
+@pytest.mark.parametrize(
+    "dialed_number",
+    ["+582120000001", "+58212000000", "../practice-spa", ""],
+    ids=["another-business-number", "a-prefix-of-a-line", "not-a-number", "empty"],
+)
+async def test_a_number_that_is_not_a_practice_line_is_refused(dialed_number: str) -> None:
+    # The page dials only the lines it lists: no number reaches a business it does not offer.
+    app_under_test = AppUnderTest(business_resolver=schedule(), practice_lines=(SPA_LINE,))
+    browser, offer = await browser_offer()
+    try:
+        with reported_error_codes() as codes:
+            async with _local_client(app_under_test) as client:
+                response = await client.post(
+                    "/practice/offer", json=offer | {"dialed_number": dialed_number}
+                )
+    finally:
+        await browser.close()
+    assert response.status_code == 400
+    assert codes == ["REQUEST_INVALID"]
+    assert app_under_test.runner.calls == []
+    assert app_under_test.supervisor.active_calls == 0

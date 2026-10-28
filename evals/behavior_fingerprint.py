@@ -80,7 +80,7 @@ def behavior_inputs() -> dict[str, str]:
         "agent_tools": _digest({name: json.dumps(tool) for name, tool in agent_tools().items()}),
         "golden_dataset": golden_dataset_version(),
         # The booking prompt the model receives is built from these businesses.
-        "practice_businesses": _digest({"catalog": load_practice_catalog().model_dump_json()}),
+        "practice_businesses": _digest({"catalog": _practice_catalog_the_model_sees()}),
         "scoring": _digest({name: _normalized(_EVALS_DIR / name) for name in _SCORING_SOURCES}),
         "judge_model": JUDGE_MODEL,
     }
@@ -88,6 +88,16 @@ def behavior_inputs() -> dict[str, str]:
 
 def behavior_fingerprint(inputs: dict[str, str]) -> str:
     return _digest(inputs)
+
+
+def _practice_catalog_the_model_sees() -> str:
+    """The practice businesses without the numbers that reach them: a number decides which
+    business a call reaches, never what its model is told or does."""
+    catalog = load_practice_catalog()
+    unnumbered = tuple(
+        business.model_copy(update={"dialed_numbers": ()}) for business in catalog.businesses
+    )
+    return catalog.model_copy(update={"businesses": unnumbered}).model_dump_json()
 
 
 def _normalized(path: Path) -> str:

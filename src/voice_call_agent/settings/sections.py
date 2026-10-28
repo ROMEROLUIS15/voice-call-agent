@@ -94,6 +94,12 @@ class CallTraceLogSettings(_Section):
     path: Path
 
 
+class ConversationTranscriptSettings(_Section):
+    """Where each call leaves what was said: development only (ADR 0017)."""
+
+    directory: Path
+
+
 class LogFormat(StrEnum):
     """Log output format."""
 

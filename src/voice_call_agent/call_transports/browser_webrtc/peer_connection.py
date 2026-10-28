@@ -23,6 +23,8 @@ class BrowserOffer(BaseModel):
 
     sdp: str = Field(min_length=1, max_length=32_768)
     type: Literal["offer"]
+    dialed_number: str | None = Field(default=None, max_length=16)
+    """One of the practice lines (`GET /practice/lines`); without it the backend decides."""
 
 
 class BrowserAnswer(BaseModel):

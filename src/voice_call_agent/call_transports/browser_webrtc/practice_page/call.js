@@ -4,6 +4,7 @@
 // answer once every ICE candidate is gathered (no trickle ICE).
 
 const OFFER_PATH = "/practice/offer";
+const LINES_PATH = "/practice/lines";
 const KEEP_ALIVE_INTERVAL_MS = 1000;
 
 let peer = null;
@@ -17,6 +18,27 @@ function showStatus(text) {
 function showCallControls(inCall) {
   document.getElementById("start-call").disabled = inCall;
   document.getElementById("hang-up").disabled = !inCall;
+  document.getElementById("practice-line").disabled = inCall;
+}
+
+// Each practice line reaches one business, as a phone line's dialed number does. Without lines
+// (no practice schedule), the call dials none and the backend decides.
+async function showPracticeLines() {
+  const response = await fetch(LINES_PATH);
+  if (!response.ok) {
+    throw new Error(`the service did not list its lines (HTTP ${response.status})`);
+  }
+  const lines = await response.json();
+  const choice = document.getElementById("practice-line");
+  for (const line of lines) {
+    choice.append(new Option(`${line.business_name} (${line.number})`, line.number));
+  }
+  document.getElementById("line-choice").hidden = lines.length === 0;
+}
+
+function dialedNumber() {
+  const choice = document.getElementById("practice-line");
+  return choice.value === "" ? null : choice.value;
 }
 
 function iceGatheringComplete(connection) {
@@ -69,7 +91,7 @@ async function startCall() {
   const response = await fetch(OFFER_PATH, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sdp: offer.sdp, type: offer.type }),
+    body: JSON.stringify({ sdp: offer.sdp, type: offer.type, dialed_number: dialedNumber() }),
   });
   if (!response.ok) {
     throw new Error(`the service refused the call (HTTP ${response.status})`);
@@ -97,3 +119,4 @@ document.getElementById("start-call").addEventListener("click", () => {
 });
 document.getElementById("hang-up").addEventListener("click", () => hangUp("Call ended."));
 window.addEventListener("pagehide", () => hangUp("Call ended."));
+showPracticeLines().catch((error) => showStatus(`Could not list the lines: ${error.message}`));
