@@ -1,0 +1,32 @@
+id: morning-asked-without-a-time-at-a-barbershop
+title: The caller asks for the morning without a time; the agent says what is free in the morning and books the start the caller chooses
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Hola, quiero un corte de cabello para mañana en la mañana, a nombre de Pedro Ejemplo.
+  - says: A las diez.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "10:00"
+    name: Pedro Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: haircut
+      day: "2026-10-27"
+      start: "10:00"
+      client_name: Pedro Ejemplo
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, free-times, any-business]

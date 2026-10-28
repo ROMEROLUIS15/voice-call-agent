@@ -25,6 +25,7 @@ def _steps(call: GuardedCall, backend: SchedulingBackend | None = None) -> Booki
         backend=backend or call.backend,
         guard=call.guard,
         content=CONTENT,
+        weekly_hours=TWO_BUSINESSES.business("barbershop").weekly_hours,
     )
 
 

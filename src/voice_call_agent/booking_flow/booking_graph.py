@@ -23,11 +23,23 @@ from pipecat.flows import (
 from pipecat.frames.frames import TTSSpeakFrame
 from pydantic import BaseModel
 
-from voice_call_agent.booking_flow.booking_steps import BookingSteps, JsonObject, Step, StepOutcome
+from voice_call_agent.booking_flow.booking_steps import (
+    BookingSteps,
+    JsonObject,
+    Step,
+    StepOutcome,
+    TimeChoice,
+)
 from voice_call_agent.booking_flow.flow_arguments import (
     CheckAvailabilityArguments,
     ProposeBookingArguments,
     SelectStartArguments,
+)
+from voice_call_agent.booking_flow.free_ranges import (
+    Unavailable,
+    free_ranges,
+    start_interval,
+    why_unavailable,
 )
 from voice_call_agent.conversation_content.content_loader import BookingTasks, ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import (
@@ -98,24 +110,59 @@ class BookingGraph:
         choice = self._steps.choice
         if choice is None:  # Only reached after check_availability set it.
             return self._request()
-        words, choices = self._content, self._content.booking_flow.choices
-        free_times = ", ".join(
-            choices.free_time.format(spoken=spoken_time(words, start), clock=clock_time(start))
-            for start in choice.starts
-        )
-        requested = ""
-        if choice.taken is not None:
-            requested = choices.requested_taken.format(time=spoken_time(words, choice.taken))
         task = self._tasks.choose_time.format(
             service_name=choice.service.name,
-            day=spoken_day(words, choice.day),
-            free_times=free_times,
-            requested=requested,
+            day=spoken_day(self._content, choice.day),
+            free_times=self._free_times(choice),
+            requested=self._why_not_requested(choice),
         )
         select = self._function(
             "select_start", _properties(SelectStartArguments), self._steps.select_start
         )
         return _node(Step.CHOOSE_TIME, task, [select, self._check_availability()])
+
+    def _free_times(self, choice: TimeChoice) -> str:
+        """The free starts as ranges, said aloud and as the function takes them."""
+        words, choices = self._content, self._content.booking_flow.choices
+        said = [
+            choices.free_time.format(spoken=spoken_time(words, r.first), clock=clock_time(r.first))
+            if r.first == r.last
+            else choices.free_range.format(
+                first=spoken_time(words, r.first),
+                first_clock=clock_time(r.first),
+                last=spoken_time(words, r.last),
+                last_clock=clock_time(r.last),
+            )
+            for r in free_ranges(choice.starts)
+        ]
+        interval = start_interval(choice.starts)
+        every = "" if interval is None else choices.interval.format(minutes=interval)
+        return "; ".join(said) + every
+
+    def _why_not_requested(self, choice: TimeChoice) -> str:
+        """Why the time the caller asked for is not offered, or nothing if none was asked."""
+        if choice.taken is None:
+            return ""
+        reason = Unavailable.TAKEN
+        if choice.hours is not None:
+            reason = why_unavailable(
+                choice.taken, choice.starts, choice.service.duration_min, choice.hours
+            )
+        hours, words = choice.hours, self._content
+        texts = self._content.booking_flow.choices.requested
+        by_reason = {
+            Unavailable.OUTSIDE_HOURS: texts.outside_hours,
+            Unavailable.OFF_INTERVAL: texts.off_interval,
+            Unavailable.DOES_NOT_FIT: texts.does_not_fit,
+            Unavailable.TAKEN: texts.taken,
+        }
+        return by_reason[reason].format(
+            time=spoken_time(words, choice.taken),
+            duration=choice.service.duration_min,
+            opens=spoken_time(words, hours.opens) if hours else "",
+            closes=spoken_time(words, hours.closes) if hours else "",
+            interval=start_interval(choice.starts) or "",
+        )
 
     def _name(self) -> NodeConfig:
         slot = self._steps.slot

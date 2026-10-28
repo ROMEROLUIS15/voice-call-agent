@@ -73,12 +73,12 @@ async def _shipped_availability(business_id: str, service_id: str, day: date) ->
     return await backend.availability("shipped-business", service_id, day)
 
 
-async def test_each_shipped_business_offers_its_own_slots_and_days() -> None:
+async def test_each_shipped_business_offers_starts_every_30_minutes_and_its_days() -> None:
     tuesday, sunday = date(2026, 10, 27), date(2026, 11, 1)
     cleaning = await _shipped_availability("practice-dental-clinic", "dental-cleaning", tuesday)
     assert isinstance(cleaning, AvailableSlots)
-    assert cleaning.slots[:3] == [time(8, 0), time(8, 15), time(8, 30)]  # 15-minute slots.
-    assert cleaning.slots[-1] == time(15, 15)  # 45 minutes before closing at 16:00.
+    assert cleaning.slots[:3] == [time(8, 0), time(8, 30), time(9, 0)]
+    assert cleaning.slots[-1] == time(15, 0)  # 45 minutes end by 16:00; 15:30 would not.
     assert await _shipped_availability("practice-spa", "manicure", MONDAY) == ClosedDay()
     facial = await _shipped_availability("practice-spa", "facial-cleansing", sunday)
     assert isinstance(facial, AvailableSlots)
