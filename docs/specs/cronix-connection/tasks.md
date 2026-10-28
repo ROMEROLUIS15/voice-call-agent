@@ -76,24 +76,25 @@ The practice schedule copies Cronix's rules, so what is tried in practice is wha
 
 ## Stage B: the contract's endpoints in Cronix (Cronix repository)
 
-Through Cronix's SDD gate: the phone endpoints are an area without a spec, declared and specified
-in Cronix first.
+What changes in Cronix is tracked here, not in Cronix's own specs, unless the change is large.
 
-- [ ] **B1. A local Cronix**: Docker, `npx supabase db reset`, and a seed of invented businesses
-      (services of several durations, hours with a closed day, booked appointments). Never the
-      production project.
-- [ ] **B2. The spec in Cronix**: a module for the phone endpoints, with the contract's
-      invariants, errors and isolation, read against `modulo-whatsapp-citas` and `modulo-citas-core`.
-- [ ] **B3. Bookings that cannot overlap at the same moment** (Cronix pull request #29):
+- [ ] **B1. A local Cronix**: Docker and the local Supabase stack (`npx supabase start`; pending
+      migrations with `npx supabase migration up --local`, never a reset of the local data), and a
+      seed of invented businesses (services of several durations, hours with a closed day, booked
+      appointments). Never the production project. The stack runs; the seed is pending.
+- [x] **B3. Bookings that cannot overlap at the same moment** (Cronix pull request #29, merged):
       `fn_book_appointment_wa` and `fn_reschedule_appointment_wa` take a lock per business before
       their overlap check, so a second booking of the same time waits and sees the first; the
       booking answers `SLOT_CONFLICT`, as the reschedule did. Tried in the local Cronix: pgTAP
       164/164, and two connections booking one time at once left one appointment, the second
-      answered `SLOT_CONFLICT` after waiting 2.35 s. Ticked when merged and deployed (migration
-      first, then the Edge Functions). The phone endpoints book through the same function.
-- [ ] **B4. One computation of free starts**, the one the booking also applies (statuses, past
-      times, opening hours, hours never set), used by WhatsApp, the dashboard's agent and the phone
-      endpoints.
+      answered `SLOT_CONFLICT` after waiting 2.35 s. Deployed by the maintainer: the migration
+      first, then the Edge Functions. The phone endpoints book through the same function.
+- [ ] **B4. One computation of free starts** (Cronix pull request #30): WhatsApp's resolver
+      moves to `supabase/functions/_shared/availability.ts` and the dashboard's agent uses it, so
+      both count every appointment but `cancelled` and `no_show` as taken, as the booking does, and
+      drop past times; the SQL `fn_get_available_slots`, which nothing called, is dropped. The
+      phone endpoints will use the same resolver. Tried locally: 849 function tests, pgTAP
+      164/164, type check clean.
 - [ ] **B5. The business's currency**, set by the owner with the hours, stored and returned with
       the catalog.
 - [ ] **B6. The dialed number**: how a phone line's number reaches its business (a setting like
@@ -137,7 +138,7 @@ in Cronix first.
   calls.
 
 - A break in a business's hours (closed at midday): not in Cronix today. Adding it is a Cronix
-  change that B4's computation would follow; decided before B4.
+  change in the shared resolver (B4); not part of this connection unless decided.
 
 ## Decisions
 
