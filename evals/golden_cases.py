@@ -38,6 +38,8 @@ class CaseSource(StrEnum):
     HAND_WRITTEN = "hand-written"
     PRODUCTION_FAILURE = "production-failure"
     """Added when a failure seen in production was fixed (constitution §16)."""
+    PRACTICE_FAILURE = "practice-failure"
+    """Added when a failure heard in a practice call was fixed, from its transcript (ADR 0017)."""
 
 
 class ScheduleCondition(StrEnum):

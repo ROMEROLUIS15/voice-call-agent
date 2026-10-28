@@ -1,8 +1,12 @@
-"""The service's model through OpenRouter, served by Groq or, when Groq fails, by Cerebras.
+"""The service's model through OpenRouter, served by Together or, when Together fails, by Venice.
 
-OpenRouter routes each request to Groq first and, on a rate limit or failure, to Cerebras: the
-same model on both, with every parameter the service sends, and only through providers that do
-not collect the data (manifest §10, §11). Which one answered goes to the call trace.
+OpenRouter routes each request to Together first and, on a rate limit or failure, to Venice: the
+two fastest providers of the model when it was chosen (ADR 0020), with every parameter the service
+sends, and neither may collect the data (manifest §10, §11). Which one answered goes to the call
+trace.
+
+Another model (`LLM_MODEL`, to measure candidates) goes to any provider that serves it with every
+parameter sent and does not collect the data.
 """
 
 from collections.abc import AsyncIterator, Callable, Mapping
@@ -23,17 +27,23 @@ from voice_call_agent.adapters.language_model_providers.openai_compatible_timeou
 from voice_call_agent.observability.upstream_attribution import report_llm_upstream
 from voice_call_agent.settings.sections import LanguageModelSettings
 
-DEFAULT_MODEL = "openai/gpt-oss-120b"
-"""OpenRouter's id for the model the service uses (manifest §7)."""
-GROQ_THEN_CEREBRAS = OpenRouterProviderPreferences(
-    order=["groq", "cerebras"],
-    only=["groq", "cerebras"],
+DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"
+"""OpenRouter's id for the model the service uses (manifest §7, ADR 0020)."""
+TOGETHER_THEN_VENICE = OpenRouterProviderPreferences(
+    order=["together", "venice"],
+    only=["together", "venice"],
     allow_fallbacks=False,
     require_parameters=True,
     data_collection="deny",
 )
-"""Groq first, Cerebras when Groq fails, never another provider: both serve the same model with
-tools and reasoning effort, and neither may collect the call's data."""
+"""Together first, Venice when Together fails, never another provider: both serve the model with
+tools and reasoning effort at the same price, and neither may collect the call's data."""
+ANY_PROVIDER_WITHOUT_DATA_COLLECTION = OpenRouterProviderPreferences(
+    require_parameters=True, data_collection="deny"
+)
+LOW_REASONING = {"extra_body": {"reasoning": {"effort": "low"}}}
+"""The same low reasoning effort as on Groq directly (manifest §7), in OpenRouter's own request
+field: the model answers quickly enough for a call."""
 
 
 class TimeBoundOpenRouterLLMService(OpenRouterLLMService):
@@ -96,17 +106,16 @@ class _UpstreamReportingStream:
 
 def openrouter_model_factory(settings: LanguageModelSettings) -> Callable[[str], AIService]:
     api_key = settings.api_key.get_secret_value()
+    model = settings.model or DEFAULT_MODEL
+    routing = (
+        TOGETHER_THEN_VENICE if model == DEFAULT_MODEL else ANY_PROVIDER_WITHOUT_DATA_COLLECTION
+    )
 
     def create(system_prompt: str) -> AIService:
         model_settings = OpenRouterLLMSettings(
-            system_instruction=system_prompt,
-            model=settings.model or DEFAULT_MODEL,
-            provider=GROQ_THEN_CEREBRAS,
+            system_instruction=system_prompt, model=model, provider=routing
         )
-        if not settings.model:
-            # The same low reasoning effort as on Groq directly (manifest §7), in OpenRouter's
-            # own request field.
-            model_settings.extra = {"extra_body": {"reasoning": {"effort": "low"}}}
+        model_settings.extra = LOW_REASONING
         return TimeBoundOpenRouterLLMService(
             api_key=api_key,
             settings=model_settings,

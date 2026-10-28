@@ -14,7 +14,7 @@ One YAML file per case in `evals/golden_dataset/`, named after its `id`. The YAM
 ```yaml
 id: booking-request-on-the-test-line        # kebab-case, equal to the file name
 title: The caller asks to book while the line is in testing; nothing is confirmed
-source: hand-written                         # hand-written | production-failure
+source: hand-written                         # hand-written | production-failure | practice-failure
 phase: 0                                     # manifest §9: the phase that makes it runnable
 status: active                               # active | pending (pending_reason required)
 levels: [model]                              # conversation and/or model
@@ -42,9 +42,9 @@ tags: [booking, test-line, hallucination]    # invariants (inv-N) and acceptance
 
 ## What each level checks
 
-*   **Conversation level** (`evals/conversation_checks.py`): the agent greets first with the fixed greeting; it answers each turn; it stops talking when the caller barges in; the language model receives the system prompt and every caller turn in order; the call trace has the case's channel, identity and outcome, one measured latency per turn, the greeting latency, the prompt version, the expected write decisions and only the real failures the case causes. With a write, the scripted model proposes it on the first caller turn and confirms it on the second, through the real tools and write guards.
+*   **Conversation level** (`evals/conversation_checks.py`): the agent greets first with the fixed greeting; it answers each turn; it stops talking when the caller barges in; the language model receives the system prompt and every caller turn in order; the call trace has the case's channel, identity and outcome, one measured latency per turn, the greeting latency, the prompt version, the expected write decisions and only the real failures the case causes. With a write, the scripted model follows the booking flow's nodes (ADR 0019): it checks the availability and proposes on the first caller turn, and confirms on the second, after the code read the proposal back, through the real flow functions and write guards.
 *   **What the judge reads**: the case's title and the prompt the model received (the booking prompt of the business the call reached, or the test line's), then the call in the order it happened, each turn of the agent with the tools it called before speaking, their arguments and their results (`evals/conversation_harness/call_transcript.py`). Nothing in it names a business. A line the agent says before calling a tool is its own turn, so the order comes from when each caller turn was said, not from pairing lines and turns. The judge follows the evaluation steps written for each criterion in `evals/quality_criteria.py`, the same every run. With what the agent knew in view, `invents-nothing` checks that every booking it announces and every fact it states came from the caller, its prompt or a tool result.
-*   **Model level**: for every reply of the model, `speakable-replies` (no digits, markup, list markers or emojis: replies become speech) and `brief-replies` (at most two sentences); from the call trace, `no-unwanted-write` (a case whose outcome is not `booked` never ends booked) or `bookings-completed` (a case whose outcome is `booked` ends booked), which the judge cannot see (`evals/outcome_metrics.py`); and the judge criteria the case lists (`evals/quality_criteria.py`).
+*   **Model level**: for every reply of the model, `speakable-replies` (no digits, markup, parentheses, list markers or emojis: replies become speech) and `brief-replies` (at most two sentences); what the code says, such as a proposal's read-back (ADR 0019), is not a reply of the model and is not scored. From the call trace, which the judge cannot see (`evals/outcome_metrics.py`): `no-unwanted-write` (a case whose outcome is not `booked` never ends booked) or `bookings-completed` (a case whose outcome is `booked` ends booked); `books-what-was-asked` (a booking holds the service, day, time and name of the case's `tool_call`, the name taken from the `propose_booking` call that was booked); and, in every case with a schedule, `confirms-after-the-answer` (the model never tried to confirm a proposal the caller had not answered). Then the judge criteria the case lists (`evals/quality_criteria.py`).
 
 | Measure | Kind | Scored as | May drop by |
 |---|---|---|---|
@@ -55,6 +55,8 @@ tags: [booking, test-line, hallucination]    # invariants (inv-N) and acceptance
 | `brief-replies` | quality | share of replies that pass | 0.10 (ADR 0016) |
 | `no-unwanted-write` | security | share of runs of non-booking cases that write nothing | 0 |
 | `bookings-completed` | quality | share of runs of booking cases that end booked | 0.05 |
+| `books-what-was-asked` | security | share of booked runs whose booking matches the case's `tool_call` | 0 |
+| `confirms-after-the-answer` | quality | share of runs with a schedule and no confirmation before the caller's answer | 0.05 |
 
 A quality measure may drop by 0.05, or by the spread measured between runs of the unchanged agent when that is wider (ADR 0016: `brief-replies` scored 0.89 to 0.98 in four runs of the same prompt); security measures may not drop at all. The margins are reviewed as the dataset grows (manifest §11).
 
@@ -62,6 +64,7 @@ A quality measure may drop by 0.05, or by the spread measured between runs of th
 
 *   **Hand-written** from the manifest: every invariant and acceptance criterion that is a conversation has at least one case, tagged `inv-N` or `ac-N` (`tests/evals/test_golden_dataset.py` checks AC-1 to AC-9).
 *   **Production failures**: every failure found in production and fixed adds the case that reproduces it, with `source: production-failure`.
+*   **Practice failures**: a failure heard in a practice call and fixed, read from the call's transcript (ADR 0017), adds its case with `source: practice-failure`, with invented names. A failure of the audio itself, such as a turn cut short on a pause, cannot be reproduced in text and is checked in practice calls.
 *   **Never real personal data.** Cases hold what a caller says, with invented content; the harness uses fictitious phone numbers, and a test fails if a case contains a phone number.
 
 ## What makes a good case
@@ -87,7 +90,7 @@ uv run --env-file .env --group evals python -m evals.model_evals --write-baselin
 
 The model evals need the key of the configured provider (`LLM_PROVIDER`, OpenRouter by default) and `OPENROUTER_API_KEY` for the judge (`google/gemini-3.6-flash` through OpenRouter). They exit with 0 (no regression), 1 (regression) or 2 (could not run: a missing key, or a provider that failed during the run, such as the model's rate limit or the judge's outage, since those conversations would measure the provider; nothing is scored or stored), write a Markdown report (`var/evals/report.md`) and print it. `--write-baseline` stores the scores only without a regression and only for the default model. `--record-fingerprint` records the inputs without measuring, allowed only while the baseline has never been measured.
 
-On a network that refuses the default provider (Groq refuses some VPN exits), the baseline is measured from a GitHub-hosted runner instead, on the pull request's branch, and committed in that pull request:
+On a network that refuses the default provider, the baseline is measured from a GitHub-hosted runner instead, on the pull request's branch, and committed in that pull request:
 
 ```bash
 gh workflow run evals.yml --ref <branch> -f write_baseline=true
@@ -96,7 +99,7 @@ gh run download <run-id> -n evals-baseline -D evals   # replaces evals/baseline.
 
 A change that adds or changes cases can make a quality measure drop by its own new cases rather than by a worse agent. Then the baseline is stored with the reason (`--write-baseline --accept-drop "<reason>"`, or `-f accept_drop="<reason>"` on the workflow): the report says the drop was accepted and why, the reason is kept in `evals/baseline.json`, and the pull request shows it to the maintainer who approves the merge. A security measure is never accepted down (constitution §16).
 
-In CI, `.github/workflows/evals.yml` starts on a pull request that touches the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies, and measures only when the behaviour fingerprint differs from the baseline of the commit the change starts from (`--only-if-changed`: every run spends provider credits); it compares with that baseline and puts the report in the run summary. It does not run again on `main` after the merge, which measured the same code; run on demand with `write_baseline`, it also stores a new baseline, kept 14 days as the `evals-baseline` artifact. Without the `OPENROUTER_API_KEY` secret (the model's and the judge's) it is skipped with a notice. Its check is not required (it runs only on those changes), but a pull request is not merged with it failing (ADR 0012).
+In CI, `.github/workflows/evals.yml` starts on a pull request that touches the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies, and measures only when the behaviour fingerprint differs from the baseline of the commit the change starts from and the change does not already carry a baseline measured for its fingerprint (`--only-if-changed`: every run spends provider credits); it compares with that baseline and puts the report in the run summary. It does not run again on `main` after the merge, which measured the same code; run on demand with `write_baseline`, it also stores a new baseline, kept 14 days as the `evals-baseline` artifact. Without the `OPENROUTER_API_KEY` secret (the model's and the judge's) it is skipped with a notice. Its check is not required (it runs only on those changes), but a pull request is not merged with it failing (ADR 0012).
 
 ## Rules
 

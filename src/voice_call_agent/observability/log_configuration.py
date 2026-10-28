@@ -25,7 +25,11 @@ class StandardLoggingBridge(logging.Handler):
 
 
 def configure_logging(settings: LogSettings) -> None:
-    """Install the single log sink. Called once by the entrypoint, never at import time.
+    """Install the log sinks. Called once by the entrypoint, never at import time.
+
+    In development, `file_path` adds a text copy of the log at its own level, for reading a
+    practice call back afterwards; written from a background thread (`enqueue`), never on the
+    event loop, and rotated.
 
     `diagnose=False` keeps loguru from printing variable values in tracebacks, which could
     otherwise expose secrets or personal data.
@@ -40,4 +44,17 @@ def configure_logging(settings: LogSettings) -> None:
         backtrace=False,
         diagnose=False,
     )
+    if settings.file_path is not None:
+        settings.file_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.add(
+            settings.file_path,
+            level=settings.file_level.upper(),
+            format=_TEXT_FORMAT,
+            encoding="utf-8",
+            rotation="20 MB",
+            retention=3,
+            enqueue=True,
+            backtrace=False,
+            diagnose=False,
+        )
     logging.basicConfig(handlers=[StandardLoggingBridge()], level=0, force=True)

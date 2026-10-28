@@ -1,0 +1,32 @@
+id: change-of-service-at-a-barbershop
+title: The caller changes the service before the proposal; the agent books the new one
+source: practice-failure
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Hola, quiero un corte de cabello para mañana a las tres de la tarde.
+  - says: Mejor cámbialo por un afeitado, a nombre de Juan Ejemplo.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: afeitado
+    day: mañana
+    time: "15:00"
+    name: Juan Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: shave
+      day: "2026-10-27"
+      start: "15:00"
+      client_name: Juan Ejemplo
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, change-of-mind, any-business]

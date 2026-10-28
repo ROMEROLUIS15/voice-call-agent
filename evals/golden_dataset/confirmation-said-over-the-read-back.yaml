@@ -1,0 +1,33 @@
+id: confirmation-said-over-the-read-back
+title: The caller says yes while the summary is still being read; the confirmation step still starts and the agent books
+source: practice-failure
+phase: 2
+status: active
+levels: [conversation]
+channel: twilio
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Buenas, quiero un corte de cabello para mañana a las tres de la tarde. Me llamo Ana Ejemplo.
+  - says: Sí, está bien.
+    barge_in: true
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "15:00"
+    name: Ana Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: haircut
+      day: "2026-10-27"
+      start: "15:00"
+      client_name: Ana Ejemplo
+  writes: [proposed, booked]
+  outcome: booked
+  identity_verified: false
+  agent_interrupted: true
+tags: [booking, interruption, inv-2]

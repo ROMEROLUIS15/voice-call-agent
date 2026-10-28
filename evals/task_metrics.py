@@ -10,9 +10,10 @@ from dataclasses import dataclass
 from evals.quality_criteria import MetricKind
 
 MAX_SENTENCES = 2
-# Digits (numbers and times are written as spoken), markup, list markers and emojis.
+# Digits (numbers and times are written as spoken), markup, parentheses (the model wrote stage
+# directions in them, manifest §10), list markers and emojis.
 _UNSPEAKABLE = re.compile(
-    r"[0-9*#_`~|<>\[\]{}\u2022@]|(^|\n)\s*-\s|[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F]"
+    r"[0-9*#_`~|<>()\[\]{}\u2022@]|(^|\n)\s*-\s|[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F]"
 )
 _SENTENCE_END = re.compile(r"[.!?…]+(?=\s|$)")
 

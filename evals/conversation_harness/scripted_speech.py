@@ -23,6 +23,7 @@ from pipecat.frames.frames import (
     STTMetadataFrame,
     TranscriptionFrame,
     TTSAudioRawFrame,
+    TTSSpeakFrame,
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
 )
@@ -98,6 +99,9 @@ class RecordingTextToSpeech(TTSService):
         self.last_reply_completed_at = 0.0
         self._reply_says_something = False
         self._calls_in_progress: set[str] = set()
+        self._greeted = False
+        self.code_lines: list[str] = []
+        """What the code said after the greeting, such as a proposal's read-back."""
         self._tool_calls: dict[int, tuple[RecordedToolCall, ...]] = {}
         self._unspoken_tool_calls: list[RecordedToolCall] = []
         """Results the agent has not said anything after yet."""
@@ -121,11 +125,19 @@ class RecordingTextToSpeech(TTSService):
         self._follow_the_model(frame)
         await super().process_frame(frame, direction)
         # A response that only calls a tool is not a reply: the reply follows the tool's result.
-        if (
+        # What the code says after the greeting, such as a proposal's read-back, is one.
+        model_reply = (
             isinstance(frame, LLMFullResponseEndFrame)
             and self._reply_says_something
             and not self._calls_in_progress
-        ):
+        )
+        code_reply = False
+        if isinstance(frame, TTSSpeakFrame):
+            code_reply = self._greeted
+            if code_reply:
+                self.code_lines.append(" ".join(frame.text.split()))
+            self._greeted = True
+        if model_reply or code_reply:
             self.replies_completed += 1
             self.last_reply_completed_at = time.monotonic()
 

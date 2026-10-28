@@ -1,5 +1,6 @@
 from pipecat.frames.frames import (
     ErrorFrame,
+    InterruptionFrame,
     LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
     LLMTextFrame,
@@ -117,3 +118,12 @@ async def test_a_reply_that_says_nothing_and_calls_no_tool_is_reported() -> None
     assert [(error.code.value, error.count) for error in trace.errors] == [
         ("LLM_EMPTY_RESPONSE", 1)
     ]
+
+
+async def test_a_reply_the_caller_interrupted_is_not_reported_as_silent() -> None:
+    recorder = CallTraceRecorder(CONTEXT, SERVICES, load_price_table())
+    silent = recorder.observers[-1]
+    with errors_recorded_by(recorder):
+        for frame in (LLMFullResponseStartFrame(), InterruptionFrame(), LLMFullResponseEndFrame()):
+            await silent.on_push_frame(_pushed(frame))
+    assert recorder.finish().errors == []

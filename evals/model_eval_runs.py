@@ -99,8 +99,7 @@ async def _run_case(
         case=case,
         repetition=repetition,
         agent_lines=record.agent_lines,
-        task_scores=task_scores(record.agent_lines[1:])
-        | outcome_scores(case, record.trace.outcome),
+        task_scores=task_scores(record.model_replies) | outcome_scores(case, record),
         judge_scores=await judge.score(case, record),
         turns=record.turns,
         llm_upstreams=record.trace.llm_upstreams,

@@ -4,6 +4,7 @@ replies that said nothing."""
 from pipecat.frames.frames import (
     ErrorFrame,
     FunctionCallsStartedFrame,
+    InterruptionFrame,
     LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
     LLMTextFrame,
@@ -83,6 +84,8 @@ class SilentReplyObserver(BaseObserver):
 
     A provider can end a streamed response with an error that Pipecat does not surface, such as a
     tool call that failed the provider's schema validation (manifest §10); this is how it shows.
+    A response the caller interrupted is not one: the caller spoke again, and the response was
+    cut, not empty.
     """
 
     def __init__(self) -> None:
@@ -98,6 +101,8 @@ class SilentReplyObserver(BaseObserver):
             isinstance(frame, LLMTextFrame) and frame.text.strip()
         ):
             self._did_something = True
+        elif isinstance(frame, InterruptionFrame):
+            self._responding = False
         elif isinstance(frame, LLMFullResponseEndFrame) and self._responding:
             self._responding = False
             if not self._did_something:

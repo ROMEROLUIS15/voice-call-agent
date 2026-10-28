@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Self
 
 from limits import parse
-from pydantic import HttpUrl, SecretStr, model_validator
+from pydantic import Field, HttpUrl, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from voice_call_agent.settings.sections import (
@@ -50,10 +50,12 @@ class ServiceSettings(BaseSettings):
 
     deepgram_api_key: SecretStr
     stt_model: str = "flux-general-multi"
+    stt_eot_threshold: float = Field(default=0.8, ge=0.5, le=1.0)
+    """Flux's end-of-turn confidence: higher waits longer before answering (manifest §10)."""
     tts_voice: str = "aura-2-selena-es"
 
     llm_provider: LanguageModelProvider = LanguageModelProvider.OPENROUTER
-    """OpenRouter, Groq then Cerebras, while Groq's developer tier is closed (manifest §7)."""
+    """OpenRouter, to Together then Venice (manifest §7, ADR 0020)."""
     llm_model: str | None = None
     llm_request_timeout_seconds: float = 10.0
     groq_api_key: SecretStr | None = None
@@ -99,6 +101,8 @@ class ServiceSettings(BaseSettings):
     sentry_traces_sample_rate: float = 1.0
     log_level: str = "INFO"
     log_format: LogFormat = LogFormat.JSON
+    log_file_path: Path | None = None
+    log_file_level: str = "DEBUG"
 
     @model_validator(mode="after")
     def _check_groups(self) -> Self:
@@ -138,6 +142,11 @@ class ServiceSettings(BaseSettings):
                 "CONVERSATION_TRANSCRIPTS_DIR needs ENVIRONMENT=development: transcripts keep "
                 "what callers say"
             )
+        if self.log_file_path is not None and self.environment is DeploymentEnvironment.PRODUCTION:
+            raise UnsafeSettingsError(
+                "LOG_FILE_PATH needs ENVIRONMENT=development: Pipecat logs conversation content "
+                "at DEBUG"
+            )
         if "*" in _comma_separated(self.cors_allowed_origins):
             raise UnsafeSettingsError("CORS_ALLOWED_ORIGINS must list explicit origins, never '*'")
         try:
@@ -153,6 +162,7 @@ class ServiceSettings(BaseSettings):
         return SpeechSettings(
             deepgram_api_key=self.deepgram_api_key,
             stt_model=self.stt_model,
+            eot_threshold=self.stt_eot_threshold,
             tts_voice=self.tts_voice,
         )
 
@@ -241,7 +251,12 @@ class ServiceSettings(BaseSettings):
         )
 
     def logging_output(self) -> LogSettings:
-        return LogSettings(level=self.log_level, output_format=self.log_format)
+        return LogSettings(
+            level=self.log_level,
+            output_format=self.log_format,
+            file_path=self.log_file_path,
+            file_level=self.log_file_level,
+        )
 
     def _llm_api_key(self) -> SecretStr | None:
         keys = {

@@ -19,6 +19,13 @@ expected:
     day: mañana
     time: "11:00"
     name: Ana Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: manicure
+      day: "2026-10-27"
+      start: "11:00"
+      client_name: Ana Ejemplo
   outcome: booked
   identity_verified: false
   quality: [invents-nothing, natural-spanish]

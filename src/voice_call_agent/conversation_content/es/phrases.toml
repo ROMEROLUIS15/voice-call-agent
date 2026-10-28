@@ -4,6 +4,10 @@
 
 greeting = "Hola, gracias por llamar. ¿En qué te puedo ayudar?"
 
+# The code reads back the proposal it validated, before the caller's yes (ADR 0019). Neither
+# "tú" nor "usted": the register is the business's.
+read_back = "Para confirmar: {service}, el {day}, a {time}, a nombre de {name}. ¿Está bien así?"
+
 # How the booking prompt states the business's date, hours and services (Monday first).
 [booking_briefing]
 weekdays = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
@@ -17,3 +21,38 @@ closed_day = "{weekday} cerrado"
 service = "{name} [{id}]: {minutes} minutos"
 price = ", precio {price}"
 no_price = ", precio no publicado"
+# The calendar of the coming days: the model looks a day up instead of computing it (ADR 0019).
+calendar_day = "{weekday} {day} de {month}{note}: {iso_date}{closed}"
+calendar_today = " (hoy)"
+calendar_tomorrow = " (mañana)"
+calendar_closed = ", cerrado"
+
+# How dates and times are said aloud (the read-back, a day in a tool's result).
+[spoken_moments]
+# 0 to 59, for day numbers and minutes.
+numbers = [
+    "cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez",
+    "once", "doce", "trece", "catorce", "quince", "dieciséis", "diecisiete", "dieciocho",
+    "diecinueve", "veinte", "veintiuno", "veintidós", "veintitrés", "veinticuatro", "veinticinco",
+    "veintiséis", "veintisiete", "veintiocho", "veintinueve", "treinta", "treinta y uno",
+    "treinta y dos", "treinta y tres", "treinta y cuatro", "treinta y cinco", "treinta y seis",
+    "treinta y siete", "treinta y ocho", "treinta y nueve", "cuarenta", "cuarenta y uno",
+    "cuarenta y dos", "cuarenta y tres", "cuarenta y cuatro", "cuarenta y cinco", "cuarenta y seis",
+    "cuarenta y siete", "cuarenta y ocho", "cuarenta y nueve", "cincuenta", "cincuenta y uno",
+    "cincuenta y dos", "cincuenta y tres", "cincuenta y cuatro", "cincuenta y cinco",
+    "cincuenta y seis", "cincuenta y siete", "cincuenta y ocho", "cincuenta y nueve",
+]
+day = "{weekday} {day} de {month}"
+# The hour on a 12-hour clock, with its article: index 0 is twelve.
+hours = [
+    "las doce", "la una", "las dos", "las tres", "las cuatro", "las cinco",
+    "las seis", "las siete", "las ocho", "las nueve", "las diez", "las once",
+]
+on_the_hour = "{hour} {day_part}"
+past_the_hour = "{hour} y {minutes} {day_part}"
+minute_names = { 15 = "cuarto", 30 = "media" }
+# The part of the day from each hour on (24-hour clock).
+day_parts = [
+    [0, "de la madrugada"], [6, "de la mañana"], [12, "del mediodía"], [13, "de la tarde"],
+    [20, "de la noche"],
+]

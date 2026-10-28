@@ -8,8 +8,9 @@ the model's provider and `OPENROUTER_API_KEY` for the judge. Exit code: 0 no reg
 1 regression, 2 the evals could not run (a missing key, or a provider that failed during the run).
 With `--write-baseline --accept-drop REASON`, a drop of quality measures only is stored with its
 reason: a change that adds harder cases is not blocked by its own cases. With `--only-if-changed`
-(pull requests), nothing runs when the behaviour fingerprint equals the baseline's: the change
-cannot have moved what the evals measure, and a run costs provider credits.
+(pull requests), nothing runs when the behaviour fingerprint equals the baseline's, or when the
+branch already carries a baseline measured for its fingerprint (stored by `--write-baseline`,
+which compared it then): a run costs provider credits.
 """
 
 import argparse
@@ -93,6 +94,9 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.only_if_changed and not behavior_changed(load_baseline(arguments.compare_with)):
         print("Nothing to measure: the behaviour fingerprint equals the baseline's.")
         return EXIT_OK
+    if arguments.only_if_changed and measured_for_this_behavior(load_baseline(BASELINE_PATH)):
+        print("Nothing to measure: this change carries a baseline measured for its behaviour.")
+        return EXIT_OK
     settings = ModelEvalSettings()
     model = settings.language_model()
     if model is None or settings.openrouter_api_key is None:
@@ -129,6 +133,11 @@ def main(argv: list[str] | None = None) -> int:
 def behavior_changed(baseline: EvalBaseline) -> bool:
     """Whether what shapes the agent's replies differs from what the baseline was measured with."""
     return behavior_fingerprint(behavior_inputs()) != baseline.fingerprint
+
+
+def measured_for_this_behavior(baseline: EvalBaseline) -> bool:
+    """Whether the baseline was measured, not only recorded, for the current behaviour."""
+    return baseline.measured and not behavior_changed(baseline)
 
 
 def model_under_test(choice: LanguageModelChoice) -> ModelUnderTest:

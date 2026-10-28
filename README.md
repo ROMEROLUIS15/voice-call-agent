@@ -35,6 +35,7 @@ Talk to the agent from a browser on your own machine, with no phone number (ADR 
 ```bash
 # in .env: ENVIRONMENT=development, BROWSER_PRACTICE_ENABLED=true, SCHEDULING_BACKEND=practice
 # and, to read each call back, CONVERSATION_TRANSCRIPTS_DIR=var/conversation_transcripts
+# and LOG_FILE_PATH=var/service.log
 uv run voice-call-agent      # then open http://localhost:8000/practice
 ```
 
@@ -48,18 +49,22 @@ dental clinic and a spa), kept in memory and lost on restart
 (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is also refused outside
 development. Each business has a fictitious number: pick it on the page before starting the call,
 and the call reaches that business as a phone-line call reaches the number it dials (ADR 0017).
-Ask for an appointment by voice: the agent checks the availability, proposes, reads the summary
-back and books only after you say yes (ADR 0011). Each decision lands in the call's trace
+Ask for an appointment by voice: the conversation is a Pipecat Flows graph (ADR 0019), one step
+at a time: the agent checks the availability, asks for a time among the free ones and for the name,
+the service reads the summary back, and the agent books only after you say yes (ADR 0011). Each decision lands in the call's trace
 (`writes`) with the `booked` outcome.
 
 With `CONVERSATION_TRANSCRIPTS_DIR` set, each call also leaves a text file named after the call:
 the prompt the model received, then what was said, with your turns as the speech-to-text heard
 them, the agent's lines as far as they were spoken and each tool call with its result. It keeps
 what you say, so the service refuses it outside development, and it never leaves the machine.
+With `LOG_FILE_PATH` set, the service also keeps its log in that file, at `DEBUG` by default:
+the flow's transitions and what the model received on each turn, for what a transcript cannot
+show. It is refused outside development too (ADR 0017).
 
-The language model goes through OpenRouter by default (`OPENROUTER_API_KEY`): the same
-`gpt-oss-120b`, served by Groq or, when Groq fails, by Cerebras, which also works from networks
-that Groq refuses (manifest §7, §10). Each call's trace counts the responses each one served
+The language model goes through OpenRouter by default (`OPENROUTER_API_KEY`):
+`deepseek-v4.1-flash`, served by Together or, when Together fails, by Venice, chosen by measuring
+it against other models (ADR 0020). Each call's trace counts the responses each one served
 (`llm_upstreams`).
 
 ### Phone-line entry (Twilio)
@@ -149,10 +154,10 @@ Each figure states its date and what it was measured with; what is not measured 
 
 | What | Result | Measured with |
 |---|---|---|
-| Language model, time to the first token (API only; on a call the segment of manifest §6 also includes turn detection) | Groq `openai/gpt-oss-120b` with reasoning effort `low`: p50 375 ms, p95 571 ms. With Groq's default effort: 544 / 976 ms. DeepSeek `deepseek-flash`, thinking off: 776 / 937 ms | 2026-10-19; 20 streamed answers per configuration to five caller turns with fictitious data; conversation content `es-c3d0810115bd`; from a GitHub-hosted runner (pull request #3, closed without merging) |
+| Language model, time to the first token (on a call the segment of manifest §6 also includes turn detection) | `deepseek/deepseek-v4.1-flash` on Together, reasoning effort `low`: p50 391 ms, p90 665 ms (176 responses of the model evals, 2026-10-28, ADR 0020). Earlier, Groq `openai/gpt-oss-120b` with reasoning effort `low`: p50 375 ms, p95 571 ms. With Groq's default effort: 544 / 976 ms. DeepSeek `deepseek-flash`, thinking off: 776 / 937 ms | 2026-10-19; 20 streamed answers per configuration to five caller turns with fictitious data; conversation content `es-c3d0810115bd`; from a GitHub-hosted runner (pull request #3, closed without merging) |
 | Latency per segment and channel on real calls | Not measured yet | |
 | Speech-to-text on phone audio | Not measured yet | |
-| Golden dataset success (model level, baseline) | `invents-nothing` 1.00 and `no-unwanted-write` 1.00 (security), `bookings-completed` 1.00, `natural-spanish` 1.00, `admits-test-line` 1.00, `speakable-replies` 1.00, `brief-replies` 0.93 | 2026-10-27; 15 cases, 3 repetitions (45 conversations), booking cases at a barbershop, a dental clinic and a spa; `openai/gpt-oss-120b` through OpenRouter (Groq served all 129 responses), judge `google/gemini-3.6-flash`; from a GitHub-hosted runner (evals workflow run 40586758466). `brief-replies` scored 0.89 to 0.98 across five runs of the same prompt (ADR 0016); the first run of the day scored `invents-nothing` 0.95 and found a service without a price read as free (manifest §10) |
+| Golden dataset success (model level, baseline) | `invents-nothing`, `no-unwanted-write` and `books-what-was-asked` 1.00 (security), `bookings-completed` 1.00, `confirms-after-the-answer` 1.00, `natural-spanish` 1.00, `admits-test-line` 1.00, `speakable-replies` 1.00, `brief-replies` 0.83 | 2026-10-28; 27 cases, 3 repetitions; `deepseek/deepseek-v4.1-flash` through OpenRouter (Together served all 176 responses), judge `google/gemini-3.6-flash`; measured locally with the service's defaults (ADR 0020). `brief-replies` is within its margin of the earlier model's 0.93 (ADR 0016) |
 | Cost per call | Not measured yet; every call trace carries its estimate | |
 | Capacity per instance | Not measured yet (phase 4) | |
 

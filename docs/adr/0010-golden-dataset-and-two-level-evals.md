@@ -28,3 +28,4 @@ What the agent says depends on the prompt, the fixed phrases, the language model
 
 ## Changes
 2026-10-28 · The CI run follows this decision exactly: on a pull request the model evals measure only when the behaviour fingerprint differs from the base commit's baseline (`--only-if-changed`), and they no longer run again on `main` after the merge, which measured the same code. A path filter alone had started paid runs for changes that left the fingerprint as it was, and every merge repeated one: about half of the provider credits spent in the first two days of measured runs went to such runs (pull request #23).
+2026-10-28 · Nor do they measure again a change that carries a baseline measured for its own fingerprint: the `--write-baseline` measurement that stored it already compared it with the base commit's baseline, and refuses a drop it was not told to accept. The stored baseline is reviewed in the pull request like any other file (pull request #22).

@@ -16,6 +16,7 @@ from voice_call_agent.observability.call_trace import ServiceVersions
 from voice_call_agent.observability.conversation_transcript import ConversationTranscript
 
 CASES = runnable_cases(load_golden_dataset(), EvalLevel.CONVERSATION)
+BOOKING_SEQUENCE = ("check_availability", "propose_booking", "confirm_booking")
 CONTENT = load_conversation_content()
 SCRIPTED_SERVICES = ServiceVersions(
     prompt_version=CONTENT.version,
@@ -75,10 +76,11 @@ def _assert_the_transcript_is_in_order(case: GoldenCase, record: ConversationRec
     if case.expected.tool_call is None:
         assert tools == []
         return
-    # The scripted model proposes on the first caller turn and confirms on the second.
-    assert [name for _, name in tools] == ["propose_booking", "confirm_booking"]
-    (proposed, _), (confirmed, _) = tools
-    assert callers[0] < proposed < callers[1] < confirmed
+    # The booking flow: availability and proposal on the first caller turn, the confirmation
+    # on the second, after the read-back (ADR 0019).
+    assert [name for _, name in tools] == list(BOOKING_SEQUENCE)
+    (checked, _), (proposed, _), (confirmed, _) = tools
+    assert callers[0] < checked <= proposed < callers[1] < confirmed
 
 
 def _assert_the_kept_transcript_shows_what_was_said(
@@ -92,12 +94,13 @@ def _assert_the_kept_transcript_shows_what_was_said(
     assert transcript.system_prompt == record.system_prompt
     lines = transcript.lines
     if not record.agent_interrupted:  # An interrupted line keeps only what was spoken.
-        assert lines[0] == f"agent: {greeting}"
+        # The first node's task may come before it: the greeting enters the context as spoken.
+        assert next(line for line in lines if line.startswith("agent: ")) == f"agent: {greeting}"
     callers = [line for line in lines if line.startswith("caller: ")]
     assert callers == [f"caller: {turn.says}" for turn in case.turns]
     tools = [line.split()[2] for line in lines if line.startswith("agent called ")]
     results = [line.split()[0] for line in lines if " returned: " in line]
-    expected = [] if case.expected.tool_call is None else ["propose_booking", "confirm_booking"]
+    expected = [] if case.expected.tool_call is None else list(BOOKING_SEQUENCE)
     assert tools == results == expected
 
 

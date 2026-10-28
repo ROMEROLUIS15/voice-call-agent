@@ -1,0 +1,32 @@
+id: weekday-and-date-disagree-at-a-barbershop
+title: The caller names a weekday and a date that do not match; the agent asks which one and books the day the caller settles on
+source: practice-failure
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Hola, quiero un corte de cabello el jueves cuatro de noviembre a las once de la mañana, a nombre de Pedro Ejemplo.
+  - says: Perdón, el miércoles cuatro de noviembre.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: miércoles cuatro de noviembre
+    time: "11:00"
+    name: Pedro Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: haircut
+      day: "2026-11-04"
+      start: "11:00"
+      client_name: Pedro Ejemplo
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, dates, any-business]
