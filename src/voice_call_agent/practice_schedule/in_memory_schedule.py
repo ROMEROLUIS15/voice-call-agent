@@ -20,6 +20,7 @@ from voice_call_agent.call_session.business_resolution import (
 )
 from voice_call_agent.call_session.session import CallSession
 from voice_call_agent.practice_schedule.opening_hours import (
+    START_INTERVAL_MIN,
     Interval,
     end_of,
     fits,
@@ -130,7 +131,7 @@ class InMemorySchedule:
         starts = free_starts(
             hours,
             duration_min=service.duration_min,
-            step_min=business.slot_minutes,
+            step_min=START_INTERVAL_MIN,
             booked=self._booked(business.id, day),
             not_before=now if day == today else None,
         )

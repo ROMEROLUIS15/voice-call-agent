@@ -59,16 +59,16 @@ Read from the Cronix repository on 2026-10-28; each fact names where it lives th
 
 The practice schedule copies Cronix's rules, so what is tried in practice is what Cronix does.
 
-- [ ] **A1. The practice schedule follows Cronix**: starts every 30 minutes, the service ending
+- [x] **A1. The practice schedule follows Cronix**: starts every 30 minutes, the service ending
       by closing, overlaps checked for the whole business as WhatsApp's booking does, hours as
       `[open, close]` per weekday, past times dropped.
-- [ ] **A2. Free times by ranges.** Consecutive starts form a range that ends when the service
-      would end after its last start; when few starts are left, they are said one by one (how few
-      is decided here). The time-choice task offers the ranges nearest to what the caller asked
+- [x] **A2. Free times by ranges.** Consecutive starts form a range that ends when the service
+      would end after its last start; a lone start is said on its own
+      (`booking_flow/free_ranges.py`). The time-choice task offers the ranges nearest to what the caller asked
       for (morning, afternoon, a time).
-- [ ] **A3. Why a time does not work**, from the starts and the service's duration: the service
-      would not end before the next appointment or closing, the time is taken, or the day is
-      closed.
+- [x] **A3. Why a time does not work**, from the starts and the service's duration: the service
+      would not end before the next appointment or closing, the time is off the 30-minute
+      interval, or it is taken; a closed day is answered by the availability itself.
 - [ ] **A4. Tests, golden cases with invented data, model evals and a practice call**; one pull
       request with README, manifest and golden dataset.
 

@@ -78,13 +78,32 @@ class BookingTasks(BaseModel):
     not_booked: str
 
 
+class RequestedTimeTexts(BaseModel):
+    """Why the time the caller asked for is not offered, one text per `Unavailable` reason.
+
+    Each takes `{time}`, `{duration}`, `{opens}`, `{closes}` and `{interval}`.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    outside_hours: str
+    off_interval: str
+    does_not_fit: str
+    taken: str
+
+
 class BookingChoices(BaseModel):
-    """How the choose_time task lists the free times."""
+    """How the choose_time task says the free times: ranges of starts, or single starts."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     free_time: str
-    requested_taken: str
+    """Takes `{spoken}` and `{clock}`."""
+    free_range: str
+    """Takes `{first}`, `{first_clock}`, `{last}` and `{last_clock}`."""
+    interval: str
+    """Takes `{minutes}`."""
+    requested: RequestedTimeTexts
 
 
 class BookingFlowTexts(BaseModel):

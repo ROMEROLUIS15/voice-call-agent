@@ -1,0 +1,32 @@
+id: long-service-asked-near-closing-at-a-dental-clinic
+title: A long service is asked for too close to closing; the agent says why and books an earlier start the caller chooses
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-dental-clinic
+language: es
+turns:
+  - says: Buenas tardes, quiero un blanqueamiento dental para mañana a las tres de la tarde, a nombre de Rosa Ejemplo.
+  - says: Entonces a las dos de la tarde.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: blanqueamiento dental
+    day: mañana
+    time: "14:00"
+    name: Rosa Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: teeth-whitening
+      day: "2026-10-27"
+      start: "14:00"
+      client_name: Rosa Ejemplo
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, free-times, any-business]

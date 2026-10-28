@@ -13,7 +13,6 @@ id = "practice-barbershop"
 name = "Barbería La Práctica"
 timezone = "America/Caracas"
 greeting = "Hola, gracias por llamar a Barbería La Práctica. ¿En qué te puedo ayudar?"
-slot_minutes = 30
 # E.164 numbers that reach this business, as a phone line's dialed number does. The practice
 # page offers each one to dial. 555-0100 to 555-0199 are reserved for fiction: no real line.
 dialed_numbers = ["+12025550101"]
@@ -50,7 +49,6 @@ id = "practice-dental-clinic"
 name = "Consultorio Odontológico La Práctica"
 timezone = "America/Caracas"
 greeting = "Buenos días, consultorio odontológico La Práctica. ¿En qué le puedo ayudar?"
-slot_minutes = 15
 dialed_numbers = ["+12025550102"]
 
 [[businesses.services]]
@@ -83,7 +81,6 @@ id = "practice-spa"
 name = "Spa La Práctica"
 timezone = "America/Caracas"
 greeting = "Hola, gracias por llamar a Spa La Práctica. ¿Qué te gustaría reservar?"
-slot_minutes = 30
 dialed_numbers = ["+12025550103"]
 
 [[businesses.services]]

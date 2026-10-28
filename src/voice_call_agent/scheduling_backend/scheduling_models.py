@@ -46,6 +46,10 @@ class WeeklyHours(_Model):
     sat: OpeningHours | None
     sun: OpeningHours | None
 
+    def on(self, day: date) -> OpeningHours | None:
+        """The hours of `day`'s weekday; `None` when closed."""
+        return (self.mon, self.tue, self.wed, self.thu, self.fri, self.sat, self.sun)[day.weekday()]
+
 
 class BusinessContext(_Model):
     """What the agent needs to know about the business serving the call."""
