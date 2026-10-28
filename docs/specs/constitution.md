@@ -35,7 +35,7 @@ Non-negotiable rules for all code in this repository, a real-time Python voice s
     - **Booking** with the caller ID is acceptable (the worst case is an unwanted, reversible appointment).
     - **Rescheduling or cancelling** an existing appointment requires a second factor: the caller confirms the name the appointment was booked under and its date, **or** a code sent by SMS to the registered number. Without it, a message is taken for the business instead of executing.
     - **Reading** the caller's appointments requires the same second factor, and the agent greets the caller by name only when the identity is verified: a spoofed caller ID must not reveal whose number it is nor their appointments.
-*   Personal data (name, phone) is redacted in logs and traces. Recordings, if enabled, are encrypted and have an explicit retention policy.
+*   Personal data (name, phone) is redacted in logs and traces. Recordings, if enabled, are encrypted and have an explicit retention policy. What callers say is kept only by the development transcripts (ADR 0017), refused in production and never exported.
 *   Recording notice at the start of the call when recording is enabled.
 
 ## 5. Latency is a requirement, not a wish

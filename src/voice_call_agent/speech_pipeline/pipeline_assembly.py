@@ -53,18 +53,20 @@ async def assemble_speech_pipeline(
     factories: SpeechServiceFactories,
     system_prompt: str,
     tools: AgentTools | None = None,
+    context: LLMContext | None = None,
 ) -> Pipeline:
-    """Build the pipeline of one call; with `tools`, its model can call them."""
+    """Build the pipeline of one call; with `tools`, its model can call them. `context` is the
+    conversation the model sees, for whoever needs it once the call ends."""
     # Building the VAD loads its ONNX model (~150 ms measured): keep it off the event loop,
     # where other calls are streaming audio.
     vad = await asyncio.to_thread(factories.create_vad)
     language_model = factories.create_language_model(system_prompt)
-    context = LLMContext()
+    context = context if context is not None else LLMContext()
     if tools is not None:
         if not isinstance(language_model, LLMService):
             raise ToolsNeedALanguageModelError(type(language_model).__name__)
         tools.register(language_model)
-        context = LLMContext(tools=tools.schema)
+        context.set_tools(tools.schema)
     # Turn detection is the STT's (Flux applies its own strategies). The local VAD only emits
     # the "user stopped speaking" frame each turn's latency is measured from.
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(

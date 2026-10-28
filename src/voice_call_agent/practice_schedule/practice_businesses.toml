@@ -4,6 +4,8 @@
 # not a multiple of the slot, a service without a price, closed days) so that the evals show
 # the agent working for any business, not for one catalog.
 
+# Reached by a call whose dialed number no business lists (a browser practice call that dials
+# none, an evals conversation).
 default_business = "practice-barbershop"
 
 [[businesses]]
@@ -12,9 +14,9 @@ name = "Barbería La Práctica"
 timezone = "America/Caracas"
 greeting = "Hola, gracias por llamar a Barbería La Práctica. ¿En qué te puedo ayudar?"
 slot_minutes = 30
-# E.164 numbers that reach this business (a Meta test number, for instance). A call with no
-# dialed number, such as a browser practice call, reaches the default business.
-dialed_numbers = []
+# E.164 numbers that reach this business, as a phone line's dialed number does. The practice
+# page offers each one to dial. 555-0100 to 555-0199 are reserved for fiction: no real line.
+dialed_numbers = ["+12025550101"]
 
 [[businesses.services]]
 id = "haircut"
@@ -49,7 +51,7 @@ name = "Consultorio Odontológico La Práctica"
 timezone = "America/Caracas"
 greeting = "Buenos días, consultorio odontológico La Práctica. ¿En qué le puedo ayudar?"
 slot_minutes = 15
-dialed_numbers = []
+dialed_numbers = ["+12025550102"]
 
 [[businesses.services]]
 id = "dental-cleaning"
@@ -82,7 +84,7 @@ name = "Spa La Práctica"
 timezone = "America/Caracas"
 greeting = "Hola, gracias por llamar a Spa La Práctica. ¿Qué te gustaría reservar?"
 slot_minutes = 30
-dialed_numbers = []
+dialed_numbers = ["+12025550103"]
 
 [[businesses.services]]
 id = "relaxing-massage"
