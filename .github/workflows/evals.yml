@@ -36,6 +36,10 @@ on:
         description: "Without regression, store the scores as the new baseline (artifact evals-baseline)"
         type: boolean
         default: false
+      accept_drop:
+        description: "With write_baseline: why a drop of quality measures is accepted (added or changed cases)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -89,10 +93,14 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           WRITE_BASELINE: ${{ inputs.write_baseline }}
+          ACCEPT_DROP: ${{ inputs.accept_drop }}
         run: |
           options=(--compare-with "$RUNNER_TEMP/baseline.json" --report "$RUNNER_TEMP/evals-report.md")
           if [ "$WRITE_BASELINE" = "true" ]; then
             options+=(--write-baseline)
+            if [ -n "$ACCEPT_DROP" ]; then
+              options+=(--accept-drop "$ACCEPT_DROP")
+            fi
           fi
           uv run --group evals python -m evals.model_evals "${options[@]}"
       - name: Report in the run summary

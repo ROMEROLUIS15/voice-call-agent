@@ -39,6 +39,9 @@ class EvalBaseline(BaseModel):
     inputs: dict[str, str]
     measured_with: MeasurementSetup | None = None
     metrics: dict[str, MetricScore] = {}
+    accepted_drop: str | None = None
+    """Why a quality measure was allowed to drop when this baseline was stored: the cases that
+    were added or changed (constitution §16); never set for a security measure."""
 
     @property
     def measured(self) -> bool:
