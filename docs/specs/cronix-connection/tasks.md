@@ -89,20 +89,27 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
       164/164, and two connections booking one time at once left one appointment, the second
       answered `SLOT_CONFLICT` after waiting 2.35 s. Its deployment is the maintainer's: the
       migration first, then the Edge Functions. The phone endpoints book through the same function.
-- [ ] **B4. One computation of free starts** (Cronix pull request #30): WhatsApp's resolver
+- [ ] **B4. One computation of free starts** (Cronix pull request #30, which also fixes an import
+      the tests could not see and Deno resolves): WhatsApp's resolver
       moves to `supabase/functions/_shared/availability.ts` and the dashboard's agent uses it, so
       both count every appointment but `cancelled` and `no_show` as taken, as the booking does, and
       drop past times; the SQL `fn_get_available_slots`, which nothing called, is dropped. The
       phone endpoints will use the same resolver. Tried locally: 849 function tests, pgTAP
       164/164, type check clean.
-- [ ] **B5. The business's currency**: `settings.currency` (ISO 4217), set by the owner in the
-      dashboard's settings next to the hours; USD when absent, as the reports already assume, so no
-      existing business changes until its owner chooses; returned with the catalog.
-- [ ] **B6. The dialed number**: a table of phone lines, each number unique and pointing at one
-      business, readable only by the service; lines are added with SQL when a number is bought, no
-      screen yet.
-- [ ] **B7. The v1 endpoints** of the contract, thin over the functions above, with the business
-      always from `call_sid`: start of call, business, availability, booking, end of call.
+- [ ] **B5. The business's currency** (Cronix pull request #31): `settings.currency` (USD, VES,
+      EUR, COP or MXN), set by the owner in the dashboard's settings next to the hours; USD when
+      absent, as the reports already assume, so no existing business changes until its owner
+      chooses; returned with the catalog when a call starts.
+- [ ] **B6. The dialed number** (Cronix pull request #32): `phone_agent_lines`, each number unique
+      and pointing at one business, with row-level security and no policies (the service only);
+      lines are added with SQL when a number is bought, no screen yet.
+- [ ] **B7. The v1 endpoints** of the contract, the phone line only, with the business always from
+      the call record (`phone_agent_calls`) and every request signed by the agent:
+  - [x] start of call, availability and end of call (Cronix pull request #32): tried end to end
+        against the local Cronix with the function served and invented data;
+  - [ ] booking: `fn_book_appointment_wa` with the caller's number, `OUTSIDE_HOURS` and
+        `SLOT_CONFLICT`, the idempotency key, and the owner notified through WhatsApp's
+        notification pipeline moved to `_shared` for both channels.
 - [ ] **B8. Tests**: pgTAP for the functions and isolation between businesses, `deno test` for the
       endpoints, two bookings of the same time at once.
 - [ ] **B9. A pull request in Cronix**, then deployed, after the local tries of Stage D.
