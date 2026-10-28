@@ -173,6 +173,7 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-27 | The judge reads the model's prompt and tool results: fictitious practice businesses and invented callers only (T-33 covers it) | S12 |
 | 2026-10-27 | The evals workflow measures the baseline on demand (`write_baseline`, only for those who can run workflows) and keeps it as an artifact of scores and input digests; T-32 covers it | S12 |
 | 2026-10-27 | A new baseline may be stored although a quality measure dropped, with its reason kept and shown in the pull request (`accept_drop`, only for those who can run workflows); a security measure never drops (constitution §16) | S12 |
+| 2026-10-28 | The evals workflow no longer runs on pushes to `main`, and on a pull request measures only when the behaviour fingerprint changed: fewer runs with the provider secret, none on the default branch | S12 |
 | 2026-10-27 | The four alerts exist as Sentry monitors on the production environment (T-34) | S9, S11 |
 | 2026-10-27 | Practice lines (`GET /practice/lines`, a dialed number in the offer; T-39, T-42) and conversation transcripts in development (T-44), ADR 0017 | S9, S13 |
 | 2026-10-27 | actionlint joins the quality gate (security job): T-32 relied on it, but no hook or job ran it | S12 |
