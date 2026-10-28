@@ -55,7 +55,7 @@ class ServiceSettings(BaseSettings):
     tts_voice: str = "aura-2-selena-es"
 
     llm_provider: LanguageModelProvider = LanguageModelProvider.OPENROUTER
-    """OpenRouter, Groq then Cerebras, while Groq's developer tier is closed (manifest §7)."""
+    """OpenRouter, to Together then Venice (manifest §7, ADR 0020)."""
     llm_model: str | None = None
     llm_request_timeout_seconds: float = 10.0
     groq_api_key: SecretStr | None = None

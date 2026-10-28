@@ -45,7 +45,7 @@ Living document: every change that touches an attack surface updates it in the s
 | S3 | Meta `calls` webhook and its subscription check | `GET`/`POST /whatsapp/webhook` |
 | S4 | WhatsApp WebRTC media | Negotiated by the Graph API |
 | S5 | Language model | Everything the caller says reaches the prompt |
-| S6 | Providers: Deepgram, LLM (through OpenRouter to Groq or Cerebras, or Groq directly), Twilio REST, Graph API | Outbound calls |
+| S6 | Providers: Deepgram, LLM (through OpenRouter to Together or Venice, or Groq directly), Twilio REST, Graph API | Outbound calls |
 | S7 | Scheduling backend (Cronix `phone-agent-api`) | Outbound signed HTTP (phase 1) |
 | S8 | HTTP surface in general | Health endpoints, errors, headers, hosts |
 | S9 | Logs and traces | Everything the service writes |
@@ -178,4 +178,5 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-27 | Practice lines (`GET /practice/lines`, a dialed number in the offer; T-39, T-42) and conversation transcripts in development (T-44), ADR 0017 | S9, S13 |
 | 2026-10-27 | R-08: the code reads the proposal back (ADR 0019); `books-what-was-asked` (security) measures that a booking holds what the caller asked, and `confirms-after-the-answer` that the model does not confirm for the caller | S5, S7 |
 | 2026-10-27 | The booking conversation is a Pipecat Flows graph (ADR 0019): each node offers only its functions, the code checks the service and the start against the catalog and the free starts, and the confirmation is offered only after the code read the proposal back (T-21) | S5, S7 |
+| 2026-10-28 | The default model is DeepSeek V4.1 Flash through OpenRouter to Together, then Venice, both required not to collect data (`data_collection: deny`): two new destinations of what callers say; never DeepSeek's own API (ADR 0020) | S6 |
 | 2026-10-27 | actionlint joins the quality gate (security job): T-32 relied on it, but no hook or job ran it | S12 |

@@ -13,7 +13,6 @@
       'properties': dict({
         'day': dict({
           'description': 'The day, as YYYY-MM-DD.',
-          'format': 'date',
           'type': 'string',
         }),
         'service_id': dict({
@@ -23,7 +22,6 @@
         'start': dict({
           'anyOf': list([
             dict({
-              'pattern': '^([01][0-9]|2[0-3]):[0-5][0-9]$',
               'type': 'string',
             }),
             dict({
@@ -72,7 +70,6 @@
       'properties': dict({
         'start': dict({
           'description': 'One of the free start times offered, as HH:MM.',
-          'pattern': '^([01][0-9]|2[0-3]):[0-5][0-9]$',
           'type': 'string',
         }),
       }),
@@ -100,7 +97,7 @@
 # ---
 # name: test_booking_prompt_of_each_practice_business[practice-barbershop]
   '''
-  Eres la recepcionista telefónica de Barbería La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno.
+  Eres la recepcionista telefónica de Barbería La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno. Ve directo a lo que dices, sin una frase de cortesía suelta al empezar como «Claro.» o «Con gusto.».
   
   Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
   
@@ -132,7 +129,7 @@
 # ---
 # name: test_booking_prompt_of_each_practice_business[practice-dental-clinic]
   '''
-  Eres la recepcionista telefónica de Consultorio Odontológico La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno.
+  Eres la recepcionista telefónica de Consultorio Odontológico La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno. Ve directo a lo que dices, sin una frase de cortesía suelta al empezar como «Claro.» o «Con gusto.».
   
   Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
   
@@ -164,7 +161,7 @@
 # ---
 # name: test_booking_prompt_of_each_practice_business[practice-spa]
   '''
-  Eres la recepcionista telefónica de Spa La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno.
+  Eres la recepcionista telefónica de Spa La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno. Ve directo a lo que dices, sin una frase de cortesía suelta al empezar como «Claro.» o «Con gusto.».
   
   Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
   
@@ -406,9 +403,9 @@
     'llm_provider': 'openrouter',
     'max_completion_tokens': 'NOT_GIVEN',
     'max_tokens': 'NOT_GIVEN',
-    'model': 'openai/gpt-oss-120b',
+    'model': 'deepseek/deepseek-v4.1-flash',
     'presence_penalty': 'NOT_GIVEN',
-    'provider': "order=['groq', 'cerebras'] allow_fallbacks=False require_parameters=True data_collection='deny' zdr=None enforce_distillable_text=None only=['groq', 'cerebras'] ignore=None quantizations=None sort=None preferred_min_throughput=None preferred_max_latency=None max_price=None",
+    'provider': "order=['together', 'venice'] allow_fallbacks=False require_parameters=True data_collection='deny' zdr=None enforce_distillable_text=None only=['together', 'venice'] ignore=None quantizations=None sort=None preferred_min_throughput=None preferred_max_latency=None max_price=None",
     'request_timeout_seconds': '10.0',
     'seed': 'NOT_GIVEN',
     'temperature': 'NOT_GIVEN',

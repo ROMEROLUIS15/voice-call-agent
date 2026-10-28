@@ -20,6 +20,7 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 | [0016](0016-quality-margins-from-measured-noise.md) | Quality margins from the measured noise between runs | Accepted |
 | [0017](0017-practice-lines-and-conversation-transcripts.md) | Practice lines and conversation transcripts in development | Accepted |
 | [0019](0019-pipecat-first-the-conversation-is-a-flows-graph.md) | Pipecat first: the conversation is a Pipecat Flows graph | Accepted |
+| [0020](0020-default-language-model-chosen-by-measurement.md) | The default language model, chosen by measurement: DeepSeek V4.1 Flash on Together | Accepted |
 
 ## Process
 
