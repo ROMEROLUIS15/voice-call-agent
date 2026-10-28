@@ -2,10 +2,11 @@
 
 Non-negotiable rules for all code in this repository, a real-time Python voice service. Any AI agent that generates or refactors code here MUST follow them.
 
-## 0. Law zero: the agent does the work, the code validates the write
+## 0. Law zero: Pipecat structures the conversation, the model talks, the code owns facts and writes
 
-*   **The agent does the conversational work.** The language model listens, understands what the caller wants, converses, asks for what is missing and proposes the action (for example, an appointment). The code does not script the conversation and does not redo in rules what the model understands well.
-*   **The code validates the proposal before anything is written, and only that:** the business is the call's (`CallSession`), the service and the time slot are real (returned by the scheduling backend), and the caller confirmed this exact proposal after hearing it. Validating what is written is mandatory; constraining how the agent gets there is not.
+*   **Pipecat's documented patterns come first.** The conversation is a Pipecat Flows graph: each node focuses the model on one task with only the functions it needs ("monolithic prompts with many tools lead to hallucinations and lower accuracy", Pipecat). Pipecat's built-ins (Flows, Evals, observers, turn and mute strategies, tracing) are used before any code of our own; own code exists only for a gap Pipecat leaves, and says at the code which gap it fills (ADR 0019).
+*   **The model understands and phrases.** Within a node it converses, asks for what is missing and calls the node's functions with what the caller said. No rule in code classifies the caller's words.
+*   **The code owns the facts, the transitions and the writes.** It states the facts the model gets wrong when it works them out (dates, weekdays, the summary of what will be written); a node's transition follows its function's result; and before anything is written it validates, and only that: the business is the call's (`CallSession`), the service and the time slot are real (returned by the scheduling backend), and the caller confirmed this exact proposal after hearing it read back.
 *   Every write goes through that validation and through the scheduling backend's HTTP contract; the agent has no database credentials. If the backend does not confirm a write, the agent says so and confirms nothing.
 
 ## 1. Structural quality
@@ -61,11 +62,11 @@ Non-negotiable rules for all code in this repository, a real-time Python voice s
 Documentation is updated as part of the change, not afterwards. **Before every commit and every push**, without being asked:
 
 *   **`README.md`** is updated if anything it describes changed: installation, usage, architecture, status or environment variables.
-*   **Public documentation in `docs/`** reflects every addition, removal or behaviour change: the specs (`docs/specs/`) and the architecture decisions (`docs/adr/`). No task is done until the manifest of the module it touched is updated.
+*   **Public documentation in `docs/`** reflects every addition, removal or behaviour change: the specs (`docs/specs/`) and the architecture decisions (`docs/adr/`). No task is done until the manifest of the module it touched is updated. The manifest describes the current state, not its history: what changed, when and why lives in the pull request and in git.
 *   If a change does not affect documentation, the change summary says so explicitly ("no documentation changes because …"); it is never omitted silently.
 *   Removing code or a feature removes its documentation: documentation never describes something that no longer exists.
 *   Every trade-off records its context, the alternatives considered and its consequences: as an ADR in `docs/adr/NNNN-title-in-english.md` (numbered, see `docs/adr/README.md`) if it is cross-cutting, in the module's manifest if it is local.
-*   **ADRs are versioned, not rewritten.** Before it is published (it reaches the default branch of the public repository), an ADR is edited freely. Once published, only editorial corrections are allowed (wording, links, removing sensitive data), each listed with its date in the ADR's `Revisions` section. A different decision takes a new ADR that says `Supersedes NNNN`, and the earlier one becomes `Superseded by NNNN`. A change to part of a decision takes a new ADR that says `Amends NNNN` and records only what changes; the earlier one becomes `Accepted, amended by NNNN` and holds for the rest.
+*   **ADRs keep their history.** Before it is published (it reaches the default branch of the public repository), an ADR is edited freely. Once published, a change to part of its decision is made in the ADR itself, which gains a dated entry in its `Changes` section saying what changed, why, and where the new decision is recorded; editorial corrections go to its `Revisions` section. A different decision takes a new ADR that says `Supersedes NNNN`, and the earlier one becomes `Superseded by NNNN`. ADRs that already say `Amends NNNN` keep that history.
 *   **Where documentation lives:** additional public documentation inside `docs/`; architecture decisions in `docs/adr/`; at the repository root only `README.md` and `CLAUDE.md` as documentation (tool configuration files such as `pyproject.toml` stay where their tools expect them).
 
 ## 9. Language policy
@@ -115,6 +116,7 @@ Documentation is updated as part of the change, not afterwards. **Before every c
 *   The repository describes only the product and its technical decisions. It never references third-party organizations, clients, employers, job opportunities or the personal motivations of its maintainers. External context, if any, stays outside the repository.
 *   This applies to every file, comment, test, commit message and pull request description.
 *   Technology providers the product integrates with (Meta, Twilio, Deepgram, language model providers) are technical dependencies, not external context.
+*   **Nothing from test or practice calls enters the repository:** no words a caller said, names, dates they asked for, nor quotes of the agent, in code, tests, cases, documents or commit messages. A failure is described by the behaviour it shows, and its case uses invented data.
 
 ## 15. Security and tenancy are built per feature
 
@@ -130,7 +132,7 @@ Documentation is updated as part of the change, not afterwards. **Before every c
 *   **A failure is looked for in the observability first**: the logs by error code, the call trace, error tracking. If they cannot show it, the first change instruments it (an error code, an attribute or a span, with its test), and only then is it fixed.
 *   **Every error has a code and a kind** in `observability/error_taxonomy.py`, real failure or expected outcome, and is reported with `report_error`: structured log, `voice.error` metric, an issue only for real failures, and the trace of the call. No handler silences an error (`tests/architecture/test_error_handling.py`).
 *   **Every feature ships with** what it adds to the call trace, its error codes, and its case in the golden dataset; a reference conversation when it changes how the call flows.
-*   **No change to the prompt, the phrases, the model, its generation settings or the tools lands without model evals against the baseline** (ADR 0010, amended by ADR 0013; enforced by the behaviour fingerprint). The first baseline is measured with the booking prompt of phase 2; until then the fingerprint records the inputs unmeasured. No behaviour change without a golden case that shows it; every production failure that is fixed adds its case.
+*   **No change to the prompt, the phrases, the model, its generation settings or the tools lands without model evals against the baseline** (ADR 0010, amended by ADR 0013; enforced by the behaviour fingerprint). The first baseline is measured with the booking prompt of phase 2; until then the fingerprint records the inputs unmeasured. No behaviour change without a golden case that shows it; every production failure that is fixed adds its case. A change that adds or changes cases may store its baseline although a quality measure drops, when the drop comes from those cases: the reason is stored with the baseline and shown in the pull request (`--accept-drop`). A security measure never drops.
 *   **Personal data never leaves in errors or traces**: error tracking is configured without personal data and scrubs what it sends (ADR 0009); attributes are identifiers and categories, and per-call identifiers tag issues and traces, never metrics.
 
 ## 17. Proportion and course correction
@@ -142,9 +144,10 @@ Documentation is updated as part of the change, not afterwards. **Before every c
 *   Large files and modules nobody can reason about.
 *   Patching the same path when results do not improve.
 *   Fixing without first reading the traces (§16).
+*   Building our own version of something Pipecat ships, or designing before reading Pipecat's documentation (§0).
 
 **Growth.** What exists stays. Observability, evals, golden cases and security controls are added with each feature, to the extent that feature needs them: first working and safe, then more robust as real usage shows. The safety of writes and data is never postponed.
 
 **Working rule.** Whoever implements and sees that the implementation fails, that the design is wrong or that a better path exists stops and says so at once, with evidence: where the error is and the alternative path with its trade-off, even if it contradicts an earlier decision. They do not keep insisting on the same path nor harden it. The maintainers decide.
 
-**Governance is questioned too.** A rule of this repository (this constitution, `CLAUDE.md`, the ADR policy, documentation processes, CI) that slows work without protecting anything real, creates a technical, security or reputational risk, or contradicts another rule or the code, is reported with evidence and a concrete change. It is not applied in silence.
+**The working code decides, and governance is questioned too.** A rule of this repository (this constitution, `CLAUDE.md`, the ADR policy, documentation processes, CI) that blocks a better technical path, slows work without protecting anything real, creates a technical, security or reputational risk, or contradicts another rule or the code, is changed, not worked around: whoever meets it proposes the concrete change at once, with evidence. It is not applied in silence.

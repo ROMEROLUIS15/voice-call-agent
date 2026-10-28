@@ -132,7 +132,8 @@ fingerprint. The first
 baseline is measured with the booking prompt of phase 2 (ADR 0013): until then `--record-fingerprint`
 records the new inputs; from then on `--write-baseline` stores new measurements. Where the network
 refuses the default provider, the evals workflow measures it from a GitHub-hosted runner
-(`gh workflow run evals.yml --ref <branch> -f write_baseline=true`). Details:
+(`gh workflow run evals.yml --ref <branch> -f write_baseline=true`); a change that adds harder cases
+may store it with the reason for a quality drop (`-f accept_drop="<reason>"`), never a security one. Details:
 [golden dataset](docs/evals/golden-dataset.md).
 
 Text-to-speech voices are compared on the "first token → first audio" segment of manifest §6,

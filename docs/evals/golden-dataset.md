@@ -94,6 +94,8 @@ gh workflow run evals.yml --ref <branch> -f write_baseline=true
 gh run download <run-id> -n evals-baseline -D evals   # replaces evals/baseline.json
 ```
 
+A change that adds or changes cases can make a quality measure drop by its own new cases rather than by a worse agent. Then the baseline is stored with the reason (`--write-baseline --accept-drop "<reason>"`, or `-f accept_drop="<reason>"` on the workflow): the report says the drop was accepted and why, the reason is kept in `evals/baseline.json`, and the pull request shows it to the maintainer who approves the merge. A security measure is never accepted down (constitution §16).
+
 In CI, `.github/workflows/evals.yml` runs level 2 when the prompt, phrases, model adapters, speech pipeline, settings, evals or dependencies change, compares with the baseline of the commit the change starts from and puts the report in the run summary; run on demand with `write_baseline`, it also stores a new baseline, kept 14 days as the `evals-baseline` artifact. Without the `OPENROUTER_API_KEY` secret (the model's and the judge's) it is skipped with a notice. Its check is not required (it runs only on those changes), but a pull request is not merged with it failing (ADR 0012).
 
 ## Rules
