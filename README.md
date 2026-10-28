@@ -165,7 +165,8 @@ uv run pre-commit run --all-files --hook-stage manual
 ```
 
 Changes reach `main` through pull requests; CI's jobs are required checks (ADR 0012).
-`.github/workflows/evals.yml` runs the model evals when what shapes the agent's replies changes
+`.github/workflows/evals.yml` runs the model evals on a pull request only when what shapes the agent's
+replies changes (the behaviour fingerprint), never again on `main` after the merge, and on demand
 (skipped without the `OPENROUTER_API_KEY` secret, for the model and the judge); its check is not required, but a
 pull request is not merged with it failing. `.github/workflows/provider-reachability.yml` checks
 on demand that the runners reach every provider, and prints the Groq key's rate limits, which tell

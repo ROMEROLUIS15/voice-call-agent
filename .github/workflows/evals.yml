@@ -2,25 +2,15 @@ name: Model evals
 
 # The model-level golden cases with the real language model, scored by task metrics and a
 # judge model, compared with the baseline of the commit the change starts from (ADR 0010,
-# docs/evals/golden-dataset.md). Runs when what shapes the agent's replies changes, and on
-# demand. Without the provider secrets the job is skipped with a notice: pull requests from
+# docs/evals/golden-dataset.md). On a pull request it measures only when the behaviour
+# fingerprint changed (`--only-if-changed`); it does not run again on `main` after the merge,
+# which measured the same code; and it runs on demand. Every run spends provider credits. Without the provider secrets the job is skipped with a notice: pull requests from
 # forks never receive secrets, and this workflow never runs on `pull_request_target`.
 # Run on demand with `write_baseline`, it measures the baseline from a GitHub-hosted runner, for
 # networks that refuse the default provider, and keeps it as the `evals-baseline` artifact.
 
 on:
   pull_request:
-    paths:
-      - "src/voice_call_agent/conversation_content/**"
-      - "src/voice_call_agent/adapters/language_model_providers/**"
-      - "src/voice_call_agent/speech_pipeline/**"
-      - "src/voice_call_agent/settings/**"
-      - "evals/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - ".github/workflows/evals.yml"
-  push:
-    branches: [main]
     paths:
       - "src/voice_call_agent/conversation_content/**"
       - "src/voice_call_agent/adapters/language_model_providers/**"
@@ -81,7 +71,7 @@ jobs:
       - name: Baseline of the commit the change starts from
         if: steps.secrets.outputs.present == 'true'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE_SHA" ] && git cat-file -e "$BASE_SHA:evals/baseline.json" 2>/dev/null; then
             git show "$BASE_SHA:evals/baseline.json" > "$RUNNER_TEMP/baseline.json"
@@ -96,6 +86,9 @@ jobs:
           ACCEPT_DROP: ${{ inputs.accept_drop }}
         run: |
           options=(--compare-with "$RUNNER_TEMP/baseline.json" --report "$RUNNER_TEMP/evals-report.md")
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            options+=(--only-if-changed)
+          fi
           if [ "$WRITE_BASELINE" = "true" ]; then
             options+=(--write-baseline)
             if [ -n "$ACCEPT_DROP" ]; then
