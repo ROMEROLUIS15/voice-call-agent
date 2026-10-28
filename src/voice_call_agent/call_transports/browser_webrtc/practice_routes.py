@@ -1,12 +1,15 @@
-"""Routes of the browser practice entry: the practice page, its script and the WebRTC offer."""
+"""Routes of the browser practice entry: the practice page, its script, the lines it can dial and
+the WebRTC offer."""
 
 import ipaddress
 import uuid
+from collections.abc import Sequence
 from importlib import resources
 
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
+from pydantic import BaseModel, ConfigDict
 
 from voice_call_agent.call_session.business_resolution import BusinessResolved, BusinessResolver
 from voice_call_agent.call_session.session import CallSession
@@ -33,6 +36,7 @@ from voice_call_agent.speech_pipeline.conversation_runner import ConversationRun
 
 PRACTICE_PAGE_PATH = "/practice"
 PRACTICE_SCRIPT_PATH = "/practice/call.js"
+LINES_PATH = "/practice/lines"
 OFFER_PATH = "/practice/offer"
 PRACTICE_PAGE_POLICY = (
     b"default-src 'none'; script-src 'self'; connect-src 'self'; "
@@ -41,10 +45,20 @@ PRACTICE_PAGE_POLICY = (
 """The page loads its own script and posts its offer to this service; nothing else."""
 
 
+class PracticeLine(BaseModel):
+    """A number the practice page can dial, as a phone-line caller dials a business's number."""
+
+    model_config = ConfigDict(frozen=True)
+
+    number: str
+    business_name: str
+
+
 def build_practice_router(
     supervisor: CallSupervisor,
     conversation_runner: ConversationRunner,
     business_resolver: BusinessResolver | None,
+    practice_lines: Sequence[PracticeLine] = (),
     connect_timeout_seconds: float = CONNECT_TIMEOUT_SECONDS,
 ) -> APIRouter:
     """Router of the practice entry. Reads the page once, at startup."""
@@ -53,6 +67,7 @@ def build_practice_router(
         supervisor,
         conversation_runner,
         business_resolver,
+        practice_lines=tuple(practice_lines),
         page=(page / "index.html").read_text(encoding="utf-8"),
         script=(page / "call.js").read_text(encoding="utf-8"),
         connect_timeout_seconds=connect_timeout_seconds,
@@ -60,6 +75,7 @@ def build_practice_router(
     router = APIRouter()
     router.add_api_route(PRACTICE_PAGE_PATH, endpoints.practice_page, methods=["GET"])
     router.add_api_route(PRACTICE_SCRIPT_PATH, endpoints.practice_script, methods=["GET"])
+    router.add_api_route(LINES_PATH, endpoints.list_lines, methods=["GET"])
     router.add_api_route(OFFER_PATH, endpoints.receive_offer, methods=["POST"])
     return router
 
@@ -73,6 +89,7 @@ class BrowserPracticeEndpoints:
         conversation_runner: ConversationRunner,
         business_resolver: BusinessResolver | None,
         *,
+        practice_lines: tuple[PracticeLine, ...],
         page: str,
         script: str,
         connect_timeout_seconds: float,
@@ -80,6 +97,7 @@ class BrowserPracticeEndpoints:
         self._supervisor = supervisor
         self._conversation_runner = conversation_runner
         self._business_resolver = business_resolver
+        self._practice_lines = practice_lines
         self._page = page
         self._script = script
         self._connect_timeout_seconds = connect_timeout_seconds
@@ -90,11 +108,20 @@ class BrowserPracticeEndpoints:
     async def practice_script(self) -> Response:
         return Response(self._script, media_type="text/javascript")
 
+    async def list_lines(self) -> Response:
+        """The numbers the page offers to dial; none without a practice schedule."""
+        return JSONResponse([line.model_dump() for line in self._practice_lines])
+
     async def receive_offer(self, offer: BrowserOffer, request: Request) -> Response:
         """Answer the offer of a browser on this machine and start the call."""
         if not _is_loopback(request.client.host if request.client else None):
             report_error(ErrorCode.PRACTICE_CLIENT_NOT_LOCAL, entry="browser")
             return Response(status_code=status.HTTP_403_FORBIDDEN)
+        if offer.dialed_number is not None and offer.dialed_number not in {
+            line.number for line in self._practice_lines
+        }:
+            report_error(ErrorCode.REQUEST_INVALID, entry="browser")
+            return Response(status_code=status.HTTP_400_BAD_REQUEST)
         slot = self._supervisor.try_reserve()
         if slot is None:
             report_error(ErrorCode.CALL_REJECTED_NO_SLOT, entry="browser")
@@ -108,7 +135,7 @@ class BrowserPracticeEndpoints:
         except BaseException:
             slot.release()
             raise
-        session = build_browser_session(f"practice-{uuid.uuid4().hex}")
+        session = build_browser_session(f"practice-{uuid.uuid4().hex}", offer.dialed_number)
         self._supervisor.launch(slot, self._converse(connection, session))
         return JSONResponse(answer.model_dump())
 
@@ -127,9 +154,10 @@ class BrowserPracticeEndpoints:
     async def _with_business(self, session: CallSession) -> CallSession:
         """The session with the business the backend resolves for it, when there is a backend.
 
-        The call has no dialed number, so the backend decides (the practice schedule picks its
-        default business). Unresolved, the call goes on without a business and nothing can be
-        written (constitution §3).
+        The backend decides from the practice line the page dialed, as it does from a phone-line
+        call's dialed number; without one, the practice schedule picks its default business.
+        Unresolved, the call goes on without a business and nothing can be written
+        (constitution §3).
         """
         if self._business_resolver is None:
             return session

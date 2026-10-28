@@ -35,6 +35,7 @@ from voice_call_agent.call_transports.twilio_media_streams.pipecat_websocket_tra
 )
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.observability.call_trace import CallTrace, ServiceVersions
+from voice_call_agent.observability.conversation_transcript import ConversationTranscriptSink
 from voice_call_agent.observability.cost_estimation import load_price_table
 from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
@@ -115,6 +116,7 @@ async def hold_conversation(
     content: ConversationContent,
     services: ServiceVersions,
     create_language_model: Callable[[str], AIService],
+    transcript_sink: ConversationTranscriptSink | None = None,
 ) -> ConversationRecord:
     """Call, say each of the caller's turns, wait for the last reply and hang up."""
     stt, tts, transport = ScriptedSpeechToText(), RecordingTextToSpeech(), LoopbackTransport()
@@ -133,6 +135,7 @@ async def hold_conversation(
         prices=load_price_table(),
         trace_sinks=[sink],
         scheduling_backend=schedule,
+        transcript_sink=transcript_sink,
         clock=harness_clock,
     )
     session, audio_format = _session_of(case)

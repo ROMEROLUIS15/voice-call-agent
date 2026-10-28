@@ -41,6 +41,7 @@ def _endpoints(resolver: _Resolver) -> BrowserPracticeEndpoints:
         CallSupervisor(1),
         RecordingConversationRunner(),
         resolver,
+        practice_lines=(),
         page="",
         script="",
         connect_timeout_seconds=1,

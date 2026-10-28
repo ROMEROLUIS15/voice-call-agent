@@ -1,6 +1,6 @@
 # ADR 0015: Browser practice entry for development
 
-*   **Status:** Accepted
+*   **Status:** Accepted, amended by 0017
 *   **Date:** 2026-10-26
 *   **Amends:** 0004
 
