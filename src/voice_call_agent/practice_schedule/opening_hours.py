@@ -3,15 +3,17 @@
 from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
 
-from voice_call_agent.practice_schedule.practice_catalog import WEEKDAYS, PracticeBusiness
+from voice_call_agent.practice_schedule.practice_catalog import PracticeBusiness
 from voice_call_agent.scheduling_backend.scheduling_models import OpeningHours
 
 Interval = tuple[time, time]
+START_INTERVAL_MIN = 30
+"""Minutes between the starts a day offers, from opening: the production backend's interval."""
 
 
 def hours_on(business: PracticeBusiness, day: date) -> OpeningHours | None:
     """The day's opening hours, or `None` when the business is closed."""
-    return business.opening_hours.get(WEEKDAYS[day.weekday()])
+    return business.weekly_hours.on(day)
 
 
 def end_of(start: time, minutes: int) -> time | None:

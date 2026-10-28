@@ -9,21 +9,21 @@ schedule: open
 business: practice-dental-clinic
 language: es
 turns:
-  - says: Buenos días, quisiera una limpieza dental para mañana a las diez y cuarto de la mañana. Mi nombre es Ana Ejemplo.
+  - says: Buenos días, quisiera una limpieza dental para mañana a las diez y media de la mañana. Mi nombre es Ana Ejemplo.
   - says: Sí, por favor, confírmela.
 expected:
   intent: book
   data:
     service: limpieza dental
     day: mañana
-    time: "10:15"
+    time: "10:30"
     name: Ana Ejemplo
   tool_call:
     name: propose_booking
     arguments:
       service_id: dental-cleaning
       day: "2026-10-27"
-      start: "10:15"
+      start: "10:30"
       client_name: Ana Ejemplo
   writes: [proposed, booked]
   outcome: booked

@@ -26,7 +26,6 @@ class PracticeBusiness(BaseModel):
     name: str
     timezone: str
     greeting: str
-    slot_minutes: int = Field(gt=0, le=120)
     """Distance between the start times offered."""
     dialed_numbers: tuple[str, ...] = ()
     services: tuple[ServiceOffering, ...] = Field(min_length=1)

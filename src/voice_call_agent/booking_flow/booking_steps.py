@@ -30,7 +30,12 @@ from voice_call_agent.scheduling_backend.scheduling_errors import (
     SchedulingBackendError,
     SchedulingBackendUnavailableError,
 )
-from voice_call_agent.scheduling_backend.scheduling_models import AvailableSlots, ServiceOffering
+from voice_call_agent.scheduling_backend.scheduling_models import (
+    AvailableSlots,
+    OpeningHours,
+    ServiceOffering,
+    WeeklyHours,
+)
 from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBackend
 from voice_call_agent.write_guards.booking_guard import (
     Booked,
@@ -79,6 +84,8 @@ class TimeChoice:
     starts: list[time]
     taken: time | None
     offered_at_turn: int
+    hours: OpeningHours | None
+    """The day's opening hours, to say why `taken` is not offered."""
     """The caller's turns when the starts were offered: a start is chosen only after another."""
 
 
@@ -93,8 +100,10 @@ class BookingSteps:
         backend: SchedulingBackend,
         guard: BookingGuard,
         content: ConversationContent,
+        weekly_hours: WeeklyHours,
     ) -> None:
         self._call_id = call_id
+        self._weekly_hours = weekly_hours
         self._catalog = {service.id: service for service in catalog}
         self._backend = backend
         self._guard = guard
@@ -161,7 +170,12 @@ class BookingSteps:
             status = {"status": "available", **day, "start": clock_time(call.start)}
             return StepOutcome(status, Step.NAME)
         self.choice = TimeChoice(
-            service, call.day, result.slots, call.start, self._guard.caller_turns()
+            service,
+            call.day,
+            result.slots,
+            call.start,
+            self._guard.caller_turns(),
+            self._weekly_hours.on(call.day),
         )
         starts = [clock_time(start) for start in result.slots]
         return StepOutcome(
@@ -180,6 +194,7 @@ class BookingSteps:
                 result.available_starts,
                 slot.start,
                 self._guard.caller_turns(),
+                self._weekly_hours.on(slot.day),
             )
             return StepOutcome({"status": "slot_taken"}, Step.CHOOSE_TIME)
         return StepOutcome({"status": result.reason.value}, Step.REQUEST)
