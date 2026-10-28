@@ -87,8 +87,8 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
       their overlap check, so a second booking of the same time waits and sees the first; the
       booking answers `SLOT_CONFLICT`, as the reschedule did. Tried in the local Cronix: pgTAP
       164/164, and two connections booking one time at once left one appointment, the second
-      answered `SLOT_CONFLICT` after waiting 2.35 s. Deployed by the maintainer: the migration
-      first, then the Edge Functions. The phone endpoints book through the same function.
+      answered `SLOT_CONFLICT` after waiting 2.35 s. Its deployment is the maintainer's: the
+      migration first, then the Edge Functions. The phone endpoints book through the same function.
 - [ ] **B4. One computation of free starts** (Cronix pull request #30): WhatsApp's resolver
       moves to `supabase/functions/_shared/availability.ts` and the dashboard's agent uses it, so
       both count every appointment but `cancelled` and `no_show` as taken, as the booking does, and
