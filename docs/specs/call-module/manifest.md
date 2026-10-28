@@ -331,7 +331,7 @@ The current state; what changed, when and why is in the pull requests and in git
 
 **Pending to close phase 0** (needs accounts and real calls): a Venezuelan number on the phone line (§10); 20 measured calls on the phone line; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute on the phone line. The WhatsApp entry is paused (§10): its measured calls, how it coexists with the message webhook and the multi-instance `terminate` risk wait until Meta enables *Calling* on the number.
 
-**Next:** the connection with Cronix, step by step, in `docs/specs/cronix-connection/tasks.md`: free times said by ranges, the contract's endpoints in Cronix with each business's currency, the Cronix adapter, and calls against Cronix's test environment.
+**Next:** the connection with Cronix, step by step, in `docs/specs/cronix-connection/tasks.md`: Cronix's availability rules in the agent and free times said by ranges, the contract's endpoints in Cronix (atomic bookings, one computation of free starts, each business's currency, the dialed number), the Cronix adapter, and calls against a local Cronix.
 
 **Then (ADR 0019):**
 
