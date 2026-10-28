@@ -139,6 +139,8 @@ class BookingSteps:
         return StepOutcome({"status": "changing"}, Step.REQUEST)
 
     async def _check_availability(self, call: CheckAvailabilityArguments) -> StepOutcome:
+        # A new request: nothing chosen or proposed for the earlier one may be proposed or booked.
+        self.slot, self.choice, self.proposal = None, None, None
         service = self._catalog.get(call.service_id)
         if service is None:
             return StepOutcome({"status": "unknown_service"}, None)

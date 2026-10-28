@@ -3,7 +3,10 @@
 Each node gives the model one task and only the functions that task needs. The code says the
 greeting and the read-back of the proposal, and routes on each function's outcome
 (`booking_steps`), as Pipecat's Flows examples route on a result field. Built per call from the
-call's business: its services and the free starts the backend returns become strict enums.
+call's business. Its services and the free starts are not enums in the function schemas: a
+provider that validates tool calls against the schema ends the turn on a value outside an enum
+and the agent falls silent (manifest §10). The code checks them instead (`unknown_service`,
+`not_offered`), and the model corrects itself.
 """
 
 from collections.abc import Awaitable, Callable, Mapping
@@ -86,8 +89,7 @@ class BookingGraph:
         return _node(Step.REQUEST, self._tasks.request, [self._check_availability()])
 
     def _check_availability(self) -> FlowsFunctionSchema:
-        services = [service.id for service in self._steps.catalog]
-        schema = _properties(CheckAvailabilityArguments, service_id={"enum": services})
+        schema = _properties(CheckAvailabilityArguments)
         return self._function("check_availability", schema, self._steps.check_availability)
 
     def _choose_time(self) -> NodeConfig:
@@ -108,11 +110,8 @@ class BookingGraph:
             free_times=free_times,
             requested=requested,
         )
-        starts = [clock_time(start) for start in choice.starts]
         select = self._function(
-            "select_start",
-            _properties(SelectStartArguments, start={"enum": starts}),
-            self._steps.select_start,
+            "select_start", _properties(SelectStartArguments), self._steps.select_start
         )
         return _node(Step.CHOOSE_TIME, task, [select, self._check_availability()])
 
@@ -128,7 +127,7 @@ class BookingGraph:
         propose = self._function(
             "propose_booking", _properties(ProposeBookingArguments), self._steps.propose_booking
         )
-        return _node(Step.NAME, task, [propose])
+        return _node(Step.NAME, task, [propose, self._check_availability()])
 
     def _confirm(self) -> NodeConfig:
         """The code reads the proposal back, and the model waits for the caller's answer."""
@@ -195,17 +194,13 @@ def _node(
     )
 
 
-def _properties(arguments: type[BaseModel], **constraints: dict[str, Any]) -> dict[str, Any]:
-    """The JSON Schema properties of an arguments model, with the call's own constraints (the
-    business's services, the free starts) added as strict enums."""
+def _properties(arguments: type[BaseModel]) -> dict[str, Any]:
+    """The JSON Schema properties of an arguments model."""
     schema = arguments.model_json_schema()
-    properties = {
+    return {
         field: {key: value for key, value in spec.items() if key != "title"}
         for field, spec in schema["properties"].items()
     }
-    for field, constraint in constraints.items():
-        properties[field] = {**properties[field], **constraint}
-    return properties
 
 
 _ARGUMENTS: dict[str, type[BaseModel]] = {
@@ -221,8 +216,8 @@ def _required(name: str) -> set[str]:
 
 
 def booking_functions() -> dict[str, dict[str, Any]]:
-    """Each booking function as the model receives it, without the call's own enums (its
-    services, its free starts): what the behaviour fingerprint and the snapshots follow."""
+    """Each booking function as the model receives it, the same in every call: what the
+    behaviour fingerprint and the snapshots follow."""
     return {
         name: {
             "description": description,
