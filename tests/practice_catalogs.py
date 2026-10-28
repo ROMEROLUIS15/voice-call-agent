@@ -8,6 +8,7 @@ from voice_call_agent.call_session.session_builders import (
     build_twilio_session,
     build_whatsapp_session,
 )
+from voice_call_agent.call_transports.browser_webrtc.practice_routes import PracticeLine
 from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
 from voice_call_agent.practice_schedule.practice_catalog import PracticeCatalog
 
@@ -49,6 +50,9 @@ TWO_BUSINESSES = PracticeCatalog.model_validate(
         ],
     }
 )
+
+
+SPA_LINE = PracticeLine(number=SPA_NUMBER, business_name="Spa Dos")
 
 
 def schedule() -> InMemorySchedule:

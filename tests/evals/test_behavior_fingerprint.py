@@ -2,8 +2,10 @@
 
 from pathlib import Path
 
+import pytest
 from pydantic import SecretStr
 
+from evals import behavior_fingerprint as behavior_fingerprint_module
 from evals.behavior_fingerprint import (
     behavior_fingerprint,
     behavior_inputs,
@@ -18,6 +20,7 @@ from evals.eval_baseline import (
 )
 from evals.model_evals import EXIT_CANNOT_RUN, EXIT_OK, record_unmeasured_fingerprint
 from tests.evals.eval_runs_factory import MEASURED_AT
+from voice_call_agent.practice_schedule.practice_catalog import load_practice_catalog
 
 REGENERATE = (
     "What shapes the agent's replies changed (inputs above). Run the model evals and store "
@@ -30,6 +33,26 @@ def test_the_baseline_was_measured_with_the_current_behavior() -> None:
     baseline = load_baseline()
     assert baseline.inputs == behavior_inputs(), REGENERATE
     assert baseline.fingerprint == behavior_fingerprint(baseline.inputs)
+
+
+def test_the_numbers_that_reach_a_business_do_not_change_the_fingerprint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A number decides which business a call reaches, never what its model is told."""
+    catalog = load_practice_catalog()
+    renumbered = catalog.model_copy(
+        update={
+            "businesses": tuple(
+                business.model_copy(update={"dialed_numbers": ("+12025550199",)})
+                if business.id == catalog.default_business
+                else business
+                for business in catalog.businesses
+            )
+        }
+    )
+    before = behavior_inputs()["practice_businesses"]
+    monkeypatch.setattr(behavior_fingerprint_module, "load_practice_catalog", lambda: renumbered)
+    assert behavior_inputs()["practice_businesses"] == before
 
 
 def test_the_language_model_input_names_the_provider_and_the_model() -> None:

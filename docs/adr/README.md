@@ -16,8 +16,9 @@ Cross-cutting decisions of the voice call agent. Decisions local to one module l
 | [0011](0011-write-proposals-validated-by-code.md) | Write proposals validated by code; the model judges the caller's confirmation | Accepted |
 | [0012](0012-pull-requests-with-required-checks.md) | Changes reach main through pull requests with required checks | Accepted |
 | [0013](0013-evals-fingerprint-of-what-the-evals-measure.md) | Evals fingerprint of what the evals measure, and the first baseline with the booking prompt | Accepted |
-| [0015](0015-browser-practice-entry-for-development.md) | Browser practice entry for development | Accepted |
+| [0015](0015-browser-practice-entry-for-development.md) | Browser practice entry for development | Accepted, amended by 0017 |
 | [0016](0016-quality-margins-from-measured-noise.md) | Quality margins from the measured noise between runs | Accepted |
+| [0017](0017-practice-lines-and-conversation-transcripts.md) | Practice lines and conversation transcripts in development | Accepted |
 
 ## Process
 

@@ -33,7 +33,8 @@ that URL in `PUBLIC_BASE_URL`. Keep the practice entry off while the port is exp
 Talk to the agent from a browser on your own machine, with no phone number (ADR 0015):
 
 ```bash
-# in .env: ENVIRONMENT=development, BROWSER_PRACTICE_ENABLED=true and SCHEDULING_BACKEND=practice
+# in .env: ENVIRONMENT=development, BROWSER_PRACTICE_ENABLED=true, SCHEDULING_BACKEND=practice
+# and, to read each call back, CONVERSATION_TRANSCRIPTS_DIR=var/conversation_transcripts
 uv run voice-call-agent      # then open http://localhost:8000/practice
 ```
 
@@ -43,11 +44,18 @@ start a call, and the service refuses the setting outside development. Its laten
 call's: the browser's audio is wideband, with echo cancellation, and stays on the machine.
 
 `SCHEDULING_BACKEND=practice` gives the calls fictitious businesses to book with (a barbershop, a
-dental clinic and a spa; a practice call reaches `default_business`), kept in memory and lost on
-restart (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is also refused
-outside development. With it, ask for an appointment by voice: the agent checks the
-availability, proposes, reads the summary back and books only after you say yes (ADR 0011). Each
-decision lands in the call's trace (`writes`) with the `booked` outcome.
+dental clinic and a spa), kept in memory and lost on restart
+(`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is also refused outside
+development. Each business has a fictitious number: pick it on the page before starting the call,
+and the call reaches that business as a phone-line call reaches the number it dials (ADR 0017).
+Ask for an appointment by voice: the agent checks the availability, proposes, reads the summary
+back and books only after you say yes (ADR 0011). Each decision lands in the call's trace
+(`writes`) with the `booked` outcome.
+
+With `CONVERSATION_TRANSCRIPTS_DIR` set, each call also leaves a text file named after the call:
+the prompt the model received, then what was said, with your turns as the speech-to-text heard
+them, the agent's lines as far as they were spoken and each tool call with its result. It keeps
+what you say, so the service refuses it outside development, and it never leaves the machine.
 
 The language model goes through OpenRouter by default (`OPENROUTER_API_KEY`): the same
 `gpt-oss-120b`, served by Groq or, when Groq fails, by Cerebras, which also works from networks

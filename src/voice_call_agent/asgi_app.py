@@ -16,6 +16,7 @@ from voice_call_agent.call_transports.browser_webrtc.practice_routes import (
     OFFER_PATH,
     PRACTICE_PAGE_PATH,
     PRACTICE_PAGE_POLICY,
+    PracticeLine,
     build_practice_router,
 )
 from voice_call_agent.call_transports.replay_guard import ReplayGuard
@@ -52,6 +53,8 @@ class ServiceComponents:
     shutdown_grace_seconds: float
     business_resolver: BusinessResolver | None = None
     """Present when a scheduling backend is configured; the practice entry resolves with it."""
+    practice_lines: tuple[PracticeLine, ...] = ()
+    """The practice schedule's numbers, which the practice page offers to dial."""
 
 
 def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> ASGIApp:
@@ -72,7 +75,10 @@ def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> 
     if settings.browser_practice_enabled:
         app.include_router(
             build_practice_router(
-                components.supervisor, components.conversation_runner, components.business_resolver
+                components.supervisor,
+                components.conversation_runner,
+                components.business_resolver,
+                components.practice_lines,
             )
         )
         rate_limited_paths |= {OFFER_PATH}

@@ -16,6 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from voice_call_agent.settings.sections import (
     CallSupervisionSettings,
     CallTraceLogSettings,
+    ConversationTranscriptSettings,
     DeploymentEnvironment,
     ErrorTrackingSettings,
     HttpHardeningSettings,
@@ -92,6 +93,8 @@ class ServiceSettings(BaseSettings):
     meta_connect_max_age_seconds: float = 60.0
 
     call_trace_log_path: Path = Path("var/call_traces.jsonl")
+    conversation_transcripts_dir: Path | None = None
+    """A text file per call with what was said (development only, ADR 0017)."""
     sentry_dsn: SecretStr | None = None
     sentry_traces_sample_rate: float = 1.0
     log_level: str = "INFO"
@@ -126,6 +129,14 @@ class ServiceSettings(BaseSettings):
             raise UnsafeSettingsError(
                 "SCHEDULING_BACKEND=practice needs ENVIRONMENT=development: its businesses are "
                 "fictitious"
+            )
+        if (
+            self.conversation_transcripts_dir is not None
+            and self.environment is DeploymentEnvironment.PRODUCTION
+        ):
+            raise UnsafeSettingsError(
+                "CONVERSATION_TRANSCRIPTS_DIR needs ENVIRONMENT=development: transcripts keep "
+                "what callers say"
             )
         if "*" in _comma_separated(self.cors_allowed_origins):
             raise UnsafeSettingsError("CORS_ALLOWED_ORIGINS must list explicit origins, never '*'")
@@ -214,6 +225,12 @@ class ServiceSettings(BaseSettings):
 
     def call_trace_log(self) -> CallTraceLogSettings:
         return CallTraceLogSettings(path=self.call_trace_log_path)
+
+    def conversation_transcripts(self) -> ConversationTranscriptSettings | None:
+        """Where calls leave their transcripts, or `None`: no transcripts."""
+        if self.conversation_transcripts_dir is None:
+            return None
+        return ConversationTranscriptSettings(directory=self.conversation_transcripts_dir)
 
     def error_tracking(self) -> ErrorTrackingSettings:
         return ErrorTrackingSettings(

@@ -26,11 +26,11 @@ def build_whatsapp_session(call_id: str, wa_from: str, business_number: str) -> 
     )
 
 
-def build_browser_session(call_id: str) -> CallSession:
-    """Session of a practice call from a browser: no caller or dialed number."""
+def build_browser_session(call_id: str, dialed_number: str | None = None) -> CallSession:
+    """Session of a practice call from a browser: no caller; the practice line it dialed, if any."""
     return CallSession(
         call_id=call_id,
         channel=CallChannel.BROWSER,
         caller_phone=None,
-        dialed_phone=None,
+        dialed_phone=normalize_e164(dialed_number),
     )

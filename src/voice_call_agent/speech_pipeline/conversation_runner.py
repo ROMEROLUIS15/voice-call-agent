@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from pipecat.frames.frames import TTSSpeakFrame
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.workers.runner import WorkerRunner
 
@@ -20,6 +21,10 @@ from voice_call_agent.observability.call_logging import bind_call_logger, log_ca
 from voice_call_agent.observability.call_trace import ServiceVersions
 from voice_call_agent.observability.call_trace_recorder import CallTraceRecorder
 from voice_call_agent.observability.call_trace_store import CallTraceSink, publish_trace
+from voice_call_agent.observability.conversation_transcript import (
+    ConversationTranscriptSink,
+    keep_transcript,
+)
 from voice_call_agent.observability.cost_estimation import PriceTable
 from voice_call_agent.observability.error_reporting import errors_recorded_by, report_error
 from voice_call_agent.observability.error_taxonomy import ErrorCode
@@ -58,14 +63,17 @@ class PipecatConversationRunner:
         prices: PriceTable,
         trace_sinks: Sequence[CallTraceSink],
         scheduling_backend: SchedulingBackend | None = None,
+        transcript_sink: ConversationTranscriptSink | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
+        """`transcript_sink` keeps what was said in each call: development only (ADR 0017)."""
         self._factories = factories
         self._content = content
         self._services = services
         self._prices = prices
         self._trace_sinks = trace_sinks
         self._backend = scheduling_backend
+        self._transcript_sink = transcript_sink
         self._clock = clock
 
     async def run(
@@ -83,14 +91,20 @@ class PipecatConversationRunner:
             recorder=recorder,
             today_in=self._today_in,
         )
+        conversation = LLMContext()
         # Errors and upstreams reported anywhere in this call's tasks land in its trace.
         with errors_recorded_by(recorder), upstreams_recorded_by(recorder):
             try:
-                await self._converse(transport, audio_format, recorder, plan)
+                await self._converse(transport, audio_format, recorder, plan, conversation)
             finally:
                 trace = recorder.finish()
                 await self._close_backend_call(session, trace.outcome)
                 await publish_trace(trace, self._trace_sinks)
+                if self._transcript_sink is not None:
+                    messages = conversation.get_messages()
+                    await keep_transcript(
+                        self._transcript_sink, trace, plan.system_prompt, messages
+                    )
                 call_logger.bind(
                     duration_s=round(trace.duration_s, 1),
                     turns=len(trace.turns),
@@ -105,9 +119,10 @@ class PipecatConversationRunner:
         audio_format: AudioFormat,
         recorder: CallTraceRecorder,
         plan: CallPlan,
+        conversation: LLMContext,
     ) -> None:
         pipeline = await assemble_speech_pipeline(
-            transport, self._factories, plan.system_prompt, plan.tools
+            transport, self._factories, plan.system_prompt, plan.tools, conversation
         )
         worker = PipelineWorker(
             pipeline,

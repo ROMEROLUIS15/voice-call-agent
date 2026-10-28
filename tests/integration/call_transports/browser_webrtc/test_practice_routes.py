@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from tests.app_builder import AppUnderTest
 from tests.browser_peer import browser_offer, wait_until
-from tests.practice_catalogs import schedule
+from tests.practice_catalogs import SPA_LINE, SPA_NUMBER, schedule
 from voice_call_agent.call_transports.browser_webrtc.practice_routes import PRACTICE_PAGE_POLICY
 from voice_call_agent.call_transports.pipecat_webrtc_transport import WEBRTC_AUDIO_FORMAT
 
@@ -66,3 +66,30 @@ async def test_a_practice_call_gets_the_business_the_schedule_resolves() -> None
         await browser.close()
     [(session, _)] = app_under_test.runner.calls
     assert session.business_id == "barbershop"  # The default business: no dialed number.
+
+
+def test_the_page_lists_the_practice_lines_and_none_without_a_schedule() -> None:
+    with TestClient(AppUnderTest(practice_lines=(SPA_LINE,)).build(**PRACTICE)) as client:
+        lines = client.get("/practice/lines")
+    with TestClient(AppUnderTest().build(**PRACTICE)) as client:
+        no_lines = client.get("/practice/lines")
+    assert lines.status_code == 200
+    assert lines.json() == [{"number": SPA_NUMBER, "business_name": "Spa Dos"}]
+    assert no_lines.json() == []
+
+
+async def test_a_practice_call_reaches_the_business_of_the_line_it_dials() -> None:
+    app_under_test = AppUnderTest(business_resolver=schedule(), practice_lines=(SPA_LINE,))
+    transport = httpx.ASGITransport(app=app_under_test.build(**PRACTICE), client=("127.0.0.1", 1))
+    browser, offer = await browser_offer()
+    dialing = offer | {"dialed_number": SPA_NUMBER}
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post("/practice/offer", json=dialing)
+        await browser.setRemoteDescription(RTCSessionDescription(**response.json()))
+        await wait_until(lambda: bool(app_under_test.runner.calls))
+    finally:
+        await browser.close()
+    [(session, _)] = app_under_test.runner.calls
+    assert session.dialed_phone == SPA_NUMBER
+    assert session.business_id == "spa"  # Resolved as a phone line's dialed number is.

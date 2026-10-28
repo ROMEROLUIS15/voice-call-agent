@@ -13,6 +13,7 @@ from evals.golden_cases import EvalLevel, GoldenCase, load_golden_dataset, runna
 from voice_call_agent.conversation_content.business_briefing import booking_prompt
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import ServiceVersions
+from voice_call_agent.observability.conversation_transcript import ConversationTranscript
 
 CASES = runnable_cases(load_golden_dataset(), EvalLevel.CONVERSATION)
 CONTENT = load_conversation_content()
@@ -26,6 +27,14 @@ SCRIPTED_SERVICES = ServiceVersions(
 )
 
 
+class _RecordingTranscriptSink:
+    def __init__(self) -> None:
+        self.transcripts: list[ConversationTranscript] = []
+
+    async def write(self, transcript: ConversationTranscript) -> None:
+        self.transcripts.append(transcript)
+
+
 @pytest.mark.parametrize("case", CASES, ids=[case.id for case in CASES])
 async def test_reference_conversation(case: GoldenCase) -> None:
     models: list[ScriptedLanguageModel] = []
@@ -34,11 +43,13 @@ async def test_reference_conversation(case: GoldenCase) -> None:
         models.append(ScriptedLanguageModel(system_prompt, case.expected.tool_call))
         return models[-1]
 
+    transcripts = _RecordingTranscriptSink()
     record = await hold_conversation(
         case,
         content=CONTENT,
         services=SCRIPTED_SERVICES,
         create_language_model=create_language_model,
+        transcript_sink=transcripts,
     )
 
     greeting = record.business.greeting if record.business else CONTENT.greeting
@@ -49,6 +60,8 @@ async def test_reference_conversation(case: GoldenCase) -> None:
     assert model.caller_messages == [turn.says for turn in case.turns]
     assert record.trace.services.prompt_version == CONTENT.version
     _assert_the_transcript_is_in_order(case, record)
+    [transcript] = transcripts.transcripts
+    _assert_the_kept_transcript_shows_what_was_said(case, record, transcript, greeting)
 
 
 def _assert_the_transcript_is_in_order(case: GoldenCase, record: ConversationRecord) -> None:
@@ -66,6 +79,26 @@ def _assert_the_transcript_is_in_order(case: GoldenCase, record: ConversationRec
     assert [name for _, name in tools] == ["propose_booking", "confirm_booking"]
     (proposed, _), (confirmed, _) = tools
     assert callers[0] < proposed < callers[1] < confirmed
+
+
+def _assert_the_kept_transcript_shows_what_was_said(
+    case: GoldenCase, record: ConversationRecord, transcript: ConversationTranscript, greeting: str
+) -> None:
+    """What a developer reads after a practice call (ADR 0017): the prompt, what the agent said
+    as far as the caller heard it, each caller turn as heard and each tool call with its result,
+    in order."""
+    assert transcript.call_id == record.trace.call_id
+    assert f"outcome {record.trace.outcome.value}" in transcript.header
+    assert transcript.system_prompt == record.system_prompt
+    lines = transcript.lines
+    if not record.agent_interrupted:  # An interrupted line keeps only what was spoken.
+        assert lines[0] == f"agent: {greeting}"
+    callers = [line for line in lines if line.startswith("caller: ")]
+    assert callers == [f"caller: {turn.says}" for turn in case.turns]
+    tools = [line.split()[2] for line in lines if line.startswith("agent called ")]
+    results = [line.split()[0] for line in lines if " returned: " in line]
+    expected = [] if case.expected.tool_call is None else ["propose_booking", "confirm_booking"]
+    assert tools == results == expected
 
 
 def _expected_prompt(record: ConversationRecord) -> str:

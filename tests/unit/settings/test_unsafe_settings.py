@@ -54,3 +54,14 @@ def test_the_practice_schedule_is_refused_in_production() -> None:
         ).scheduling_backend.value
         == "practice"
     )
+
+
+def test_conversation_transcripts_are_refused_in_production() -> None:
+    with pytest.raises(ValidationError, match="CONVERSATION_TRANSCRIPTS_DIR"):
+        make_service_settings(conversation_transcripts_dir="var/conversation_transcripts")
+    assert make_service_settings().conversation_transcripts() is None
+    transcripts = make_service_settings(
+        conversation_transcripts_dir="var/conversation_transcripts", environment="development"
+    ).conversation_transcripts()
+    assert transcripts is not None
+    assert transcripts.directory.name == "conversation_transcripts"

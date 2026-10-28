@@ -12,6 +12,7 @@ from voice_call_agent.adapters.language_model_providers.provider_selection impor
 )
 from voice_call_agent.asgi_app import ServiceComponents
 from voice_call_agent.call_supervision.call_supervisor import CallSupervisor
+from voice_call_agent.call_transports.browser_webrtc.practice_routes import PracticeLine
 from voice_call_agent.call_transports.replay_guard import InMemoryReplayGuard
 from voice_call_agent.call_transports.twilio_media_streams.call_termination import (
     TwilioCallTerminator,
@@ -23,10 +24,14 @@ from voice_call_agent.conversation_content.content_loader import load_conversati
 from voice_call_agent.http_hardening.request_rate_limit import build_rate_limiter
 from voice_call_agent.observability.call_trace import ServiceVersions
 from voice_call_agent.observability.call_trace_store import CallTraceSink, JsonlCallTraceSink
+from voice_call_agent.observability.conversation_transcript import TextFileTranscriptSink
 from voice_call_agent.observability.cost_estimation import load_price_table
 from voice_call_agent.observability.sentry_trace_export import SentryCallTraceSink
 from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
-from voice_call_agent.practice_schedule.practice_catalog import load_practice_catalog
+from voice_call_agent.practice_schedule.practice_catalog import (
+    PracticeCatalog,
+    load_practice_catalog,
+)
 from voice_call_agent.settings.sections import SchedulingBackendKind
 from voice_call_agent.settings.service_settings import ServiceSettings
 from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
@@ -46,7 +51,8 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
     )
     trace_sinks: list[CallTraceSink] = [JsonlCallTraceSink(settings.call_trace_log().path)]
     trace_sinks.append(SentryCallTraceSink())  # A no-op unless error tracking is configured.
-    schedule = _scheduling_backend(settings)
+    practice_catalog = _practice_catalog(settings)
+    schedule = InMemorySchedule(practice_catalog) if practice_catalog is not None else None
     runner = PipecatConversationRunner(
         factories=factories,
         content=content,
@@ -61,6 +67,7 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
         prices=load_price_table(),
         trace_sinks=trace_sinks,
         scheduling_backend=schedule,
+        transcript_sink=_transcript_sink(settings),
     )
     supervision = settings.call_supervision()
     protection = settings.webhook_protection()
@@ -79,11 +86,29 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
         rate_limiter=build_rate_limiter(protection.rate_limit_storage_uri),
         shutdown_grace_seconds=supervision.shutdown_grace_seconds,
         business_resolver=schedule,
+        practice_lines=_practice_lines(practice_catalog),
     )
 
 
-def _scheduling_backend(settings: ServiceSettings) -> InMemorySchedule | None:
-    """The practice schedule when chosen; no backend otherwise (the Cronix adapter: phase 1)."""
+def _practice_catalog(settings: ServiceSettings) -> PracticeCatalog | None:
+    """The practice schedule's businesses when chosen; no backend otherwise (the Cronix adapter:
+    phase 1)."""
     if settings.scheduling_backend is SchedulingBackendKind.PRACTICE:
-        return InMemorySchedule(load_practice_catalog())
+        return load_practice_catalog()
     return None
+
+
+def _transcript_sink(settings: ServiceSettings) -> TextFileTranscriptSink | None:
+    """Development only: each call leaves what was said in a local file (ADR 0017)."""
+    transcripts = settings.conversation_transcripts()
+    return TextFileTranscriptSink(transcripts.directory) if transcripts is not None else None
+
+
+def _practice_lines(catalog: PracticeCatalog | None) -> tuple[PracticeLine, ...]:
+    if catalog is None:
+        return ()
+    return tuple(
+        PracticeLine(number=number, business_name=business.name)
+        for business in catalog.businesses
+        for number in business.dialed_numbers
+    )

@@ -32,3 +32,8 @@ def test_browser_practice_call_has_no_numbers_and_no_verified_identity() -> None
     assert (session.caller_phone, session.dialed_phone) == (None, None)
     assert not session.identity_verified
     assert session.trace_context().channel_label == "browser"
+
+
+def test_a_practice_call_carries_the_line_it_dialed() -> None:
+    assert build_browser_session("practice-1", "+1 (202) 555-0103").dialed_phone == "+12025550103"
+    assert build_browser_session("practice-1").dialed_phone is None

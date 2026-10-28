@@ -1,5 +1,6 @@
 """The practice catalog: the shipped businesses load, and a broken catalog fails at startup."""
 
+import re
 from datetime import UTC, date, datetime, time
 from typing import Any
 
@@ -90,3 +91,12 @@ def test_a_service_without_a_price_says_it_is_not_published() -> None:
     prompt = booking_prompt(content, clinic, MONDAY)
     [line] = [line for line in prompt.splitlines() if "[first-assessment]" in line]
     assert line.endswith(content.booking_briefing.no_price)  # Never read as a free service.
+
+
+def test_every_shipped_business_has_a_fictitious_line_that_reaches_it() -> None:
+    catalog = load_practice_catalog()
+    for business in catalog.businesses:
+        assert business.dialed_numbers, f"{business.id} cannot be dialed from the practice page"
+        for number in business.dialed_numbers:
+            assert re.fullmatch(r"\+1\d{3}55501\d{2}", number), "555-0100 to 555-0199 only"
+            assert catalog.business_for_number(number) == business
