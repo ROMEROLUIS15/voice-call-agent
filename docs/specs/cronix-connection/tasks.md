@@ -69,35 +69,47 @@ The practice schedule copies Cronix's rules, so what is tried in practice is wha
 - [x] **A3. Why a time does not work**, from the starts and the service's duration: the service
       would not end before the next appointment or closing, the time is off the 30-minute
       interval, or it is taken; a closed day is answered by the availability itself.
-- [ ] **A4. Tests, golden cases with invented data, model evals and a practice call**; one pull
-      request with README, manifest and golden dataset.
+- [x] **A4. Tests, golden cases with invented data, model evals and a practice call**; one pull
+      request with README, manifest and golden dataset. The practice call said the free times by
+      ranges, explained why a time before opening did not work, and booked after a change of
+      service at the confirmation.
 
 ## Stage B: the contract's endpoints in Cronix (Cronix repository)
 
-Through Cronix's SDD gate: the phone endpoints are an area without a spec, declared and specified
-in Cronix first.
+What changes in Cronix is tracked here, not in Cronix's own specs, unless the change is large.
 
-- [ ] **B1. A local Cronix**: Docker, `npx supabase db reset`, and a seed of invented businesses
-      (services of several durations, hours with a closed day, booked appointments). Never the
-      production project.
-- [ ] **B2. The spec in Cronix**: a module for the phone endpoints, with the contract's
-      invariants, errors and isolation, read against `modulo-whatsapp-citas` and `modulo-citas-core`.
-- [ ] **B3. Bookings that cannot overlap at the same moment** (Cronix pull request #29):
+- [ ] **B1. A local Cronix**: Docker and the local Supabase stack (`npx supabase start`; pending
+      migrations with `npx supabase migration up --local`, never a reset of the local data), and a
+      seed of invented businesses (services of several durations, hours with a closed day, booked
+      appointments). Never the production project. The stack runs; the seed is pending.
+- [x] **B3. Bookings that cannot overlap at the same moment** (Cronix pull request #29, merged):
       `fn_book_appointment_wa` and `fn_reschedule_appointment_wa` take a lock per business before
       their overlap check, so a second booking of the same time waits and sees the first; the
       booking answers `SLOT_CONFLICT`, as the reschedule did. Tried in the local Cronix: pgTAP
       164/164, and two connections booking one time at once left one appointment, the second
-      answered `SLOT_CONFLICT` after waiting 2.35 s. Ticked when merged and deployed (migration
-      first, then the Edge Functions). The phone endpoints book through the same function.
-- [ ] **B4. One computation of free starts**, the one the booking also applies (statuses, past
-      times, opening hours, hours never set), used by WhatsApp, the dashboard's agent and the phone
-      endpoints.
-- [ ] **B5. The business's currency**, set by the owner with the hours, stored and returned with
-      the catalog.
-- [ ] **B6. The dialed number**: how a phone line's number reaches its business (a setting like
-      WhatsApp's `wa_phone_number_id`).
-- [ ] **B7. The v1 endpoints** of the contract, thin over the functions above, with the business
-      always from `call_sid`: start of call, business, availability, booking, end of call.
+      answered `SLOT_CONFLICT` after waiting 2.35 s. Its deployment is the maintainer's: the
+      migration first, then the Edge Functions. The phone endpoints book through the same function.
+- [ ] **B4. One computation of free starts** (Cronix pull request #30, which also fixes an import
+      the tests could not see and Deno resolves): WhatsApp's resolver
+      moves to `supabase/functions/_shared/availability.ts` and the dashboard's agent uses it, so
+      both count every appointment but `cancelled` and `no_show` as taken, as the booking does, and
+      drop past times; the SQL `fn_get_available_slots`, which nothing called, is dropped. The
+      phone endpoints will use the same resolver. Tried locally: 849 function tests, pgTAP
+      164/164, type check clean.
+- [ ] **B5. The business's currency** (Cronix pull request #31): `settings.currency` (USD, VES,
+      EUR, COP or MXN), set by the owner in the dashboard's settings next to the hours; USD when
+      absent, as the reports already assume, so no existing business changes until its owner
+      chooses; returned with the catalog when a call starts.
+- [ ] **B6. The dialed number** (Cronix pull request #32): `phone_agent_lines`, each number unique
+      and pointing at one business, with row-level security and no policies (the service only);
+      lines are added with SQL when a number is bought, no screen yet.
+- [ ] **B7. The v1 endpoints** of the contract, the phone line only, with the business always from
+      the call record (`phone_agent_calls`) and every request signed by the agent:
+  - [x] start of call, availability and end of call (Cronix pull request #32): tried end to end
+        against the local Cronix with the function served and invented data;
+  - [ ] booking: `fn_book_appointment_wa` with the caller's number, `OUTSIDE_HOURS` and
+        `SLOT_CONFLICT`, the idempotency key, and the owner notified through WhatsApp's
+        notification pipeline moved to `_shared` for both channels.
 - [ ] **B8. Tests**: pgTAP for the functions and isolation between businesses, `deno test` for the
       endpoints, two bookings of the same time at once.
 - [ ] **B9. A pull request in Cronix**, then deployed, after the local tries of Stage D.
@@ -129,8 +141,13 @@ in Cronix first.
 
 ## Open questions
 
+- A reply the caller waited for and then spoke over is recorded nowhere: in the practice call of
+  stage A the model streamed nothing for 6.6 s after the caller's thanks, and only the log's
+  time to first byte showed it. The trace should record such a wait; decided before Stage D's
+  calls.
+
 - A break in a business's hours (closed at midday): not in Cronix today. Adding it is a Cronix
-  change that B4's computation would follow; decided before B4.
+  change in the shared resolver (B4); not part of this connection unless decided.
 
 ## Decisions
 
@@ -144,3 +161,7 @@ in Cronix first.
   stays with Cronix's multi-employee work.
 - 2026-10-28 · What has to change in Cronix is tracked here, not in Cronix's own specs, unless the
   change is large.
+- 2026-10-28 · Currency in the business's settings, USD when absent (B5); phone lines in their own
+  table with a unique number (B6); the v1 endpoints serve the phone line only, WhatsApp's choice of
+  business by name waits for Meta's calling (B7); Cronix returns the business's name and the agent
+  builds the greeting with its own phrase, no recording for now (the contract changes, C1).
