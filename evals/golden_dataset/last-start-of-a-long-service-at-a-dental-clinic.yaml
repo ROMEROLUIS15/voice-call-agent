@@ -1,0 +1,32 @@
+id: last-start-of-a-long-service-at-a-dental-clinic
+title: The caller asks for the last free time of a long service; the agent books the last start that still ends before closing
+source: practice-failure
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-dental-clinic
+language: es
+turns:
+  - says: Hola, quiero un blanqueamiento dental para mañana, a nombre de Elena Ejemplo.
+  - says: La última hora que tengas, por favor.
+  - says: Sí, perfecto.
+expected:
+  intent: book
+  data:
+    service: blanqueamiento dental
+    day: mañana
+    time: "14:30"
+    name: Elena Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: teeth-whitening
+      day: "2026-10-27"
+      start: "14:30"
+      client_name: Elena Ejemplo
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, free-times, any-business]
