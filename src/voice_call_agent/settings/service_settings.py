@@ -24,6 +24,7 @@ from voice_call_agent.settings.sections import (
     LanguageModelSettings,
     LogFormat,
     LogSettings,
+    PracticeLinesSpec,
     SchedulingApiSettings,
     SchedulingBackendKind,
     ServerSettings,
@@ -81,6 +82,7 @@ class ServiceSettings(BaseSettings):
     scheduling_backend: SchedulingBackendKind = SchedulingBackendKind.NONE
     scheduling_api_url: HttpUrl | None = None
     scheduling_api_signing_secret: SecretStr | None = None
+    practice_lines: PracticeLinesSpec = ""
 
     max_concurrent_calls: int = 10
     shutdown_grace_seconds: float = 300.0

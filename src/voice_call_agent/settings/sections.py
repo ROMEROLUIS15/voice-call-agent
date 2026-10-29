@@ -1,9 +1,11 @@
 """Typed configuration sections. Each component receives only the section it needs."""
 
+import re
 from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, SecretStr
 
 
 class _Section(BaseModel):
@@ -56,6 +58,25 @@ class SchedulingBackendKind(StrEnum):
     """The in-memory practice schedule with fictitious businesses; development only."""
     API = "api"
     """The scheduling backend's HTTP API, every request signed (contract §2)."""
+
+
+_PRACTICE_LINE = re.compile(r"\+1\d{3}55501\d{2}=[^;=]+")
+
+
+def practice_lines(spec: str) -> tuple[tuple[str, str], ...]:
+    """`number=Business name;…` as (number, name) pairs; every number in 555-0100 to 555-0199,
+    the range reserved for fiction, so a practice page can never dial a real business's line."""
+    entries = [entry.strip() for entry in spec.split(";") if entry.strip()]
+    for entry in entries:
+        if not _PRACTICE_LINE.fullmatch(entry):
+            raise ValueError(
+                "PRACTICE_LINES takes `+1NNN55501NN=Business name;…` (fictitious numbers)"
+            )
+    return tuple((number, name.strip()) for number, name in (e.split("=", 1) for e in entries))
+
+
+PracticeLinesSpec = Annotated[str, AfterValidator(lambda spec: (practice_lines(spec), spec)[1])]
+"""Practice lines a browser practice call can dial when the backend is an API (development)."""
 
 
 class SchedulingApiSettings(_Section):
