@@ -98,3 +98,13 @@ def test_the_scheduling_api_needs_its_url_and_secret_and_https_in_production() -
     assert api is not None and api.base_url.endswith("/phone-agent-api")
     assert "s3cret" not in repr(api)  # A SecretStr: never printed.
     assert make_service_settings().scheduling_api() is None
+
+
+def test_practice_lines_take_only_fictitious_numbers() -> None:
+    settings = make_service_settings(
+        practice_lines="+13055550101=Barbería Local; +13055550102=Clínica"
+    )
+    assert settings.practice_lines.startswith("+13055550101")
+    for spec in ("+584121234567=Real", "+13055550101", "+13055550101=A=B"):
+        with pytest.raises(ValidationError, match="PRACTICE_LINES"):
+            make_service_settings(practice_lines=spec)  # A real number never reaches the page.
