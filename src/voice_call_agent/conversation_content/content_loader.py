@@ -127,6 +127,8 @@ class ConversationContent(BaseModel):
     booking_prompt: str
     """For calls whose business the backend resolved; filled in by `business_briefing`."""
     greeting: str
+    business_greeting: str
+    """Takes `{business_name}`."""
     read_back: str
     """The proposal as the code reads it back before the caller's yes (ADR 0019)."""
     booking_briefing: BookingBriefing
@@ -143,6 +145,8 @@ class ConversationContent(BaseModel):
 
 class _Phrases(BaseModel):
     greeting: str
+    business_greeting: str
+    """Takes `{business_name}`."""
     read_back: str
     booking_briefing: BookingBriefing
     spoken_moments: SpokenMoments
@@ -171,6 +175,7 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         system_prompt=system_prompt,
         booking_prompt=booking_prompt,
         greeting=phrases.greeting,
+        business_greeting=phrases.business_greeting,
         read_back=phrases.read_back,
         booking_briefing=phrases.booking_briefing,
         spoken_moments=phrases.spoken_moments,

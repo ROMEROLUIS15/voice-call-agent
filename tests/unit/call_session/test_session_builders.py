@@ -1,3 +1,5 @@
+import re
+
 from voice_call_agent.call_session.session_builders import (
     build_browser_session,
     build_twilio_session,
@@ -27,9 +29,11 @@ def test_trace_context_carries_the_channel_as_a_label() -> None:
     assert context.channel_label == "twilio"
 
 
-def test_browser_practice_call_has_no_numbers_and_no_verified_identity() -> None:
+def test_browser_practice_call_has_a_fictitious_caller_and_no_verified_identity() -> None:
     session = build_browser_session("practice-1")
-    assert (session.caller_phone, session.dialed_phone) == (None, None)
+    assert session.caller_phone is not None
+    assert re.fullmatch(r"\+120255501\d{2}", session.caller_phone)  # 555-0100 to 555-0199.
+    assert session.dialed_phone is None
     assert not session.identity_verified
     assert session.trace_context().channel_label == "browser"
 

@@ -155,7 +155,7 @@ Closes the call record with its outcome (`booked`, `rescheduled`, `cancelled`, `
 | Same idempotency key, different body | 409 | `IDEMPOTENCY_MISMATCH` | `IdempotencyKeyReusedError` |
 | Non-recoverable logic error | 500 | captured in Sentry; the agent does **not** retry | `SchedulingBackendRejectedRequestError` |
 
-The agent retries **only** `429` and `503`, with the same `Idempotency-Key`, and at most once within the call (the caller is waiting).
+The agent retries `429`, `503`, a timeout and a connection failure, with the same `Idempotency-Key`, at most once within the call (the caller is waiting): a read is safe to repeat, and a repeated write returns the stored response or `503` while the first still runs, never a second booking.
 
 ## 7. Agent-side timeouts
 

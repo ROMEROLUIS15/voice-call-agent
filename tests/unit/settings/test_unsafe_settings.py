@@ -74,3 +74,27 @@ def test_the_log_file_is_refused_in_production() -> None:
         log_file_path="var/service.log", environment="development"
     ).logging_output()
     assert log.file_path is not None and log.file_level == "DEBUG"
+
+
+def test_the_scheduling_api_needs_its_url_and_secret_and_https_in_production() -> None:
+    with pytest.raises(
+        ValidationError, match="SCHEDULING_API_URL and SCHEDULING_API_SIGNING_SECRET"
+    ):
+        make_service_settings(
+            scheduling_backend="api", scheduling_api_url="https://api.example.com/fn"
+        )
+    with pytest.raises(ValidationError, match="https"):
+        make_service_settings(
+            scheduling_backend="api",
+            scheduling_api_url="http://127.0.0.1:54321/functions/v1/phone-agent-api",
+            scheduling_api_signing_secret="s3cret",
+        )
+    api = make_service_settings(
+        scheduling_backend="api",
+        scheduling_api_url="http://127.0.0.1:54321/functions/v1/phone-agent-api/",
+        scheduling_api_signing_secret="s3cret",
+        environment="development",
+    ).scheduling_api()
+    assert api is not None and api.base_url.endswith("/phone-agent-api")
+    assert "s3cret" not in repr(api)  # A SecretStr: never printed.
+    assert make_service_settings().scheduling_api() is None
