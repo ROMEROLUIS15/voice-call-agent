@@ -64,3 +64,17 @@ def test_the_scheduling_api_is_wired_as_backend_and_resolver_when_chosen() -> No
         )
     )
     assert isinstance(components.business_resolver, CronixSchedulingBackend)
+
+
+def test_an_api_backend_offers_the_configured_practice_lines() -> None:
+    components = compose_service(
+        make_service_settings(
+            scheduling_backend="api",
+            scheduling_api_url="https://api.example.com/functions/v1/phone-agent-api",
+            scheduling_api_signing_secret="s3cret",
+            practice_lines="+13055550101=Barbería Local",
+        )
+    )
+    assert [(line.number, line.business_name) for line in components.practice_lines] == [
+        ("+13055550101", "Barbería Local")
+    ]
