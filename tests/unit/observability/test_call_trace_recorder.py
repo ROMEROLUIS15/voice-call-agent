@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from pipecat.frames.frames import (
     ErrorFrame,
     InterruptionFrame,
@@ -12,6 +14,7 @@ from pipecat.observers.base_observer import FramePushed
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
 from tests.call_trace_factory import SERVICES
+from voice_call_agent.observability.call_trace import BackendRequest
 from voice_call_agent.observability.call_trace_recorder import CallTraceRecorder
 from voice_call_agent.observability.cost_estimation import load_price_table
 from voice_call_agent.observability.error_reporting import errors_recorded_by, report_error
@@ -127,3 +130,15 @@ async def test_a_reply_the_caller_interrupted_is_not_reported_as_silent() -> Non
         for frame in (LLMFullResponseStartFrame(), InterruptionFrame(), LLMFullResponseEndFrame()):
             await silent.on_push_frame(_pushed(frame))
     assert recorder.finish().errors == []
+
+
+def test_the_trace_keeps_each_backend_request() -> None:
+    recorder = _recorder()
+    request = BackendRequest(
+        operation="book_appointment",
+        started_at=datetime(2026, 10, 19, 10, 0, tzinfo=UTC),
+        duration_ms=420.0,
+        outcome="ok",
+    )
+    recorder.record_backend_request(request)
+    assert recorder.finish().backend_requests == [request]
