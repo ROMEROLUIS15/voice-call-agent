@@ -217,7 +217,7 @@ Registered on 2026-10-19; what each item solves and how it applies here is in [`
 *   **Phase 4:** a deadline on the language model's first token with a retry on the fallback model **before speaking**, never in the middle of a reply; a false-interruption filter (coughs, fillers) that refines AC-8; provider fault injection; load tests and capacity per instance; Redis for replay protection and rate limits before a second instance runs.
 *   **Phase 5:** inspectable language model traces (self-hosted Langfuse, or a hosted tracer with redaction beforehand, decided in an ADR); SLOs with an error budget; runbooks and a postmortems folder.
 *   **When real usage asks for it:** per-component metrics next to the end-to-end ones; the OpenTelemetry GenAI semantic conventions, decided with the phase 5 ADR on language model traces.
-*   **Deployment:** a multi-stage Dockerfile on Debian slim, **not Alpine**: musl breaks onnxruntime (needed by Silero VAD, which ships no musl wheels nor sources) and other native dependencies.
+*   **Deployment:** a multi-stage Dockerfile on Debian slim, **not Alpine**: musl breaks onnxruntime (needed by Silero VAD, which ships no musl wheels nor sources) and other native dependencies. The server runs in São Paulo, next to Cronix's database (§11); of the hosts checked on 2026-10-29, Fly.io (`gru`) and AWS (`sa-east-1`) have a São Paulo region, while Railway (US, Amsterdam, Singapore), Render (US, Frankfurt, Singapore) and Pipecat Cloud (US, Frankfurt, Mumbai) have none.
 
 ## 10. Known risks
 
@@ -276,6 +276,7 @@ Decisions local to this module:
 *   **First case = booking in Cronix**.
 *   **One number per business on the phone line**, not one number shared by every business: the dialed number identifies the business before the greeting, so the greeting and the business context are the business's from the first second. A shared number would start every call with a question, depend on business names transcribed from 8 kHz audio and load the business in the middle of the call. Cost: a Venezuelan number per business (§10).
 *   **v1 is booking; checking, rescheduling, cancelling and messages are v1.1.** Booking solves the problem end to end with one kind of write and no second factor; the rest needs the phone line's identity check and a message store that is not decided yet (contract §4.6).
+*   **The agent's server in São Paulo (`sa-east-1`), next to Cronix's database.** Supabase runs an Edge Function in the region nearest to its caller, and the database is in `sa-east-1`: called from the US, each query crossed the continent (measured 2026-10-29: about 1,010 ms of function time from `us-east-1` against about 790 ms in `sa-east-1`). A server in São Paulo gets the function next to the database with no setting, and is also near Twilio's São Paulo edge and the callers in Venezuela. Pinning the region per request (`x-region`) stays the fallback if the server cannot run there: a pinned region is not rerouted in an outage.
 *   **No message when the backend is down** (AC-9): the message would be stored in the backend that failed.
 *   **`calls/{id}/end` sends only the outcome:** latency and cost stay in the agent's call trace (ADR 0009).
 *   **Stream admission token on Twilio Media Streams**. The `/twilio/stream` WebSocket is public; without control anyone could open an STT + LLM + TTS session at our expense. The signed webhook issues an HMAC token bound to the `CallSid`, valid for 60 s, inside the TwiML; the WebSocket requires it in the `start` event. The key is derived from the Twilio auth token: no new secret. Stateless, so any instance can verify it. Rejected alternative: validating `X-Twilio-Signature` on the WebSocket handshake, a Twilio behaviour not verified in its documentation.
@@ -333,7 +334,7 @@ The current state; what changed, when and why is in the pull requests and in git
 
 **Pending to close phase 0** (needs accounts and real calls): a Venezuelan number on the phone line (§10); 20 measured calls on the phone line; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute on the phone line. The WhatsApp entry is paused (§10): its measured calls, how it coexists with the message webhook and the multi-instance `terminate` risk wait until Meta enables *Calling* on the number.
 
-**Next:** the adjustments the practice calls against Cronix found (`docs/specs/cronix-connection/tasks.md`, D4): the time of each request to the scheduling API in the trace, measured against production, and the latency above the 1.0 s target, measured per segment before choosing a change; then the phone line against Cronix once a Venezuelan number exists.
+**Next** (`docs/specs/cronix-connection/tasks.md`): the latency above the 1.0 s target (D4), measured per segment, starting with the scheduling API's trip to its database; then WhatsApp calls with Meta's test number, which needs no messaging limit (stage E). Production goes first for whichever channel is unblocked first: Meta's messaging limit for WhatsApp, or an affordable number for the phone line; a server in São Paulo is contracted then (§11).
 
 **Then (ADR 0019):**
 
