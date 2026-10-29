@@ -132,20 +132,35 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
 
 ## Stage D: calls against the local Cronix, and adjustments
 
-- [ ] **D1. The practice entry against the local Cronix**: the page lists the seeded businesses'
+- [x] **D1. The practice entry against the local Cronix**: the page lists the seeded businesses'
       lines; a call books in the local Cronix. The page's lines come from `PRACTICE_LINES`
-      (fictitious numbers only) with `SCHEDULING_BACKEND=api`; the seed and the call remain.
-- [ ] **D2. Practice calls**, each read from its transcript, trace and log: a booking, a time taken
-      meanwhile, a closed day, a long service near closing, a question about prices.
-- [ ] **D3. Each appointment checked in the local Cronix's dashboard**: there once, with its service,
-      day, time and client.
+      (fictitious numbers only) with `SCHEDULING_BACKEND=api`; the seed holds two invented
+      businesses, a barbershop in USD and a dental clinic in VES, each with a closed day and an
+      appointment already taken.
+- [x] **D2. Practice calls**, each read from its transcript, trace and log: a booking, a time taken
+      meanwhile, a closed day, a long service near closing, a question about prices. Three calls,
+      all booked, no error logged: prices said in each business's currency, and corrected when
+      the caller named another; a closed day refused from the business's hours; a two-hour
+      service refused when it ends past closing, with the nearest starts offered; a time taken
+      by another booking after the availability check, caught when the proposal is checked again
+      and answered with the free ranges. Not tried in a call: a time taken between the read-back
+      and the caller's yes, which Cronix refuses with `SLOT_CONFLICT` (covered by the adapter's
+      and Cronix's tests).
+- [x] **D3. Each appointment checked in the local Cronix's database**: there once, with its service,
+      day, time, client and the caller's fictitious number; one stored idempotency response per
+      booking; each call closed as `booked`; the owner notified.
 - [ ] **D4. Adjustments** recorded below; then Cronix's pull request (B9) and its deployment; the
       phone line against Cronix once a Venezuelan number exists.
+  - [ ] The model misstates a fact the code gave it: told the free starts run from 08:00 to 14:00,
+        it said until 13:30. The free ranges become a phrase the code speaks, as the read-back
+        is, instead of a range the model rewords; with its golden case and model evals.
+  - [ ] Latency above the 1.0 s p50 target: 1.3 s and 1.7 s median per call, 2.3 to 2.8 s on
+        turns with a function call (two model rounds). Speech-to-text took 1.5 to 3.0 s when the
+        caller paused mid-sentence. Measured per segment before choosing a change.
+  - [ ] The time spent in the scheduling API is not visible per request; a span or attribute per
+        request, measured against production's Cronix (the local one is not representative).
 
 ## Open questions
-
-- Stored responses of idempotency keys are kept with no expiry; the contract says 7 days. A
-  periodic cleanup is added before calls reach production.
 
 - A reply the caller waited for and then spoke over is recorded nowhere: in the practice call of
   stage A the model streamed nothing for 6.6 s after the caller's thanks, and only the log's
@@ -176,3 +191,5 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
   (`SCHEDULING_API_SIGNING_SECRET`), and the functions `phone-agent-api`, `process-whatsapp`,
   `voice-worker` and `whatsapp-webhook`, which also needed its import map (Cronix pull request
   #33).
+- 2026-10-29 · Stored responses of idempotency keys are deleted after 7 days by a daily job in
+  Cronix (pull request #35), as the contract says.
