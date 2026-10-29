@@ -12,7 +12,9 @@ Its telemetry and its retries are set before that import, whatever the environme
 """
 
 import os
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from functools import partial
 
 from openai import APIError
 
@@ -105,11 +107,22 @@ class ConversationJudge:
                 model=self._model,
                 threshold=JUDGE_PASS_THRESHOLD,
             )
-            try:
-                score = float(await metric.a_measure(test_case, _show_indicator=False))
-            except (APIError, TimeoutError) as error:
-                raise JudgeUnavailableError(
-                    f"the judge {self._model_name} failed: {error}"
-                ) from error
+            score = await measure(
+                partial(metric.a_measure, test_case, _show_indicator=False), self._model_name
+            )
             scores.append(JudgeScore(criterion.id, score, str(metric.reason or "")))
         return scores
+
+
+async def measure(score: Callable[[], Awaitable[float]], model_name: str) -> float:
+    """One criterion's score. An answer that is not the JSON asked for is asked once more: the
+    judge returned one in a full run, and the run lost every score already paid for."""
+    for attempt in range(2):
+        try:
+            return float(await score())
+        except ValueError as error:  # DeepEval's invalid JSON from the judge.
+            if attempt:
+                raise JudgeUnavailableError(f"the judge {model_name} failed: {error}") from error
+        except (APIError, TimeoutError) as error:
+            raise JudgeUnavailableError(f"the judge {model_name} failed: {error}") from error
+    raise AssertionError("unreachable")  # pragma: no cover

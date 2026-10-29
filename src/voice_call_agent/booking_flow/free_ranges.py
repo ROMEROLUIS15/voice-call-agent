@@ -51,6 +51,19 @@ def free_ranges(starts: Sequence[time]) -> list[FreeRange]:
     return ranges
 
 
+def nearest_ranges(ranges: Sequence[FreeRange], around: time | None, limit: int) -> list[FreeRange]:
+    """At most `limit` ranges, the closest to `around` (the earliest without it), in day order."""
+    if around is None or len(ranges) <= limit:
+        return list(ranges[:limit])
+    target = _minutes(around)
+
+    def distance(free: FreeRange) -> int:
+        first, last = _minutes(free.first), _minutes(free.last)
+        return 0 if first <= target <= last else min(abs(first - target), abs(last - target))
+
+    return sorted(sorted(ranges, key=distance)[:limit], key=lambda free: free.first)
+
+
 def why_unavailable(
     requested: time, starts: Sequence[time], duration_min: int, hours: OpeningHours
 ) -> Unavailable:

@@ -14,7 +14,7 @@ from evals.conversation_harness.conversation_driver import (
     hold_conversation,
 )
 from evals.conversation_harness.scripted_language_model import ScriptedLanguageModel
-from evals.judge_scoring import JudgeUnavailableError
+from evals.judge_scoring import JudgeUnavailableError, measure
 from evals.model_eval_runs import CaseRun
 from evals.model_evals import EXIT_CANNOT_RUN, main
 from tests.evals.eval_runs_factory import golden_case
@@ -83,3 +83,23 @@ def test_a_provider_failure_during_the_run_cannot_run(
     assert main(["--report", str(report)]) == EXIT_CANNOT_RUN
     assert not report.exists()
     assert "Nothing was scored or stored" in capsys.readouterr().out
+
+
+class FlakyJudgeMetric:
+    """Answers as listed: a score, or DeepEval's error for a reply that is not JSON."""
+
+    def __init__(self, *answers: float | ValueError) -> None:
+        self.answers = list(answers)
+
+    async def a_measure(self) -> float:
+        answer = self.answers.pop(0)
+        if isinstance(answer, ValueError):
+            raise answer
+        return answer
+
+
+async def test_a_judge_reply_that_is_not_json_is_asked_once_more() -> None:
+    not_json = ValueError("Evaluation LLM outputted an invalid JSON.")
+    assert await measure(FlakyJudgeMetric(not_json, 0.9).a_measure, "judge") == 0.9
+    with pytest.raises(JudgeUnavailableError, match="invalid JSON"):
+        await measure(FlakyJudgeMetric(not_json, not_json).a_measure, "judge")

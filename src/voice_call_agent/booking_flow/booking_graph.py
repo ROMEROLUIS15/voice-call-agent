@@ -1,12 +1,12 @@
 """The booking conversation as a Pipecat Flows graph (ADR 0019).
 
 Each node gives the model one task and only the functions that task needs. The code says the
-greeting and the read-back of the proposal, and routes on each function's outcome
-(`booking_steps`), as Pipecat's Flows examples route on a result field. Built per call from the
-call's business. Its services and the free starts are not enums in the function schemas: a
-provider that validates tool calls against the schema ends the turn on a value outside an enum
-and the agent falls silent (manifest §10). The code checks them instead (`unknown_service`,
-`not_offered`), and the model corrects itself.
+greeting, the free times to choose from and the read-back of the proposal, and routes on each
+function's outcome (`booking_steps`), as Pipecat's Flows examples route on a result field. Built
+per call from the call's business. Its services and the free starts are not enums in the
+function schemas: a provider that validates tool calls against the schema ends the turn on a
+value outside an enum and the agent falls silent (manifest §10). The code checks them instead
+(`unknown_service`, `not_offered`), and the model corrects itself.
 """
 
 from collections.abc import Awaitable, Callable, Mapping
@@ -28,18 +28,16 @@ from voice_call_agent.booking_flow.booking_steps import (
     JsonObject,
     Step,
     StepOutcome,
-    TimeChoice,
 )
 from voice_call_agent.booking_flow.flow_arguments import (
     CheckAvailabilityArguments,
     ProposeBookingArguments,
     SelectStartArguments,
 )
-from voice_call_agent.booking_flow.free_ranges import (
-    Unavailable,
-    free_ranges,
-    start_interval,
-    why_unavailable,
+from voice_call_agent.booking_flow.spoken_free_times import (
+    free_times_for_model,
+    free_times_said,
+    requested_for_model,
 )
 from voice_call_agent.conversation_content.content_loader import BookingTasks, ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import (
@@ -47,7 +45,6 @@ from voice_call_agent.conversation_content.spoken_moments import (
     spoken_day,
     spoken_time,
 )
-from voice_call_agent.write_guards.booking_guard import clock_time
 
 StepFunction = Callable[[Mapping[str, Any]], Awaitable[StepOutcome]]
 
@@ -107,62 +104,23 @@ class BookingGraph:
         return self._function("check_availability", schema, self._steps.check_availability)
 
     def _choose_time(self) -> NodeConfig:
+        """The code says the free times, and the model waits for the caller to choose."""
         choice = self._steps.choice
         if choice is None:  # Only reached after check_availability set it.
             return self._request()
         task = self._tasks.choose_time.format(
             service_name=choice.service.name,
             day=spoken_day(self._content, choice.day),
-            free_times=self._free_times(choice),
-            requested=self._why_not_requested(choice),
+            free_times=free_times_for_model(self._content, choice),
+            requested=requested_for_model(self._content, choice),
         )
         select = self._function(
             "select_start", _properties(SelectStartArguments), self._steps.select_start
         )
-        return _node(Step.CHOOSE_TIME, task, [select, self._check_availability()])
-
-    def _free_times(self, choice: TimeChoice) -> str:
-        """The free starts as ranges, said aloud and as the function takes them."""
-        words, choices = self._content, self._content.booking_flow.choices
-        said = [
-            choices.free_time.format(spoken=spoken_time(words, r.first), clock=clock_time(r.first))
-            if r.first == r.last
-            else choices.free_range.format(
-                first=spoken_time(words, r.first),
-                first_clock=clock_time(r.first),
-                last=spoken_time(words, r.last),
-                last_clock=clock_time(r.last),
-            )
-            for r in free_ranges(choice.starts)
-        ]
-        interval = start_interval(choice.starts)
-        every = "" if interval is None else choices.interval.format(minutes=interval)
-        return "; ".join(said) + every
-
-    def _why_not_requested(self, choice: TimeChoice) -> str:
-        """Why the time the caller asked for is not offered, or nothing if none was asked."""
-        if choice.taken is None:
-            return ""
-        reason = Unavailable.TAKEN
-        if choice.hours is not None:
-            reason = why_unavailable(
-                choice.taken, choice.starts, choice.service.duration_min, choice.hours
-            )
-        hours, words = choice.hours, self._content
-        texts = self._content.booking_flow.choices.requested
-        by_reason = {
-            Unavailable.OUTSIDE_HOURS: texts.outside_hours,
-            Unavailable.OFF_INTERVAL: texts.off_interval,
-            Unavailable.DOES_NOT_FIT: texts.does_not_fit,
-            Unavailable.TAKEN: texts.taken,
-        }
-        return by_reason[reason].format(
-            time=spoken_time(words, choice.taken),
-            duration=choice.service.duration_min,
-            opens=spoken_time(words, hours.opens) if hours else "",
-            closes=spoken_time(words, hours.closes) if hours else "",
-            interval=start_interval(choice.starts) or "",
-        )
+        node = _node(Step.CHOOSE_TIME, task, [select, self._check_availability()])
+        node["pre_actions"] = [say(free_times_said(self._content, choice))]
+        node["respond_immediately"] = False
+        return node
 
     def _name(self) -> NodeConfig:
         slot = self._steps.slot
