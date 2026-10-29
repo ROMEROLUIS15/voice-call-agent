@@ -151,9 +151,10 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
       booking; each call closed as `booked`; the owner notified.
 - [ ] **D4. Adjustments** recorded below; then Cronix's pull request (B9) and its deployment; the
       phone line against Cronix once a Venezuelan number exists.
-  - [ ] The model misstates a fact the code gave it: told the free starts run from 08:00 to 14:00,
-        it said until 13:30. The free ranges become a phrase the code speaks, as the read-back
-        is, instead of a range the model rewords; with its golden case and model evals.
+  - [x] The model misstates a fact the code gave it: told the free starts run from 08:00 to 14:00,
+        it said until 13:30. The code now says the free times on entering the choose-time node,
+        at most four ranges, the closest to the time asked for, and the model waits for the
+        choice; golden case `last-start-of-a-long-service-at-a-dental-clinic`, model evals.
   - [ ] Latency above the 1.0 s p50 target: 1.3 s and 1.7 s median per call, 2.3 to 2.8 s on
         turns with a function call (two model rounds). Speech-to-text took 1.5 to 3.0 s when the
         caller paused mid-sentence. Measured per segment before choosing a change.

@@ -6,6 +6,7 @@ from voice_call_agent.booking_flow.free_ranges import (
     FreeRange,
     Unavailable,
     free_ranges,
+    nearest_ranges,
     start_interval,
     why_unavailable,
 )
@@ -40,3 +41,12 @@ def test_each_reason_a_requested_start_is_not_offered() -> None:
     assert why(time(8, 15)) is Unavailable.OFF_INTERVAL  # Starts are every 30 minutes.
     assert why(time(9, 30)) is Unavailable.DOES_NOT_FIT  # Free, but runs into 10:00.
     assert why(time(10, 0), 30) is Unavailable.TAKEN
+
+
+def test_only_the_ranges_closest_to_the_time_asked_for_are_kept_in_day_order() -> None:
+    lone = [FreeRange(time(h, 0), time(h, 0)) for h in (8, 10, 12, 14, 16, 17)]
+    assert nearest_ranges(lone, None, 4) == lone[:4]  # Nothing asked for: the earliest.
+    assert nearest_ranges(lone, time(15, 0), 3) == lone[3:]  # 14, 16, 17: in day order.
+    assert nearest_ranges(lone[:2], time(15, 0), 4) == lone[:2]  # Few enough: all of them.
+    within = [FreeRange(time(8, 0), time(9, 0)), FreeRange(time(11, 0), time(11, 30))]
+    assert nearest_ranges(within, time(8, 30), 1) == within[:1]  # Inside a range: distance 0.

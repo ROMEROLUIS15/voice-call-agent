@@ -95,6 +95,38 @@ class RequestedTimeTexts(BaseModel):
     taken: str
 
 
+class SaidReasons(BaseModel):
+    """Why the time the caller asked for is not offered, as the code says it to the caller.
+
+    Each takes `{time}`, `{opens}` and `{closes}`.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    outside_hours: str
+    off_interval: str
+    does_not_fit: str
+    taken: str
+
+
+class SaidTimes(BaseModel):
+    """How the code says the free times to the caller on entering the choose_time step."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    offer: str
+    """Takes `{reason}`, `{day}` and `{times}`."""
+    free_time: str
+    """Takes `{time}`."""
+    free_range: str
+    """Takes `{first}` and `{last}`."""
+    last_joiner: str
+    """Between the last two times said."""
+    more: str
+    """After the times said when more are free."""
+    reasons: SaidReasons
+
+
 class BookingChoices(BaseModel):
     """How the choose_time task says the free times: ranges of starts, or single starts."""
 
@@ -107,6 +139,7 @@ class BookingChoices(BaseModel):
     interval: str
     """Takes `{minutes}`."""
     requested: RequestedTimeTexts
+    said: SaidTimes
 
 
 class BookingFlowTexts(BaseModel):

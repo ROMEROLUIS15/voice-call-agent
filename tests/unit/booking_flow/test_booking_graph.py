@@ -69,6 +69,12 @@ async def test_choosing_a_time_says_the_free_starts_as_ranges() -> None:
     check = _functions(graph.initial_node())["check_availability"]
     _, node = await _run(check, service_id="haircut", day=TUESDAY.isoformat())
     assert node is not None and node.get("name") == Step.CHOOSE_TIME.value
+    # The code says them, as the backend offered them, and the model waits for the choice.
+    assert _said(node) == [
+        "El martes veintisiete de octubre hay horas libres de las nueve de la mañana a las "
+        "cinco y media de la tarde. ¿Cuál te sirve?"
+    ]
+    assert node.get("respond_immediately") is False
     functions = _functions(node)
     assert set(functions) == {"select_start", "check_availability"}
     assert "enum" not in functions["select_start"].properties["start"]
@@ -76,6 +82,16 @@ async def test_choosing_a_time_says_the_free_starts_as_ranges() -> None:
     content = str(task["content"])
     assert "(09:00 a 17:30), con inicio cada 30 minutos." in content
     assert "las once de la mañana" not in content  # Ranges, not every start.
+
+
+async def test_a_time_that_does_not_work_is_said_with_why_before_the_free_times() -> None:
+    graph, _ = _graph(await guarded_call())
+    check = _functions(graph.initial_node())["check_availability"]
+    _, node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), start="07:00")
+    assert node is not None
+    [said] = _said(node)
+    assert said.startswith("A las siete de la mañana queda fuera del horario de ese día, de ")
+    assert "El martes veintisiete de octubre hay horas libres de las nueve" in said
 
 
 async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> None:
