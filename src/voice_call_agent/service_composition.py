@@ -37,7 +37,7 @@ from voice_call_agent.practice_schedule.practice_catalog import (
     PracticeCatalog,
     load_practice_catalog,
 )
-from voice_call_agent.settings.sections import SchedulingBackendKind
+from voice_call_agent.settings.sections import SchedulingBackendKind, practice_lines
 from voice_call_agent.settings.service_settings import ServiceSettings
 from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
 from voice_call_agent.speech_pipeline.pipeline_assembly import SpeechServiceFactories
@@ -91,7 +91,7 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
         rate_limiter=build_rate_limiter(protection.rate_limit_storage_uri),
         shutdown_grace_seconds=supervision.shutdown_grace_seconds,
         business_resolver=schedule,
-        practice_lines=_practice_lines(practice_catalog),
+        practice_lines=_practice_lines(practice_catalog, settings.practice_lines),
     )
 
 
@@ -120,9 +120,10 @@ def _transcript_sink(settings: ServiceSettings) -> TextFileTranscriptSink | None
     return TextFileTranscriptSink(transcripts.directory) if transcripts is not None else None
 
 
-def _practice_lines(catalog: PracticeCatalog | None) -> tuple[PracticeLine, ...]:
+def _practice_lines(catalog: PracticeCatalog | None, spec: str) -> tuple[PracticeLine, ...]:
+    """The practice schedule's lines, or those `PRACTICE_LINES` lists for an API backend."""
     if catalog is None:
-        return ()
+        return tuple(PracticeLine(number=n, business_name=name) for n, name in practice_lines(spec))
     return tuple(
         PracticeLine(number=number, business_name=business.name)
         for business in catalog.businesses

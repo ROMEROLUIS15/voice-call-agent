@@ -133,7 +133,8 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
 ## Stage D: calls against the local Cronix, and adjustments
 
 - [ ] **D1. The practice entry against the local Cronix**: the page lists the seeded businesses'
-      lines; a call books in the local Cronix.
+      lines; a call books in the local Cronix. The page's lines come from `PRACTICE_LINES`
+      (fictitious numbers only) with `SCHEDULING_BACKEND=api`; the seed and the call remain.
 - [ ] **D2. Practice calls**, each read from its transcript, trace and log: a booking, a time taken
       meanwhile, a closed day, a long service near closing, a question about prices.
 - [ ] **D3. Each appointment checked in the local Cronix's dashboard**: there once, with its service,

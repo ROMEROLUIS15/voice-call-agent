@@ -58,7 +58,9 @@ the service reads the summary back, and the agent books only after you say yes (
 With `SCHEDULING_BACKEND=api`, `SCHEDULING_API_URL` and `SCHEDULING_API_SIGNING_SECRET`, the calls
 read and book in Cronix through its signed phone agent API instead
 (`docs/specs/cronix-phone-api-contract.md`); a practice call carries a fictitious caller number,
-as Cronix finds clients by phone.
+as Cronix finds clients by phone. `PRACTICE_LINES` lists the lines the practice page offers then
+(`+13055550101=Barbería Local;…`), each a line of a Cronix business; only fictitious numbers
+(555-0100 to 555-0199) are accepted, so the page never dials a real business.
 
 With `CONVERSATION_TRANSCRIPTS_DIR` set, each call also leaves a text file named after the call:
 the prompt the model received, then what was said, with your turns as the speech-to-text heard
