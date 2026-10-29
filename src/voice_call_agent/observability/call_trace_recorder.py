@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pipecat.observers.base_observer import BaseObserver
 
 from voice_call_agent.observability.call_trace import (
+    BackendRequest,
     CallTrace,
     RecordedError,
     ServiceVersions,
@@ -41,6 +42,7 @@ class CallTraceRecorder:
         self._errors: Counter[ErrorCode] = Counter()
         self._upstreams: Counter[str] = Counter()
         self._writes: list[WriteDecision] = []
+        self._backend_requests: list[BackendRequest] = []
         self._specs: dict[ErrorCode, ErrorSpec] = {}
         self.observers: list[BaseObserver] = [
             self._latency.observer,
@@ -60,6 +62,9 @@ class CallTraceRecorder:
 
     def record_write(self, decision: WriteDecision) -> None:
         self._writes.append(decision)
+
+    def record_backend_request(self, request: BackendRequest) -> None:
+        self._backend_requests.append(request)
 
     def record_llm_upstream(self, upstream: str) -> None:
         self._upstreams[upstream] += 1
@@ -91,6 +96,7 @@ class CallTraceRecorder:
                 for code, count in sorted(self._errors.items())
             ],
             writes=list(self._writes),
+            backend_requests=list(self._backend_requests),
             usage=self._usage.usage.model_copy(),
             llm_upstreams=dict(sorted(self._upstreams.items())),
             cost=estimate_cost(

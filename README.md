@@ -54,7 +54,8 @@ at a time: the agent checks the availability, the service says which ranges of t
 (and first why a requested time is not, such as a long service too close to closing), the agent
 asks for a time and for the name,
 the service reads the summary back, and the agent books only after you say yes (ADR 0011). Each decision lands in the call's trace
-(`writes`) with the `booked` outcome.
+(`writes`) with the `booked` outcome, and each request to the scheduling backend with how long
+it took (`backend_requests`).
 
 With `SCHEDULING_BACKEND=api`, `SCHEDULING_API_URL` and `SCHEDULING_API_SIGNING_SECRET`, the calls
 read and book in Cronix through its signed phone agent API instead

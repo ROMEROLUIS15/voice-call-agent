@@ -158,8 +158,18 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
   - [ ] Latency above the 1.0 s p50 target: 1.3 s and 1.7 s median per call, 2.3 to 2.8 s on
         turns with a function call (two model rounds). Speech-to-text took 1.5 to 3.0 s when the
         caller paused mid-sentence. Measured per segment before choosing a change.
-  - [ ] The time spent in the scheduling API is not visible per request; a span or attribute per
-        request, measured against production's Cronix (the local one is not representative).
+  - [x] The time spent in the scheduling API is visible per request: each request of the
+        conversation lands in the call's trace (`backend_requests`: operation, start, duration,
+        outcome) and in Sentry (a `scheduling.request` span, the `voice.scheduling.request`
+        metric). Measured against production's Cronix on 2026-10-29 with 20 signed `calls/start`
+        for an unknown line (nothing is written): 1.0 to 1.9 s per request from a development
+        machine, of which opening the connection is about 170 ms; Cronix's logs show 194 to
+        2,322 ms of execution in the function (median about 1.1 s), the slowest on a newly
+        started instance and the fastest on a reused one.
+  - [ ] Cronix's `phone-agent-api` takes about a second per request, far above the 300 ms p50
+        of a backend read (manifest §6), and each availability check waits on it within a turn.
+        Measure where the function spends it (start of a new instance, imports, queries) and
+        lighten it in Cronix (B9); the agent's server near Cronix's region (`us-east-1`).
 
 ## Open questions
 
