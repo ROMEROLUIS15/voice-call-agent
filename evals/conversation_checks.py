@@ -20,6 +20,8 @@ def conversation_failures(case: GoldenCase, record: ConversationRecord, greeting
         ("agent lines (greeting + one per turn)", len(record.agent_lines), len(case.turns) + 1),
         ("agent stopped when interrupted", record.agent_interrupted, expected.agent_interrupted),
         ("write decisions", [write.outcome for write in trace.writes], list(expected.writes)),
+        # A write reaches the backend, and every backend request lands timed in the trace.
+        ("scheduling requests timed", bool(trace.backend_requests) or not expected.writes, True),
         ("real failures", sorted(real_failures), sorted(expected.real_failures)),
     ]
     return [

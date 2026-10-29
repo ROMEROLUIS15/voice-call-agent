@@ -46,6 +46,20 @@ class SentryCallTraceSink:
                 span.finish(end_timestamp=turn.started_at + timedelta(milliseconds=turn.total_ms))
             else:
                 span.finish()
+        for request in trace.backend_requests:
+            span = transaction.start_child(
+                op="scheduling.request", name=request.operation, start_timestamp=request.started_at
+            )
+            span.set_data("outcome", request.outcome)
+            span.finish(
+                end_timestamp=request.started_at + timedelta(milliseconds=request.duration_ms)
+            )
+            sentry_sdk.metrics.distribution(
+                "voice.scheduling.request",
+                request.duration_ms,
+                unit="millisecond",
+                attributes=attributes | {"operation": request.operation},
+            )
         transaction.set_status("internal_error" if trace.real_failure else "ok")
         transaction.finish(end_timestamp=trace.started_at + timedelta(seconds=trace.duration_s))
 
