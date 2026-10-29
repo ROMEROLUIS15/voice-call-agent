@@ -45,7 +45,7 @@ start a call, and the service refuses the setting outside development. Its laten
 call's: the browser's audio is wideband, with echo cancellation, and stays on the machine.
 
 `SCHEDULING_BACKEND=practice` gives the calls fictitious businesses to book with (a barbershop, a
-dental clinic and a spa), kept in memory and lost on restart
+dental clinic, whose prices are in bolívares, and a spa), kept in memory and lost on restart
 (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is also refused outside
 development. Each business has a fictitious number: pick it on the page before starting the call,
 and the call reaches that business as a phone-line call reaches the number it dials (ADR 0017).

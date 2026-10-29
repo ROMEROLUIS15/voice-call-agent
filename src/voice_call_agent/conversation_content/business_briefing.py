@@ -28,7 +28,9 @@ def booking_prompt(content: ConversationContent, business: BusinessContext, toda
         today=_today(briefing, today),
         opening_hours="; ".join(_opening_hours(briefing, business)),
         calendar="\n".join(f"- {line}" for line in _calendar(briefing, business, today)),
-        services="\n".join(f"- {_service(briefing, service)}" for service in business.services),
+        services="\n".join(
+            f"- {_service(briefing, service, business.currency)}" for service in business.services
+        ),
     )
 
 
@@ -78,13 +80,15 @@ def _opening_hours(briefing: BookingBriefing, business: BusinessContext) -> list
     return lines
 
 
-def _service(briefing: BookingBriefing, service: ServiceOffering) -> str:
+def _service(briefing: BookingBriefing, service: ServiceOffering, currency: str) -> str:
     line = briefing.service.format(name=service.name, id=service.id, minutes=service.duration_min)
     # Said, not left out: a service listed without a price reads as a free one (manifest §10).
     if service.price is None:
         line += briefing.no_price
     else:
-        line += briefing.price.format(price=service.price)
+        # In the business's own currency: a price said in an assumed one is invented.
+        said = briefing.currencies.get(currency, currency)
+        line += briefing.price.format(price=service.price, currency=said)
     return line
 
 
