@@ -29,6 +29,7 @@ class PracticeBusiness(BaseModel):
     """Distance between the start times offered."""
     dialed_numbers: tuple[str, ...] = ()
     services: tuple[ServiceOffering, ...] = Field(min_length=1)
+    currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
     opening_hours: dict[Weekday, OpeningHours]
     """A day that is not listed is closed."""
 
@@ -51,6 +52,7 @@ class PracticeBusiness(BaseModel):
             recording_enabled=False,
             services=list(self.services),
             weekly_hours=self.weekly_hours,
+            currency=self.currency,
             known_client_first_name=known_client_first_name,
         )
 

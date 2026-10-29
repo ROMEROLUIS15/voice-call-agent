@@ -29,8 +29,11 @@ class BookingBriefing(BaseModel):
     closed_day: str
     service: str
     price: str
+    """Takes `{price}` and `{currency}`, the currency's name from `currencies`."""
     no_price: str
     """For a service whose business publishes no price."""
+    currencies: dict[str, str]
+    """How each ISO 4217 code is said; a code missing here is said as the code."""
     calendar_day: str
     """A day of the calendar of the coming days, with its date for the tools."""
     calendar_today: str

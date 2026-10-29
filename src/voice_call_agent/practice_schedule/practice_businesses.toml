@@ -49,6 +49,8 @@ id = "practice-dental-clinic"
 name = "Consultorio Odontológico La Práctica"
 timezone = "America/Caracas"
 greeting = "Buenos días, consultorio odontológico La Práctica. ¿En qué le puedo ayudar?"
+# Fictitious: prices in bolívares, so a practice call hears a currency other than dollars.
+currency = "VES"
 dialed_numbers = ["+12025550102"]
 
 [[businesses.services]]

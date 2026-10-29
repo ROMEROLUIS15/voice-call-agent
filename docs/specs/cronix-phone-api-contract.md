@@ -33,7 +33,7 @@ Ports: `scheduling_backend/scheduling_port.py`, `call_session/business_resolutio
 *   There is no Cronix user behind a call: authentication is an **HMAC-SHA256 signature** with a shared secret (`PHONE_AGENT_SIGNING_SECRET`).
 *   Mandatory headers:
     - `X-Cronix-Timestamp`: Unix seconds. Rejected if it differs from the server clock by more than 300 s.
-    - `X-Cronix-Signature`: `hex(HMAC_SHA256(secret, timestamp + "." + METHOD + "." + path + "." + body))`.
+    - `X-Cronix-Signature`: `hex(HMAC_SHA256(secret, timestamp + "." + METHOD + "." + route + "." + body))`, where `route` is the path from `/v1/` with its query string (`/v1/availability?call_sid=…&service_id=…&date=…`), so a read's parameters are signed too; `body` is empty for a `GET`.
 *   The signature is compared in constant time. Invalid signature → `401` without a descriptive body.
 *   Rate limit per business and per `call_sid`.
 
@@ -43,7 +43,7 @@ Cronix keeps a record per call (business, channel, caller phone, whether the ide
 
 ## 4. Endpoints
 
-All under `/functions/v1/phone-agent-api`. All except `calls/start` receive `call_sid`; the server reads the business from the call record (§3) and does **not** accept it from the body.
+All under `/functions/v1/phone-agent-api`. All except `calls/start` receive `call_sid`; the server reads the business from the call record (§3) and does **not** accept it from the body. **v1 serves the phone line only** (`channel = "twilio"`): WhatsApp's choice of business (§4.1b) waits until Meta enables calling on the number. A request for a call that was never started answers `NOT_FOUND`.
 
 ### 4.1 `POST /v1/calls/start`
 Resolves the business and returns the call context. `call_sid` is the call's identifier in its channel (Twilio `CallSid` or Meta's `call_id`).
@@ -56,13 +56,17 @@ Resolves the business and returns the call context. `call_sid` is the call's ide
 // response
 {
   "success": true,
-  "business": { "name": "Barbería Ana", "timezone": "America/Caracas",
-                "greeting": "Gracias por llamar a Barbería Ana…", "recording_enabled": false },
+  "business": { "id": "uuid", "name": "Barbería Ana", "timezone": "America/Caracas",
+                "currency": "VES" },
   "services": [ { "id": "uuid", "name": "Corte de cabello", "duration_min": 30, "price": 10 } ],
   "working_hours": { "mon": ["09:00", "18:00"], "sun": null },
-  "known_client": { "first_name": "Ana" }   // or null
+  "known_client": null
 }
 ```
+*   `business.id` is for the agent's call trace only: no endpoint accepts it back.
+*   `currency` is the ISO 4217 code the owner chose for the prices (USD when unset); the agent says prices in it and never in one it assumes.
+*   `working_hours` are the hours that apply: the owner's, or 09:00–18:00 every day when never set, as Cronix's resolver of free starts reads them.
+*   There is no greeting nor recording setting in Cronix: the agent greets with its own phrase and the business's name, and records nothing.
 *   `channel = "twilio"`: the business is the one whose voice line is the dialed number `to`. Errors: `UNKNOWN_LINE`.
 *   `channel = "whatsapp"`: the business comes from the WhatsApp routing without slug (the sender's active session, then the client's phone). If it cannot be decided, it answers `{ "success": true, "business": null, "needs_business_choice": true }` and the agent asks for the business (see 4.1b).
 *   `known_client` returns **only the first name**, and only when the call's identity is verified (`channel = "whatsapp"`); on the phone line it is `null`, because a spoofed caller ID must not reveal whose number it is (constitution §4).
@@ -80,7 +84,7 @@ Free slots of that day for that service, in the business's local time, computed 
 ```json
 { "success": true, "date": "2026-10-22", "slots": ["09:00", "09:30", "15:00"] }
 ```
-Errors: `INVALID_ARGS`, `CLOSED_DAY`.
+Starts every 30 minutes from opening, where the service ends by closing and overlaps no appointment that blocks it (every status but `cancelled` and `no_show`, the rule the booking applies); times already past are dropped. Errors: `INVALID_ARGS`, `CLOSED_DAY`, `NOT_FOUND`.
 
 ### 4.3 `GET /v1/my-appointments?call_sid=…` (v1.1)
 Future active appointments of the client whose phone matches the call's `from`. If the call is **not** `identity_verified` (phone line), it answers `IDENTITY_REQUIRED` unless the request carries the identity proof of §4.5; the proof is personal data, so it never travels in the URL.
@@ -102,7 +106,10 @@ Mandatory header: `Idempotency-Key`.
 ```json
 { "success": true, "appointment_id": "uuid" }
 ```
-Errors: `SLOT_CONFLICT`, `INVALID_ARGS`, `OUTSIDE_HOURS`.
+*   The time must be one §4.2 offers: if the service would not fit the day's hours the answer is `OUTSIDE_HOURS`, if it is taken `SLOT_CONFLICT`; a booking made at the same moment by another channel is refused by Cronix's lock per business and also answers `SLOT_CONFLICT`.
+*   The owner is notified after the response, so the agent's write budget (§7) is not spent on it; the message says the appointment was made by phone.
+
+Errors: `SLOT_CONFLICT`, `INVALID_ARGS`, `OUTSIDE_HOURS`, `NOT_FOUND`.
 
 ### 4.5 `POST /v1/appointments/{id}/reschedule` and `POST /v1/appointments/{id}/cancel` (v1.1)
 Mandatory header: `Idempotency-Key`. If the call is **not** `identity_verified` (phone line), the body must include an **identity proof** (constitution §4); on WhatsApp calls it is omitted:
@@ -134,6 +141,8 @@ Closes the call record with its outcome (`booked`, `rescheduled`, `cancelled`, `
 *   First time: it is executed and the response is stored (§3).
 *   Same key again: the stored response is returned without executing again.
 *   Same key with a different body: `409 IDEMPOTENCY_MISMATCH`.
+*   Same key while the first request is still running: `503` with `Retry-After`.
+*   Stored responses are deleted after 7 days.
 
 ## 6. Errors and HTTP codes
 

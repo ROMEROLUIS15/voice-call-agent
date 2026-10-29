@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 18mm 16mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    background-color: #ffffff;
+    line-height: 1.5;
+    font-size: 10.5pt;
+  }
+
+  .cover {
+    page-break-after: always;
+    padding-top: 60px;
+    text-align: center;
+  }
+
+  .cover-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 24px;
+  }
+
+  .cover h1 {
+    font-size: 26pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+
+  .cover p.subtitle {
+    font-size: 13pt;
+    color: #475569;
+    max-width: 600px;
+    margin: 0 auto 36px auto;
+    line-height: 1.4;
+  }
+
+  .cover-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: left;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  .cover-card div {
+    margin-bottom: 10px;
+    font-size: 10pt;
+  }
+  .cover-card strong {
+    color: #0f172a;
+    display: inline-block;
+    width: 130px;
+  }
+
+  h2 {
+    font-size: 16pt;
+    color: #0f172a;
+    border-bottom: 2px solid #0284c7;
+    padding-bottom: 6px;
+    margin-top: 28px;
+    margin-bottom: 14px;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 12.5pt;
+    color: #0369a1;
+    margin-top: 18px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin-bottom: 10px;
+    color: #334155;
+  }
+
+  .alert {
+    background: #f0f9ff;
+    border-left: 4px solid #0284c7;
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+    font-size: 10pt;
+  }
+
+  .alert-warning {
+    background: #fffbeb;
+    border-left-color: #f59e0b;
+  }
+
+  .tool-card {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 18px;
+    background: #ffffff;
+    page-break-inside: avoid;
+  }
+
+  .tool-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+
+  .tool-name {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .tool-type {
+    font-size: 8.5pt;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+
+  .badge-saas { background: #ede9fe; color: #6d28d9; }
+  .badge-oss { background: #dcfce7; color: #15803d; }
+  .badge-hybrid { background: #e0f2fe; color: #0369a1; }
+
+  .pricing-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 10px 0;
+    font-size: 9.5pt;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+    font-size: 9pt;
+    page-break-inside: avoid;
+  }
+
+  th, td {
+    padding: 9px 10px;
+    text-align: left;
+    border: 1px solid #cbd5e1;
+  }
+
+  th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+
+  .stage-card {
+    background: #ffffff;
+    border-left: 4px solid #10b981;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #10b981;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    page-break-inside: avoid;
+  }
+
+  .stage-title {
+    font-weight: 700;
+    color: #065f46;
+    font-size: 11pt;
+    margin-bottom: 4px;
+  }
+
+  ul {
+    margin: 6px 0 12px 20px;
+    padding: 0;
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+
+  code {
+    background: #f1f5f9;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 8.5pt;
+    font-family: Consolas, Monaco, monospace;
+    color: #b91c1c;
+  }
+</style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="cover">
+  <div class="cover-badge">Arquitectura Voice AI & Escalabilidad</div>
+  <h1>Guía Maestra de Pruebas</h1>
+  <p class="subtitle">Evaluación de Alucinaciones, Estrés de Concurrencia y Calidad para Agentes de Voz Telefónicos (Call Centers / Cronix SaaS)</p>
+  
+  <div class="cover-card">
+    <div><strong>Sistema Auditado:</strong> Voice Call Agent (Twilio + Pipecat + Deepgram + LLM)</div>
+    <div><strong>Destino:</strong> Integración SaaS Cronix / Call Center Concurrente</div>
+    <div><strong>Objetivo:</strong> Detección de fallos, alucinaciones y límites de carga</div>
+    <div><strong>Fecha de Emisión:</strong> Octubre 2026</div>
+    <div><strong>Autor:</strong> Antigravity AI Engineering</div>
+  </div>
+</div>
+
+<!-- SECCION 1: EL RETO TECNICO -->
+<h2>1. El Reto Técnico: ¿Por qué Voice AI no se prueba como una API tradicional?</h2>
+<p>
+  En el desarrollo de software tradicional, herramientas como <strong>k6</strong> o <strong>JMeter</strong> prueban APIs enviando peticiones HTTP (GET/POST) y midiendo milisegundos hasta recibir un código de estado (200 o 500).
+</p>
+<p>
+  Un <strong>Agente de Voz en Tiempo Real</strong> que opera en un call center funciona de forma radicalmente distinta:
+</p>
+<ul>
+  <li><strong>Streaming Bidireccional Continuo:</strong> No son peticiones aisladas; Twilio Media Streams y WebRTC mantienen WebSockets abiertos transmitiendo paquetes de audio en tiempo real (G.711 &mu;-law a 8kHz o PCM a 16kHz/24kHz) cada <strong>20 milisegundos</strong> en ambos sentidos.</li>
+  <li><strong>Pipeline en Cascada Multi-Proveedor:</strong> Cada segundo de audio pasa por: <em>VAD local &rarr; Deepgram Flux (STT) &rarr; LLM / Pipecat Flows &rarr; Deepgram Aura-2 (TTS) &rarr; Telefonía</em>. Un retraso o fallo en cualquiera de las fases rompe la llamada.</li>
+  <li><strong>La Doble Dimensión del Fallo:</strong>
+    <ul>
+      <li><strong>Fallo de Infraestructura (Carga):</strong> Saturación del Event Loop de Python (FastAPI/asyncio), saturación de memoria por búferes de audio, y caídas por Rate-Limits (HTTP 429) de proveedores de IA.</li>
+      <li><strong>Fallo Cognitivo (Lógica y Alucinaciones):</strong> Cuando hay 50 personas hablando a la vez, ¿el modelo inventa citas? ¿Asume respuestas sin que el cliente las dé? ¿Pierde la máquina de estados si el usuario tose o interrumpe?</li>
+    </ul>
+  </li>
+</ul>
+
+<div class="alert alert-warning">
+  <strong>Principio Clave:</strong> Probar un call center de Voice AI requiere evaluar tanto la <strong>concurrencia de red/audio</strong> (¿se cae el servidor?) como la <strong>fidelidad conversacional</strong> (¿el bot alucina o agenda correctamente?).
+</div>
+
+<!-- SECCION 2: HERRAMIENTAS Y COSTOS -->
+<h2>2. Catálogo de Herramientas, Funcionalidad y Costos</h2>
+
+<div class="tool-card">
+  <div class="tool-header">
+    <span class="tool-name">1. Hamming AI (hamming.ai)</span>
+    <span class="tool-type badge-saas">Plataforma Especializada Voice AI</span>
+  </div>
+  <p><strong>Propósito:</strong> Simulación de llamadas telefónicas concurrentes a gran escala para call centers con evaluación automática de alucinaciones.</p>
+  <p><strong>Cómo funciona:</strong> Agentes sintéticos llaman a los números reales de tu central telefónica (Twilio/SIP/WebRTC). Hablan con tu agente mediante voces humanas sintéticas, balbucean, interrumpen (<em>barge-in</em>), dudan y cambian de fecha u hora para verificar si el agente de voz resiste la interacción.</p>
+  <p><strong>Qué fallos detecta:</strong> Alucinaciones de citas, saltos de guardrails de seguridad, latencia TTFA (<em>Time to First Audio</em>) en percentiles P50, P95 y P99, y tasa de éxito de la tarea (TSR).</p>
+  <div class="pricing-box">
+    <strong>Estructura de Costos:</strong>
+    <ul>
+      <li><strong>Prueba Gratuita:</strong> Sí (créditos de bienvenida de 100 a 250 minutos de simulación al registrarse).</li>
+      <li><strong>Starter / Growth:</strong> Desde <strong>$200 a $500 USD/mes</strong> (incluye 1,000 a 2,500 minutos de llamadas de prueba sintéticas).</li>
+      <li><strong>Enterprise / Call Center:</strong> Precio personalizado según volumen (entre <strong>$0.10 y $0.20 USD por minuto simulado</strong>). Permite conectar tu propia cuenta de Twilio (BYOC) para no pagar sobreprecio de telefonía.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tool-card">
+  <div class="tool-header">
+    <span class="tool-name">2. Coval (coval.dev)</span>
+    <span class="tool-type badge-saas">Simulación Adversarial & Regresión de Voz</span>
+  </div>
+  <p><strong>Propósito:</strong> Evaluación profunda de máquinas de estados y diálogos complejos. Diseñada por ex-líderes de simulación de vehículos autónomos de Waymo.</p>
+  <p><strong>Cómo funciona:</strong> Se conecta directamente a tu arquitectura (nativo con <strong>Pipecat</strong>, Deepgram y OpenAI/OpenRouter). Ejecuta cientos de conversaciones paralelas creando personas con comportamientos adversariales (clientes enfadados, que no cooperan o cambian de opinión bruscamente).</p>
+  <p><strong>Qué fallos detecta:</strong> Errores de transición de nodo en Pipecat Flows, desvíos de contexto, argumentos malformados en tools (como <code>service_id</code> inexistentes) y reintentos fallidos.</p>
+  <div class="pricing-box">
+    <strong>Estructura de Costos:</strong>
+    <ul>
+      <li><strong>Developer Sandbox:</strong> Gratuito (simulaciones limitadas de hasta 50-100 conversaciones/mes en entorno de desarrollo).</li>
+      <li><strong>Team Tier:</strong> Desde <strong>$250 a $499 USD/mes</strong> para integración continua en CI/CD y suites de regresión automatizadas.</li>
+      <li><strong>Enterprise:</strong> Cotización anual para call centers con más de 10,000 simulaciones mensuales y soporte SLA.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tool-card">
+  <div class="tool-header">
+    <span class="tool-name">3. Locust (con Client WebSocket de Audio)</span>
+    <span class="tool-type badge-oss">Open-Source / Estrés de Red</span>
+  </div>
+  <p><strong>Propósito:</strong> El verdadero sustituto open-source de k6 para streaming de telefonía. Pruebas de estrés y carga bruta de WebSockets concurrentes.</p>
+  <p><strong>Cómo funciona:</strong> Se programa un usuario virtual en Python que abre una conexión WebSocket con el endpoint <code>/twilio/stream</code>, envía el handshake JSON <code>start</code> y bombea paquetes de audio G.711 &mu;-law cada 20 ms, emulando 10, 50 o 200 llamadas activas simultáneamente en el servidor.</p>
+  <p><strong>Qué fallos detecta:</strong> Cuello de botella en el Event Loop de FastAPI (asyncio), fuga de memoria (RAM) por acumulación de búferes de audio, saturación de CPU y límites de sockets del sistema operativo (<code>ulimit</code>).</p>
+  <div class="pricing-box">
+    <strong>Estructura de Costos:</strong>
+    <ul>
+      <li><strong>Licencia:</strong> <strong>100% GRATUITO y Open-Source</strong> (Licencia MIT).</li>
+      <li><strong>Costo de Infraestructura:</strong> $0 en tu máquina local. En servidores de prueba cloud (AWS EC2 / DigitalOcean), entre <strong>$15 y $40 USD</strong> al mes para generar cientos de clientes concurrentes distribuidos.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tool-card">
+  <div class="tool-header">
+    <span class="tool-name">4. SIPp (sipp.sourceforge.net)</span>
+    <span class="tool-type badge-oss">Open-Source / Telefonía SIP Pura</span>
+  </div>
+  <p><strong>Propósito:</strong> Generador de tráfico de telefonía estándar mundial para pruebas de centrales telefónicas (PBX) y enlaces SIP Trunk.</p>
+  <p><strong>Cómo funciona:</strong> Emite tráfico SIP real y paquetes RTP con audio codificado directamente contra los Gateways de telecomunicaciones de Twilio o la infraestructura del call center.</p>
+  <p><strong>Qué fallos detecta:</strong> Jitter de audio, pérdida de paquetes UDP en telefonía, saturación de troncales y rechazos por concurrencia telefónica.</p>
+  <div class="pricing-box">
+    <strong>Estructura de Costos:</strong>
+    <ul>
+      <li><strong>Licencia:</strong> <strong>100% GRATUITO y Open-Source</strong> (Licencia GPL).</li>
+      <li><strong>Costo:</strong> $0 de software. Solo pagas las tarifas de consumo de los minutos de prueba a tu proveedor telefónico (Twilio/Carrier) si la llamada sale a la red pública.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tool-card">
+  <div class="tool-header">
+    <span class="tool-name">5. DeepEval / Braintrust</span>
+    <span class="tool-type badge-hybrid">Evaluación Funcional de Diálogos & Transcripciones</span>
+  </div>
+  <p><strong>Propósito:</strong> Calificación automatizada de transcripciones mediante LLM-as-a-Judge (ya implementado en este repositorio vía <code>deepeval-4.2.8</code>).</p>
+  <p><strong>Cómo funciona:</strong> Tras finalizar las llamadas (sean reales o de prueba), un modelo juez (Gemini Flash / GPT-4o) califica métricas como <code>invents-nothing</code>, <code>natural-spanish</code> y cumplimiento de herramientas.</p>
+  <div class="pricing-box">
+    <strong>Estructura de Costos:</strong>
+    <ul>
+      <li><strong>Librería Python (DeepEval):</strong> <strong>100% GRATUITA</strong> (Open-Source Apache 2.0).</li>
+      <li><strong>Costo de Consumo:</strong> Solo los tokens del modelo juez (usando Gemini Flash directo con <code>GEMINI_API_KEY</code> es prácticamente gratuito o centavos por corrida; en OpenRouter cuesta según el volumen evaluado).</li>
+      <li><strong>Dashboard Confident AI:</strong> Opcional, capa gratuita para desarrolladores, planes de equipo desde <strong>$49 USD/mes</strong>.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- SECCION 3: TABLA COMPARATIVA -->
+<h2>3. Matriz Comparativa de Capacidades y Costos</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Herramienta</th>
+      <th>Tipo de Prueba</th>
+      <th>Costo de Entrada</th>
+      <th>Detección de Alucinaciones</th>
+      <th>Simulación de Clientes Reales</th>
+      <th>Estrés de Concurrencia (WebSockets)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Hamming AI</strong></td>
+      <td>E2E Telefónico + QA</td>
+      <td>$200 - $500/mes (Free Trial)</td>
+      <td>Excelente (Automático)</td>
+      <td>Sí (Voces humanas sintéticas)</td>
+      <td>Alta (Cientos de llamadas)</td>
+    </tr>
+    <tr>
+      <td><strong>Coval</strong></td>
+      <td>Simulación Diálogo Voice AI</td>
+      <td>$250 - $499/mes (Free Tier)</td>
+      <td>Excelente (Adversarial)</td>
+      <td>Sí (Personas de prueba)</td>
+      <td>Media / Alta</td>
+    </tr>
+    <tr>
+      <td><strong>Locust (Audio WS)</strong></td>
+      <td>Carga y Estrés de Servidor</td>
+      <td><strong>$0 (Open Source)</strong></td>
+      <td>No (Solo métricas técnicas)</td>
+      <td>No (Inyección de audio)</td>
+      <td><strong>Muy Alta (Miles de streams)</strong></td>
+    </tr>
+    <tr>
+      <td><strong>SIPp</strong></td>
+      <td>Carga Telefónica SIP</td>
+      <td><strong>$0 (Open Source)</strong></td>
+      <td>No (Solo paquetes RTP)</td>
+      <td>No (Audio pregrabado)</td>
+      <td><strong>Masiva (Troncales completas)</strong></td>
+    </tr>
+    <tr>
+      <td><strong>DeepEval</strong></td>
+      <td>LLM-as-a-Judge (Transcripción)</td>
+      <td><strong>$0 (Open Source)</strong></td>
+      <td>Excelente (Semántico)</td>
+      <td>No (Post-llamada)</td>
+      <td>No (Evaluación analítica)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- SECCION 4: ROADMAP POR ETAPAS -->
+<h2>4. ¿En qué etapas del proyecto usar cada herramienta?</h2>
+
+<div class="stage-card">
+  <div class="stage-title">Fase 1: Desarrollo Activo y CI/CD (La fase actual)</div>
+  <p><strong>Objetivo:</strong> Evitar regresiones de código y asegurar que cada commit no rompa la máquina de estados sin gastar presupuesto.</p>
+  <ul>
+    <li><strong>Herramientas:</strong> <strong>Golden Dataset interno + DeepEval</strong> (ya configurado en el repo).</li>
+    <li><strong>Acción:</strong> Correr las pruebas unitarias y conversacionales en loopback local sin tocar telefonía real. Usar el filtro <code>--only-if-changed</code> para no gastar créditos innecesarios.</li>
+    <li><strong>Costo estimado:</strong> <strong>$0 USD</strong> (o menos de $2/mes en tokens de juez).</li>
+  </ul>
+</div>
+
+<div class="stage-card">
+  <div class="stage-title">Fase 2: Conexión con Cronix SaaS & Staging (Pre-producción)</div>
+  <p><strong>Objetivo:</strong> Validar que la API de Cronix aguante la concurrencia y calibrar los límites del servidor antes de salir a clientes reales.</p>
+  <ul>
+    <li><strong>Herramientas:</strong> <strong>Locust (Script de Audio) + Coval (Developer Sandbox)</strong>.</li>
+    <li><strong>Acción:</strong>
+      <ol>
+        <li>Ejecutar un script de <strong>Locust</strong> simulando 20 a 50 conexiones simultáneas a <code>/twilio/stream</code> para calibrar el <code>MAX_CONCURRENT_CALLS</code> de tu <code>CallSupervisor</code> y vigilar el uso de memoria RAM.</li>
+        <li>Usar <strong>Coval</strong> para lanzar 50 simulaciones de agendamiento y verificar que los turnos se creen bien en la base de datos de Cronix sin que el agente alucine confirmaciones.</li>
+      </ol>
+    </li>
+    <li><strong>Costo estimado:</strong> <strong>$0 a $50 USD</strong> (Coval Free Tier + VPS de prueba).</li>
+  </ul>
+</div>
+
+<div class="stage-card">
+  <div class="stage-title">Fase 3: Salida a Producción & Call Center a Escala (Producción Masiva)</div>
+  <p><strong>Objetivo:</strong> Garantizar que cuando 50 o 100 personas llamen al mismo tiempo a la central telefónica, la calidad no se degrade y las citas sean 100% verídicas.</p>
+  <ul>
+    <li><strong>Herramientas:</strong> <strong>Hamming AI + Monitoreo Sentry/Traces</strong>.</li>
+    <li><strong>Acción:</strong>
+      <ol>
+        <li>Programar campañas de estrés semanal en <strong>Hamming AI</strong> donde agentes sintéticos llamen concurrentemente a las líneas telefónicas reales de Cronix.</li>
+        <li>Monitorear que el percentil $P_{95}$ de latencia se mantenga bajo los 1,800 ms y que la tasa de resolución supere el 95%.</li>
+        <li>Si se detecta una alucinación o un fallo en producción, exportar la transcripción y convertirla inmediatamente en un caso del Golden Dataset (<code>golden_dataset/*.yaml</code>) para que nunca vuelva a ocurrir.</li>
+      </ol>
+    </li>
+    <li><strong>Costo estimado:</strong> <strong>$250 a $500 USD/mes</strong> (justificado como seguro de calidad para una operación comercial de call center).</li>
+  </ul>
+</div>
+
+<!-- SECCION 5: PLAN DE ACCION -->
+<h2>5. Checklist Recomendado para Preparar el Call Center</h2>
+<ul>
+  <li>[ ] <strong>Calibrar el Worker de Python:</strong> Actualmente corres un único proceso Uvicorn. Para un call center debes usar múltiples workers (o contenedores Docker orquestados) detrás de un Load Balancer con Redis para compartir el rate-limiting (<code>RATE_LIMIT_STORAGE_URI</code>).</li>
+  <li>[ ] <strong>Prueba de fuego de WebSockets con Locust:</strong> Lanzar una prueba de 30 WebSockets concurrentes en staging para verificar en qué segundo Deepgram o tu servidor alcanzan el límite de hilos de audio.</li>
+  <li>[ ] <strong>Activar alertamiento de latencia:</strong> Configurar alertas cuando la latencia por turno exceda los 2,000 ms en <code>var/call_traces.jsonl</code> para cortar llamadas problemáticas antes de que el usuario cuelgue frustrado.</li>
+</ul>
+
+</body>
+</html>
+
