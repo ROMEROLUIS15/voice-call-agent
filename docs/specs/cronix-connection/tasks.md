@@ -118,15 +118,15 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
 
 ## Stage C: the Cronix adapter (agent)
 
-- [ ] **C1. The contract updated** with what Stage B decided: currency, the dialed number, the
+- [x] **C1. The contract updated** with what Stage B decided: currency, the dialed number, the
       conflict code, the client's phone.
-- [ ] **C2. The caller's phone for the booking**: the phone line passes the caller's number, as
+- [x] **C2. The caller's phone for the booking**: the phone line passes the caller's number, as
       Cronix finds clients by phone; the practice entry passes a fictitious one per call.
-- [ ] **C3. The adapter** (`adapters/cronix_scheduling_api/`): HTTP client with the contract's
+- [x] **C3. The adapter** (`adapters/cronix_scheduling_api/`): HTTP client with the contract's
       timeouts, authentication, the contract's errors translated to the port's.
-- [ ] **C4. The currency said**: in the business's context and in the price phrase; the practice
+- [x] **C4. The currency said**: in the business's context and in the price phrase; the practice
       catalog gets one too.
-- [ ] **C5. Settings** (`SCHEDULING_BACKEND=cronix`, the API's address, its secret as `SecretStr`)
+- [x] **C5. Settings** (`SCHEDULING_BACKEND=cronix`, the API's address, its secret as `SecretStr`)
       in `.env.example`; contract tests against recorded responses, negative security tests,
       tenant isolation, the threat model; model evals; one pull request.
 

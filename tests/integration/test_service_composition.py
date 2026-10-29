@@ -1,6 +1,7 @@
 """The composition root wires every real component without touching the network."""
 
 from tests.settings_factory import make_service_settings
+from voice_call_agent.adapters.cronix_scheduling_api.cronix_backend import CronixSchedulingBackend
 from voice_call_agent.call_transports.twilio_media_streams.call_termination import (
     TwilioCallTerminator,
 )
@@ -52,3 +53,14 @@ def test_the_practice_page_gets_a_line_per_practice_number() -> None:
     )
     names = {line.business_name for line in practice.practice_lines}
     assert names == {business.name for business in load_practice_catalog().businesses}
+
+
+def test_the_scheduling_api_is_wired_as_backend_and_resolver_when_chosen() -> None:
+    components = compose_service(
+        make_service_settings(
+            scheduling_backend="api",
+            scheduling_api_url="https://api.example.com/functions/v1/phone-agent-api",
+            scheduling_api_signing_secret="s3cret",
+        )
+    )
+    assert isinstance(components.business_resolver, CronixSchedulingBackend)

@@ -3,6 +3,8 @@
 # from the scheduling backend.
 
 greeting = "Hola, gracias por llamar. ¿En qué te puedo ayudar?"
+# A business's greeting when its backend gives only its name.
+business_greeting = "Hola, gracias por llamar a {business_name}. ¿En qué te puedo ayudar?"
 
 # The code reads back the proposal it validated, before the caller's yes (ADR 0019). Neither
 # "tú" nor "usted": the register is the business's.
@@ -19,7 +21,7 @@ today = "{weekday} {day} de {month} de {year} ({iso_date})"
 open_day = "{weekday} de {opens} a {closes}"
 closed_day = "{weekday} cerrado"
 service = "{name} [{id}]: {minutes} minutos"
-price = ", precio {price}"
+price = ", precio {price} {currency}"
 no_price = ", precio no publicado"
 # The calendar of the coming days: the model looks a day up instead of computing it (ADR 0019).
 calendar_day = "{weekday} {day} de {month}{note}: {iso_date}{closed}"
@@ -28,6 +30,14 @@ calendar_tomorrow = " (mañana)"
 calendar_closed = ", cerrado"
 
 # How dates and times are said aloud (the read-back, a day in a tool's result).
+# The currency a business gives its prices in (ISO 4217), as it is said.
+[booking_briefing.currencies]
+USD = "dólares"
+VES = "bolívares"
+EUR = "euros"
+COP = "pesos colombianos"
+MXN = "pesos mexicanos"
+
 [spoken_moments]
 # 0 to 59, for day numbers and minutes.
 numbers = [

@@ -10,7 +10,7 @@ from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class _Model(BaseModel):
@@ -60,6 +60,8 @@ class BusinessContext(_Model):
     recording_enabled: bool
     services: list[ServiceOffering]
     weekly_hours: WeeklyHours
+    currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
+    """ISO 4217 code of the business's prices: said in it, never in an assumed one."""
     known_client_first_name: str | None
     """Only the first name, sent only when the caller's identity is verified (constitution §4)."""
 

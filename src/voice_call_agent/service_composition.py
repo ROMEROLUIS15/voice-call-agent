@@ -3,6 +3,8 @@
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.transcriptions.language import Language
 
+from voice_call_agent.adapters.cronix_scheduling_api.cronix_backend import CronixSchedulingBackend
+from voice_call_agent.adapters.cronix_scheduling_api.signed_api import SignedApi
 from voice_call_agent.adapters.deepgram_speech.service_factories import (
     aura_tts_factory,
     flux_stt_factory,
@@ -20,7 +22,10 @@ from voice_call_agent.call_transports.twilio_media_streams.call_termination impo
 from voice_call_agent.call_transports.whatsapp_calling.call_acceptance import (
     WhatsAppCallAcceptor,
 )
-from voice_call_agent.conversation_content.content_loader import load_conversation_content
+from voice_call_agent.conversation_content.content_loader import (
+    ConversationContent,
+    load_conversation_content,
+)
 from voice_call_agent.http_hardening.request_rate_limit import build_rate_limiter
 from voice_call_agent.observability.call_trace import ServiceVersions
 from voice_call_agent.observability.call_trace_store import CallTraceSink, JsonlCallTraceSink
@@ -52,7 +57,7 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
     trace_sinks: list[CallTraceSink] = [JsonlCallTraceSink(settings.call_trace_log().path)]
     trace_sinks.append(SentryCallTraceSink())  # A no-op unless error tracking is configured.
     practice_catalog = _practice_catalog(settings)
-    schedule = InMemorySchedule(practice_catalog) if practice_catalog is not None else None
+    schedule = _scheduling_backend(settings, content, practice_catalog)
     runner = PipecatConversationRunner(
         factories=factories,
         content=content,
@@ -90,9 +95,20 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
     )
 
 
+def _scheduling_backend(
+    settings: ServiceSettings, content: ConversationContent, catalog: PracticeCatalog | None
+) -> CronixSchedulingBackend | InMemorySchedule | None:
+    """Cronix's API, the practice schedule, or no backend, as `SCHEDULING_BACKEND` says."""
+    api = settings.scheduling_api()
+    if api is not None:
+        return CronixSchedulingBackend(
+            SignedApi(api), lambda name: content.business_greeting.format(business_name=name)
+        )
+    return InMemorySchedule(catalog) if catalog is not None else None
+
+
 def _practice_catalog(settings: ServiceSettings) -> PracticeCatalog | None:
-    """The practice schedule's businesses when chosen; no backend otherwise (the Cronix adapter:
-    phase 1)."""
+    """The practice schedule's businesses when chosen; none otherwise."""
     if settings.scheduling_backend is SchedulingBackendKind.PRACTICE:
         return load_practice_catalog()
     return None
