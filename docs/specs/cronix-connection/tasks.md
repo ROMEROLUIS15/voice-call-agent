@@ -4,7 +4,7 @@ The steps from today's agent, which books against the practice schedule, to call
 Cronix. Cronix is in production with real businesses: the agent adopts Cronix's data and rules as
 they are, tries them in a local copy of Cronix, never in production, and adjusts each decision.
 
-This file is temporary. It is deleted when Stage D ends; what stays true moves to the contract
+This file is temporary. It is deleted when Stage E ends; what stays true moves to the contract
 (`docs/specs/cronix-phone-api-contract.md`), the manifest and the ADRs. A box is ticked in the pull
 request that does it; a decision taken on the way goes under **Decisions** with its date.
 
@@ -168,8 +168,32 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         started instance and the fastest on a reused one.
   - [ ] Cronix's `phone-agent-api` takes about a second per request, far above the 300 ms p50
         of a backend read (manifest §6), and each availability check waits on it within a turn.
-        Measure where the function spends it (start of a new instance, imports, queries) and
-        lighten it in Cronix (B9); the agent's server near Cronix's region (`us-east-1`).
+        Measured on 2026-10-29:
+        - The database is in `sa-east-1` and the function runs in the region nearest to its
+          caller: from the US it ran in `us-east-1` and each query crossed the continent. Pinned
+          to `sa-east-1`, its time fell from about 1,010 to about 790 ms. Decided: the agent's
+          server in São Paulo (manifest §11).
+        - The function starts in 40 to 55 ms. Each signed response now carries `Server-Timing`
+          (Cronix pull request #36): signature and client about 1 to 5 ms, the route about
+          420 ms although PostgREST answers that query in 5 to 10 ms. The time is in the
+          function's trip to PostgREST through the public endpoint, not in Cronix's code.
+        - Next: measure the function reusing its client across requests, and querying Postgres
+          directly, then lighten it in Cronix (B9).
+
+## Stage E: WhatsApp calls with Meta's test number
+
+Development only, at no cost: Meta's test numbers need no messaging limit of 2,000 recipients,
+and only the few numbers registered on them can call. The real WhatsApp entry waits for that
+limit (manifest §10).
+
+- [ ] **E1. A public address for the webhook**: a free tunnel from the development machine
+      first; WhatsApp's audio is WebRTC and may not cross a tunnel or a VPN, in which case a
+      server in São Paulo (manifest §11).
+- [ ] **E2. The business of a WhatsApp call in Cronix**: its WhatsApp number is shared by every
+      business, and the v1 endpoints serve the phone line only. Cronix resolves the business
+      from the session or the client's phone; when it cannot, the agent asks for it.
+- [ ] **E3. Practice calls over WhatsApp** from a registered phone, each read from its
+      transcript, trace and log, and checked in the local Cronix.
 
 ## Open questions
 
@@ -177,6 +201,10 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
   stage A the model streamed nothing for 6.6 s after the caller's thanks, and only the log's
   time to first byte showed it. The trace should record such a wait; decided before Stage D's
   calls.
+
+- Cronix's smoke and voice E2E jobs still build the app against the production database: about
+  60 light requests per push (at most 2.7 s, measured 2026-10-29). The voice E2E needs the
+  deployed `voice-worker`; the smoke E2E could move to the ephemeral Supabase later.
 
 - A break in a business's hours (closed at midday): not in Cronix today. Adding it is a Cronix
   change in the shared resolver (B4); not part of this connection unless decided.
@@ -202,5 +230,13 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
   (`SCHEDULING_API_SIGNING_SECRET`), and the functions `phone-agent-api`, `process-whatsapp`,
   `voice-worker` and `whatsapp-webhook`, which also needed its import map (Cronix pull request
   #33).
+- 2026-10-29 · The order, while a number for the phone line is too costly in development:
+  first the agent's adjustments with the browser practice entry and the local Cronix (D4), at no
+  cost; then WhatsApp calls with Meta's test number (stage E); production for whichever channel
+  is unblocked first (Meta's limit, or an affordable number). A server is contracted only then,
+  or for stage E if a tunnel does not carry the audio.
+- 2026-10-29 · Cronix's integration tests run against an ephemeral Supabase in CI, never the
+  production database (Cronix pull request #37): two overlapping runs had slowed it for every
+  user for about ten minutes.
 - 2026-10-29 · Stored responses of idempotency keys are deleted after 7 days by a daily job in
   Cronix (pull request #35), as the contract says.
