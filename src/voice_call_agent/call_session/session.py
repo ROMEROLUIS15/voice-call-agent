@@ -42,8 +42,14 @@ class CallSession(BaseModel):
     @property
     def identity_verified(self) -> bool:
         """Meta verifies the WhatsApp number; a phone caller ID can be spoofed and a browser
-        practice call has no number at all (INV-4)."""
+        practice call's number is fictitious (INV-4)."""
         return self.channel is CallChannel.WHATSAPP
+
+    @property
+    def line_kind(self) -> str:
+        """How a scheduling backend names the entry: a browser practice call dials a practice
+        line as a phone does."""
+        return "whatsapp" if self.channel is CallChannel.WHATSAPP else "twilio"
 
     def resolve_business(
         self, business_id: str, context: BusinessContext | None = None

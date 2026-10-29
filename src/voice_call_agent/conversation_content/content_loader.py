@@ -29,8 +29,11 @@ class BookingBriefing(BaseModel):
     closed_day: str
     service: str
     price: str
+    """Takes `{price}` and `{currency}`, the currency's name from `currencies`."""
     no_price: str
     """For a service whose business publishes no price."""
+    currencies: dict[str, str]
+    """How each ISO 4217 code is said; a code missing here is said as the code."""
     calendar_day: str
     """A day of the calendar of the coming days, with its date for the tools."""
     calendar_today: str
@@ -124,6 +127,8 @@ class ConversationContent(BaseModel):
     booking_prompt: str
     """For calls whose business the backend resolved; filled in by `business_briefing`."""
     greeting: str
+    business_greeting: str
+    """Takes `{business_name}`."""
     read_back: str
     """The proposal as the code reads it back before the caller's yes (ADR 0019)."""
     booking_briefing: BookingBriefing
@@ -140,6 +145,8 @@ class ConversationContent(BaseModel):
 
 class _Phrases(BaseModel):
     greeting: str
+    business_greeting: str
+    """Takes `{business_name}`."""
     read_back: str
     booking_briefing: BookingBriefing
     spoken_moments: SpokenMoments
@@ -168,6 +175,7 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         system_prompt=system_prompt,
         booking_prompt=booking_prompt,
         greeting=phrases.greeting,
+        business_greeting=phrases.business_greeting,
         read_back=phrases.read_back,
         booking_briefing=phrases.booking_briefing,
         spoken_moments=phrases.spoken_moments,

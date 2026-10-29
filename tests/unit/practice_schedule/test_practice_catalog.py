@@ -93,6 +93,26 @@ def test_a_service_without_a_price_says_it_is_not_published() -> None:
     assert line.endswith(content.booking_briefing.no_price)  # Never read as a free service.
 
 
+def test_prices_are_said_in_the_currency_the_business_gives() -> None:
+    content = load_conversation_content()
+    clinic = load_practice_catalog().business("practice-dental-clinic").context(None)
+    [cleaning] = [
+        line
+        for line in booking_prompt(content, clinic, MONDAY).splitlines()
+        if "[dental-cleaning]" in line
+    ]
+    assert cleaning.endswith("precio 25.00 bolívares")
+    unknown = clinic.model_copy(update={"currency": "PEN"})
+    [line] = [
+        line
+        for line in booking_prompt(content, unknown, MONDAY).splitlines()
+        if "[dental-cleaning]" in line
+    ]
+    assert line.endswith(
+        "precio 25.00 PEN"
+    )  # A code with no name is said as the code, never as dollars.
+
+
 def test_every_shipped_business_has_a_fictitious_line_that_reaches_it() -> None:
     catalog = load_practice_catalog()
     for business in catalog.businesses:

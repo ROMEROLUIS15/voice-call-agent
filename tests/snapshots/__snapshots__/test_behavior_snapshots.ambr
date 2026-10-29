@@ -127,9 +127,9 @@
   - domingo 8 de noviembre: 2026-11-08, cerrado
   
   Servicios (el identificador entre corchetes es para las funciones):
-  - Corte de cabello [haircut]: 30 minutos, precio 8.00
-  - Corte y barba [haircut-and-beard]: 60 minutos, precio 12.00
-  - Afeitado [shave]: 30 minutos, precio 6.00
+  - Corte de cabello [haircut]: 30 minutos, precio 8.00 dólares
+  - Corte y barba [haircut-and-beard]: 60 minutos, precio 12.00 dólares
+  - Afeitado [shave]: 30 minutos, precio 6.00 dólares
   
   Usa siempre las funciones disponibles para avanzar. Nunca inventes servicios, precios, horarios ni citas: usa solo esta información y lo que devuelven las funciones. Los identificadores nunca se dicen.
   '''
@@ -159,9 +159,9 @@
   - domingo 8 de noviembre: 2026-11-08, cerrado
   
   Servicios (el identificador entre corchetes es para las funciones):
-  - Limpieza dental [dental-cleaning]: 45 minutos, precio 25.00
+  - Limpieza dental [dental-cleaning]: 45 minutos, precio 25.00 bolívares
   - Consulta de evaluación [first-assessment]: 30 minutos, precio no publicado
-  - Blanqueamiento dental [teeth-whitening]: 90 minutos, precio 120.00
+  - Blanqueamiento dental [teeth-whitening]: 90 minutos, precio 120.00 bolívares
   
   Usa siempre las funciones disponibles para avanzar. Nunca inventes servicios, precios, horarios ni citas: usa solo esta información y lo que devuelven las funciones. Los identificadores nunca se dicen.
   '''
@@ -191,9 +191,9 @@
   - domingo 8 de noviembre: 2026-11-08
   
   Servicios (el identificador entre corchetes es para las funciones):
-  - Masaje relajante [relaxing-massage]: 60 minutos, precio 35.00
-  - Limpieza facial [facial-cleansing]: 50 minutos, precio 28.00
-  - Manicura [manicure]: 40 minutos, precio 12.00
+  - Masaje relajante [relaxing-massage]: 60 minutos, precio 35.00 dólares
+  - Limpieza facial [facial-cleansing]: 50 minutos, precio 28.00 dólares
+  - Manicura [manicure]: 40 minutos, precio 12.00 dólares
   
   Usa siempre las funciones disponibles para avanzar. Nunca inventes servicios, precios, horarios ni citas: usa solo esta información y lo que devuelven las funciones. Los identificadores nunca se dicen.
   '''
@@ -206,6 +206,13 @@
       'calendar_today': ' (hoy)',
       'calendar_tomorrow': ' (mañana)',
       'closed_day': '{weekday} cerrado',
+      'currencies': dict({
+        'COP': 'pesos colombianos',
+        'EUR': 'euros',
+        'MXN': 'pesos mexicanos',
+        'USD': 'dólares',
+        'VES': 'bolívares',
+      }),
       'months': tuple(
         'enero',
         'febrero',
@@ -222,7 +229,7 @@
       ),
       'no_price': ', precio no publicado',
       'open_day': '{weekday} de {opens} a {closes}',
-      'price': ', precio {price}',
+      'price': ', precio {price} {currency}',
       'service': '{name} [{id}]: {minutes} minutos',
       'today': '{weekday} {day} de {month} de {year} ({iso_date})',
       'weekdays': tuple(
@@ -730,6 +737,12 @@
     'additionalProperties': False,
     'description': 'What the agent needs to know about the business serving the call.',
     'properties': dict({
+      'currency': dict({
+        'default': 'USD',
+        'pattern': '^[A-Z]{3}$',
+        'title': 'Currency',
+        'type': 'string',
+      }),
       'greeting': dict({
         'title': 'Greeting',
         'type': 'string',
@@ -815,6 +828,12 @@
         'additionalProperties': False,
         'description': 'What the agent needs to know about the business serving the call.',
         'properties': dict({
+          'currency': dict({
+            'default': 'USD',
+            'pattern': '^[A-Z]{3}$',
+            'title': 'Currency',
+            'type': 'string',
+          }),
           'greeting': dict({
             'title': 'Greeting',
             'type': 'string',
@@ -1326,6 +1345,12 @@
         'additionalProperties': False,
         'description': 'What the agent needs to know about the business serving the call.',
         'properties': dict({
+          'currency': dict({
+            'default': 'USD',
+            'pattern': '^[A-Z]{3}$',
+            'title': 'Currency',
+            'type': 'string',
+          }),
           'greeting': dict({
             'title': 'Greeting',
             'type': 'string',

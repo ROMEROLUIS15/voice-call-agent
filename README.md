@@ -45,7 +45,7 @@ start a call, and the service refuses the setting outside development. Its laten
 call's: the browser's audio is wideband, with echo cancellation, and stays on the machine.
 
 `SCHEDULING_BACKEND=practice` gives the calls fictitious businesses to book with (a barbershop, a
-dental clinic and a spa), kept in memory and lost on restart
+dental clinic, whose prices are in bolívares, and a spa), kept in memory and lost on restart
 (`src/voice_call_agent/practice_schedule/practice_businesses.toml`); it is also refused outside
 development. Each business has a fictitious number: pick it on the page before starting the call,
 and the call reaches that business as a phone-line call reaches the number it dials (ADR 0017).
@@ -54,6 +54,11 @@ at a time: the agent checks the availability, says which ranges of times are fre
 requested time is not, such as a long service too close to closing), asks for a time and for the name,
 the service reads the summary back, and the agent books only after you say yes (ADR 0011). Each decision lands in the call's trace
 (`writes`) with the `booked` outcome.
+
+With `SCHEDULING_BACKEND=api`, `SCHEDULING_API_URL` and `SCHEDULING_API_SIGNING_SECRET`, the calls
+read and book in Cronix through its signed phone agent API instead
+(`docs/specs/cronix-phone-api-contract.md`); a practice call carries a fictitious caller number,
+as Cronix finds clients by phone.
 
 With `CONVERSATION_TRANSCRIPTS_DIR` set, each call also leaves a text file named after the call:
 the prompt the model received, then what was said, with your turns as the speech-to-text heard

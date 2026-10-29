@@ -24,6 +24,7 @@ from voice_call_agent.settings.sections import (
     LanguageModelSettings,
     LogFormat,
     LogSettings,
+    SchedulingApiSettings,
     SchedulingBackendKind,
     ServerSettings,
     SpeechSettings,
@@ -78,6 +79,8 @@ class ServiceSettings(BaseSettings):
     browser_practice_enabled: bool = False
     """Practice calls from a browser on this machine (development only, ADR 0015)."""
     scheduling_backend: SchedulingBackendKind = SchedulingBackendKind.NONE
+    scheduling_api_url: HttpUrl | None = None
+    scheduling_api_signing_secret: SecretStr | None = None
 
     max_concurrent_calls: int = 10
     shutdown_grace_seconds: float = 300.0
@@ -121,6 +124,7 @@ class ServiceSettings(BaseSettings):
             self.whatsapp_app_secret,
             self.whatsapp_verify_token,
         )
+        self._check_scheduling_api()
         if self.browser_practice_enabled and self.environment is DeploymentEnvironment.PRODUCTION:
             raise UnsafeSettingsError(
                 "BROWSER_PRACTICE_ENABLED needs ENVIRONMENT=development: the entry has no "
@@ -235,6 +239,22 @@ class ServiceSettings(BaseSettings):
 
     def call_trace_log(self) -> CallTraceLogSettings:
         return CallTraceLogSettings(path=self.call_trace_log_path)
+
+    def _check_scheduling_api(self) -> None:
+        url, secret = self.scheduling_api_url, self.scheduling_api_signing_secret
+        if self.scheduling_backend is SchedulingBackendKind.API and (url is None or secret is None):
+            raise IncompleteSettingsError(
+                "SCHEDULING_BACKEND=api needs SCHEDULING_API_URL and SCHEDULING_API_SIGNING_SECRET"
+            )
+        if url and url.scheme != "https" and self.environment is DeploymentEnvironment.PRODUCTION:
+            raise UnsafeSettingsError("SCHEDULING_API_URL must use https outside development")
+
+    def scheduling_api(self) -> SchedulingApiSettings | None:
+        """The scheduling backend's HTTP API when it is the chosen backend; `None` otherwise."""
+        url, secret = self.scheduling_api_url, self.scheduling_api_signing_secret
+        if self.scheduling_backend is not SchedulingBackendKind.API or not (url and secret):
+            return None  # Not chosen; an incomplete choice is refused at startup.
+        return SchedulingApiSettings(base_url=str(url).rstrip("/"), signing_secret=secret)
 
     def conversation_transcripts(self) -> ConversationTranscriptSettings | None:
         """Where calls leave their transcripts, or `None`: no transcripts."""
