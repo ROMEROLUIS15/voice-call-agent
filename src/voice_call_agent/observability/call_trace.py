@@ -52,6 +52,19 @@ class WriteDecision(BaseModel):
     start: time | None = None
 
 
+class BackendRequest(BaseModel):
+    """One request to the scheduling backend during the conversation: how long the caller
+    waited on it. The operation is the port's method; no arguments, which can carry a name."""
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: str
+    started_at: datetime
+    duration_ms: float
+    outcome: str
+    """`ok`, or the type of the backend error it raised."""
+
+
 class TurnLatency(BaseModel):
     """One measured turn, in milliseconds. `other_ms` is pipeline time no service owns."""
 
@@ -99,6 +112,7 @@ class CallTrace(BaseModel):
     caller_turns: int
     errors: list[RecordedError]
     writes: list[WriteDecision] = Field(default_factory=list)
+    backend_requests: list[BackendRequest] = Field(default_factory=list)
     usage: ProviderUsage
     llm_upstreams: dict[str, int] = Field(default_factory=dict)
     """Responses served by each upstream provider, when the provider routes (OpenRouter)."""

@@ -14,6 +14,7 @@ from voice_call_agent.booking_flow.booking_steps import BookingSteps
 from voice_call_agent.call_session.session import CallSession
 from voice_call_agent.conversation_content.business_briefing import booking_prompt
 from voice_call_agent.conversation_content.content_loader import ConversationContent
+from voice_call_agent.observability.backend_timing import TimedSchedulingBackend
 from voice_call_agent.observability.call_trace_recorder import CallTraceRecorder
 from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBackend
 from voice_call_agent.write_guards.booking_guard import BookingGuard
@@ -41,6 +42,8 @@ def plan_call(
         return CallPlan(
             system_prompt=content.system_prompt, greeting=content.greeting, booking_flow=None
         )
+    # Each request the conversation makes lands in the call's trace with how long it took.
+    backend = TimedSchedulingBackend(backend, recorder.record_backend_request)
     guard = BookingGuard(
         call_id=session.call_id,
         catalog=business.services,
