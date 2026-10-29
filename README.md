@@ -55,6 +55,11 @@ requested time is not, such as a long service too close to closing), asks for a 
 the service reads the summary back, and the agent books only after you say yes (ADR 0011). Each decision lands in the call's trace
 (`writes`) with the `booked` outcome.
 
+With `SCHEDULING_BACKEND=api`, `SCHEDULING_API_URL` and `SCHEDULING_API_SIGNING_SECRET`, the calls
+read and book in Cronix through its signed phone agent API instead
+(`docs/specs/cronix-phone-api-contract.md`); a practice call carries a fictitious caller number,
+as Cronix finds clients by phone.
+
 With `CONVERSATION_TRANSCRIPTS_DIR` set, each call also leaves a text file named after the call:
 the prompt the model received, then what was said, with your turns as the speech-to-text heard
 them, the agent's lines as far as they were spoken and each tool call with its result. It keeps

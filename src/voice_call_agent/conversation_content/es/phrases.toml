@@ -3,6 +3,8 @@
 # from the scheduling backend.
 
 greeting = "Hola, gracias por llamar. ¿En qué te puedo ayudar?"
+# A business's greeting when its backend gives only its name.
+business_greeting = "Hola, gracias por llamar a {business_name}. ¿En qué te puedo ayudar?"
 
 # The code reads back the proposal it validated, before the caller's yes (ADR 0019). Neither
 # "tú" nor "usted": the register is the business's.

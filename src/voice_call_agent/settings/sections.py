@@ -54,6 +54,18 @@ class SchedulingBackendKind(StrEnum):
     """No backend yet (phase 0): the agent converses and books nothing."""
     PRACTICE = "practice"
     """The in-memory practice schedule with fictitious businesses; development only."""
+    API = "api"
+    """The scheduling backend's HTTP API, every request signed (contract §2)."""
+
+
+class SchedulingApiSettings(_Section):
+    """The scheduling backend's HTTP API: where it is and the secret requests are signed with."""
+
+    base_url: str
+    signing_secret: SecretStr
+    read_timeout_seconds: float = Field(default=1.5, gt=0)
+    """Contract §7: the caller is waiting."""
+    write_timeout_seconds: float = Field(default=3.0, gt=0)
 
 
 class TwilioMediaStreamsSettings(_Section):
