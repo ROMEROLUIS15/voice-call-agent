@@ -166,7 +166,7 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         machine, of which opening the connection is about 170 ms; Cronix's logs show 194 to
         2,322 ms of execution in the function (median about 1.1 s), the slowest on a newly
         started instance and the fastest on a reused one.
-  - [ ] Cronix's `phone-agent-api` takes about a second per request, far above the 300 ms p50
+  - [x] Cronix's `phone-agent-api` took about a second per request, far above the 300 ms p50
         of a backend read (manifest §6), and each availability check waits on it within a turn.
         Measured on 2026-10-29:
         - The database is in `sa-east-1` and the function runs in the region nearest to its
@@ -177,8 +177,20 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
           (Cronix pull request #36): signature and client about 1 to 5 ms, the route about
           420 ms although PostgREST answers that query in 5 to 10 ms. The time is in the
           function's trip to PostgREST through the public endpoint, not in Cronix's code.
-        - Next: measure the function reusing its client across requests, and querying Postgres
-          directly, then lighten it in Cronix (B9).
+        - Compared with a temporary read-only function in `sa-east-1` (since deleted), 15 rounds:
+          a client per request, a reused client and a direct Postgres connection all had a
+          median of about 140 ms per query; the reused client cut the worst case from about 2 s
+          to 470 ms, and direct Postgres added credentials to the function for no gain in the
+          median. Cronix pull request #38 reuses the client.
+        - Part of the earlier slowness was Cronix's database itself: the Free plan's Nano
+          instance (5 MB/s of disk throughput at baseline) ran out of its disk IO budget and
+          stopped answering. Realtime's `postgres_changes` read the WAL all the time, and
+          `cron.job_run_details` held 20 MB of a 56 MB database. Fixed without changing plan:
+          the history emptied and cleaned daily (Cronix #39), the dashboard on Broadcast
+          instead of `postgres_changes` (#40), the smoke E2E on an ephemeral Supabase and the
+          voice E2E on `main` only (#41).
+        - Result: with the function in `sa-east-1`, about 75 ms of function time per request
+          after the first (440 ms on a new instance), within the 300 ms target.
 
 ## Stage E: WhatsApp calls with Meta's test number
 
@@ -202,9 +214,10 @@ limit (manifest §10).
   time to first byte showed it. The trace should record such a wait; decided before Stage D's
   calls.
 
-- Cronix's smoke and voice E2E jobs still build the app against the production database: about
-  60 light requests per push (at most 2.7 s, measured 2026-10-29). The voice E2E needs the
-  deployed `voice-worker`; the smoke E2E could move to the ephemeral Supabase later.
+- Cronix's production database is on the Free plan's Nano instance, whose disk IO budget ran out
+  on 2026-10-29. The two monitoring jobs (`cron-ai-alerts`, `ai-agent-error-rate-check`) stay
+  paused until the dashboard's Disk IO Balance stays high; 18 unused indexes are candidates to
+  drop. The agent's own calls add a few reads each.
 
 - A break in a business's hours (closed at midday): not in Cronix today. Adding it is a Cronix
   change in the shared resolver (B4); not part of this connection unless decided.
@@ -235,6 +248,9 @@ limit (manifest §10).
   cost; then WhatsApp calls with Meta's test number (stage E); production for whichever channel
   is unblocked first (Meta's limit, or an affordable number). A server is contracted only then,
   or for stage E if a tunnel does not carry the audio.
+- 2026-10-29 · Cronix's database stays on Supabase's Free plan for now (a paid plan is not
+  affordable during development): its disk use is lowered instead (Cronix #39 to #41), and the
+  plan is revisited if the disk IO budget runs out again.
 - 2026-10-29 · Cronix's integration tests run against an ephemeral Supabase in CI, never the
   production database (Cronix pull request #37): two overlapping runs had slowed it for every
   user for about ten minutes.
