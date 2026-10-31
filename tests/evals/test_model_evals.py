@@ -234,6 +234,7 @@ def _record(
     booking: tuple[str, date, time, str] | None = None,
     refusals: tuple[str, ...] = (),
     proposed_by: str = "propose_booking",
+    first_check: str | None = None,
 ) -> ConversationRecord:
     writes = [
         WriteDecision(
@@ -242,6 +243,8 @@ def _record(
         for refusal in refusals
     ]
     calls: list[RecordedToolCall] = []
+    if first_check is not None:
+        calls.append(RecordedToolCall("check_availability", {}, {"status": first_check}))
     if booking is not None:
         service_id, day, start, name = booking
         proposal_id = uuid4()
@@ -271,7 +274,13 @@ def _record(
     )
 
 
-BOOKED_AS_ASKED = {"bookings-completed": 1.0, "confirms-after-the-answer": 1.0}
+BOOKED_AS_ASKED = {
+    "bookings-completed": 1.0,
+    "confirms-after-the-answer": 1.0,
+    "asks-which-day": 1.0,
+}
+WEEKDAY_ASKED = ("haircut", date(2026, 11, 4), time(11, 0), "Pedro Ejemplo")
+"""What `weekday-and-date-disagree-at-a-barbershop` books once the caller said which day."""
 
 
 @pytest.mark.parametrize(
@@ -306,7 +315,23 @@ BOOKED_AS_ASKED = {"bookings-completed": 1.0, "confirms-after-the-answer": 1.0}
         (
             "book-appointment-over-whatsapp",
             _record(CallOutcome.INFO_ONLY),
-            {"bookings-completed": 0.0, "confirms-after-the-answer": 1.0},
+            {"bookings-completed": 0.0, "confirms-after-the-answer": 1.0, "asks-which-day": 1.0},
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            _record(CallOutcome.BOOKED, ASKED, first_check="weekday_mismatch"),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 1.0, "asks-which-day": 0.0},  # No reason.
+        ),
+        (
+            "weekday-and-date-disagree-at-a-barbershop",
+            _record(CallOutcome.BOOKED, WEEKDAY_ASKED, first_check="weekday_mismatch"),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 1.0},
+        ),
+        (
+            "weekday-and-date-disagree-at-a-barbershop",
+            # Booked the right day, but without asking: the caller could have meant the other.
+            _record(CallOutcome.BOOKED, WEEKDAY_ASKED, first_check="proposed"),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 1.0, "asks-which-day": 0.0},
         ),
         ("book-appointment-over-whatsapp", None, {"bookings-completed": 0.0}),  # It stalled.
         (

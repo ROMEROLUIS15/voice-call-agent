@@ -6,7 +6,7 @@ from typing import Any
 from pipecat.flows import FlowManager, FlowsFunctionSchema, NodeConfig
 from pipecat.frames.frames import TTSSpeakFrame
 
-from tests.practice_catalogs import TWO_BUSINESSES
+from tests.practice_catalogs import MONDAY, TWO_BUSINESSES
 from tests.write_guard_fixtures import CALL_ID, TUESDAY, GuardedCall, guarded_call
 from voice_call_agent.booking_flow.booking_graph import BookingGraph, booking_functions, say
 from voice_call_agent.booking_flow.booking_steps import BookingSteps, Step
@@ -25,6 +25,7 @@ def _graph(call: GuardedCall) -> tuple[BookingGraph, BookingSteps]:
         guard=call.guard,
         content=CONTENT,
         weekly_hours=TWO_BUSINESSES.business("barbershop").weekly_hours,
+        today=MONDAY,
     )
     return BookingGraph(steps=steps, content=CONTENT, role=ROLE, greeting=GREETING), steps
 
@@ -145,6 +146,24 @@ async def test_the_booking_is_announced_by_the_code_and_the_model_waits() -> Non
     ]
     assert booked.get("respond_immediately") is False
     assert set(_functions(booked)) == {"new_request"}
+
+
+async def test_a_weekday_that_does_not_match_the_date_is_asked_by_the_code() -> None:
+    graph, _ = _graph(await guarded_call())
+    check = _functions(graph.initial_node())["check_availability"]
+    _, node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), weekday="jueves")
+    assert node is not None and node.get("name") == Step.WHICH_DAY.value
+    assert _said(node) == [
+        "El veintisiete de octubre es martes. ¿La cita es para el martes veintisiete de octubre "
+        "o para el jueves veintinueve de octubre?"
+    ]
+    assert node.get("respond_immediately") is False
+    assert set(_functions(node)) == {"check_availability"}
+    [task] = node.get("task_messages", [])
+    assert "(2026-10-27)" in str(task["content"]) and "(2026-10-29)" in str(task["content"])
+    again = _functions(node)["check_availability"]
+    _, chosen = await _run(again, service_id="haircut", day=TUESDAY.isoformat(), weekday="martes")
+    assert chosen is not None and chosen.get("name") == Step.CHOOSE_TIME.value
 
 
 async def test_a_step_that_stays_returns_no_node() -> None:

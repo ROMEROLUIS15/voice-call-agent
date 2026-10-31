@@ -26,6 +26,7 @@ expected:
       day: "2026-11-04"
       start: "11:00"
       client_name: Pedro Ejemplo
+  asks_which_day: true
   outcome: booked
   identity_verified: false
   quality: [invents-nothing, natural-spanish]

@@ -5,9 +5,10 @@ from datetime import time, timedelta
 from typing import cast
 
 from tests.browser_peer import reported_error_codes
-from tests.practice_catalogs import TWO_BUSINESSES
+from tests.practice_catalogs import MONDAY, TWO_BUSINESSES
 from tests.write_guard_fixtures import CALL_ID, TUESDAY, GuardedCall, guarded_call
 from voice_call_agent.booking_flow.booking_steps import BookingSteps, Step
+from voice_call_agent.booking_flow.named_day import DayQuestion
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.scheduling_backend.scheduling_errors import (
     SchedulingBackendUnavailableError,
@@ -26,6 +27,7 @@ def _steps(call: GuardedCall, backend: SchedulingBackend | None = None) -> Booki
         guard=call.guard,
         content=CONTENT,
         weekly_hours=TWO_BUSINESSES.business("barbershop").weekly_hours,
+        today=MONDAY,
     )
 
 
@@ -156,3 +158,53 @@ async def test_a_change_of_mind_goes_back_to_the_request_with_nothing_pending() 
     assert outcome.next_step is Step.REQUEST
     assert (steps.slot, steps.choice, steps.proposal) == (None, None, None)
     assert (await steps.confirm_booking({})).next_step is Step.REQUEST
+
+
+THURSDAY = TUESDAY + timedelta(days=2)
+
+
+async def test_a_weekday_that_does_not_match_the_date_is_asked_before_anything_is_offered() -> None:
+    call = await guarded_call()
+    steps = _steps(call)
+    said = {"start": "11:00", "client_name": "Ana Ejemplo", "weekday": "jueves"}
+    outcome = await steps.check_availability({**HAIRCUT, **said})
+    assert (outcome.next_step, outcome.result["status"]) == (Step.WHICH_DAY, "weekday_mismatch")
+    assert steps.day_question == DayQuestion(TUESDAY, THURSDAY)
+    assert (steps.slot, steps.choice, steps.proposal) == (None, None, None)
+    assert call.decisions == []
+
+
+async def test_the_date_the_caller_said_counts_even_when_the_day_passed_is_the_weekday() -> None:
+    # "El jueves veintisiete": the day passed is Thursday the 29th, the caller said the 27th.
+    steps = _steps(await guarded_call())
+    said = {"day": THURSDAY.isoformat(), "weekday": "jueves", "day_number": 27}
+    outcome = await steps.check_availability({**HAIRCUT, **said})
+    assert outcome.next_step is Step.WHICH_DAY
+    assert steps.day_question == DayQuestion(TUESDAY, THURSDAY)
+
+
+async def test_a_weekday_that_matches_goes_on_whatever_its_accents_or_case() -> None:
+    steps = _steps(await guarded_call())
+    wednesday = (TUESDAY + timedelta(days=1)).isoformat()
+    for day, weekday in ((TUESDAY.isoformat(), " Martes "), (wednesday, "miercoles")):
+        said = {"day": day, "start": "11:00", "weekday": weekday, "day_number": int(day[-2:])}
+        outcome = await steps.check_availability({**HAIRCUT, **said})
+        assert (outcome.next_step, outcome.result["status"]) == (Step.NAME, "available")
+        assert steps.day_question is None
+
+
+async def test_the_other_day_offered_is_never_in_the_past() -> None:
+    # Today is Monday the 26th: the Sunday nearest Tuesday the 27th, the 25th, has gone.
+    steps = _steps(await guarded_call())
+    await steps.check_availability({**HAIRCUT, "weekday": "domingo"})
+    assert steps.day_question == DayQuestion(TUESDAY, TUESDAY + timedelta(days=5))
+
+
+async def test_an_unknown_weekday_or_day_number_is_answered_with_its_field() -> None:
+    steps = _steps(await guarded_call())
+    with reported_error_codes() as codes:
+        weekday = await steps.check_availability({**HAIRCUT, "weekday": "juebes"})
+        number = await steps.check_availability({**HAIRCUT, "weekday": "martes", "day_number": 32})
+    assert weekday.result == {"status": "invalid_arguments", "fields": ["weekday"]}
+    assert number.result == {"status": "invalid_arguments", "fields": ["day_number"]}
+    assert codes == ["TOOL_ARGUMENTS_INVALID", "TOOL_ARGUMENTS_INVALID"]

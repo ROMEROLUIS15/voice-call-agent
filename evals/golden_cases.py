@@ -89,6 +89,9 @@ class Expectations(_Strict):
     (a name said with the request goes with the availability check instead); `None`: no write.
     At the conversation level the scripted model proposes it on the first caller turn and
     confirms it on the second."""
+    asks_which_day: bool = False
+    """The caller names a weekday and a date that do not match: the code asks which day before
+    anything is offered or proposed."""
     writes: tuple[str, ...] = ()
     """The write guards' decisions in the call trace, in order (conversation level)."""
     real_failures: tuple[str, ...] = ()
