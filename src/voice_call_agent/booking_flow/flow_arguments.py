@@ -60,6 +60,10 @@ class CheckAvailabilityArguments(_Arguments):
         default=None,
         description="The day of the month the caller named for this day, if they named one.",
     )
+    month: str | None = Field(
+        default=None,
+        description="The month the caller named for this day (enero, febrero…), as they said it.",
+    )
     start: ClockTime | None = Field(
         default=None, description="The time the caller asked for, as HH:MM, if they named one."
     )
