@@ -30,6 +30,18 @@ def spoken_time(content: ConversationContent, moment: time) -> str:
     return words.past_the_hour.format(hour=hour, minutes=minutes, day_part=day_part)
 
 
+def which_day_question(content: ConversationContent, said_date: date, weekday_date: date) -> str:
+    """'El cuatro de noviembre es miércoles. ¿La cita es para el miércoles cuatro de noviembre o
+    para el jueves cinco de noviembre?': the weekdays are the calendar's, never the model's."""
+    words, briefing = content.spoken_moments, content.booking_briefing
+    return content.which_day.format(
+        date=f"{words.numbers[said_date.day]} de {briefing.months[said_date.month - 1]}",
+        weekday=briefing.weekdays[said_date.weekday()],
+        said_day=spoken_day(content, said_date),
+        weekday_day=spoken_day(content, weekday_date),
+    )
+
+
 def proposal_read_back(
     content: ConversationContent, service: str, day: date, start: time, client_name: str
 ) -> str:

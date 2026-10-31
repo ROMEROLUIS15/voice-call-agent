@@ -29,6 +29,18 @@
           'description': 'The day, as YYYY-MM-DD.',
           'type': 'string',
         }),
+        'day_number': dict({
+          'anyOf': list([
+            dict({
+              'type': 'integer',
+            }),
+            dict({
+              'type': 'null',
+            }),
+          ]),
+          'default': None,
+          'description': 'The day of the month the caller named for this day, if they named one.',
+        }),
         'service_id': dict({
           'description': "The service's id, from the brackets in the service list.",
           'type': 'string',
@@ -44,6 +56,18 @@
           ]),
           'default': None,
           'description': 'The time the caller asked for, as HH:MM, if they named one.',
+        }),
+        'weekday': dict({
+          'anyOf': list([
+            dict({
+              'type': 'string',
+            }),
+            dict({
+              'type': 'null',
+            }),
+          ]),
+          'default': None,
+          'description': 'The weekday the caller named for this day in their latest words (lunes, martes…), as they said it, even if it does not match the date; the system checks them.',
         }),
       }),
       'required': list([
@@ -139,7 +163,8 @@
       'confirm': 'Tu tarea ahora: la confirmación. El sistema acaba de leerle a la persona el resumen de la cita y le preguntó si está bien. Si lo acepta sin cambios, llama a confirm_booking: la cita no existe hasta que la función responde, así que nunca digas que está agendada o confirmada sin ese resultado. Si quiere cambiar algo, duda o dice que no, llama a change_request. No repitas el resumen.',
       'name': 'Tu tarea ahora: el nombre. Está libre {service_name}, el {day}, a {time}, y el sistema acaba de preguntarle a la persona a nombre de quién es la cita. En cuanto diga el nombre y apellido de quien va a la cita, llama a propose_booking con ese nombre sin anunciarlo. Si falta el nombre o el apellido, pídeselo; si la cita es para otra persona, pide el nombre de esa persona. Si cambia el servicio, el día o la hora, llama primero a check_availability con lo nuevo. No repitas la pregunta ni anuncies la propuesta: el sistema se la lee.',
       'not_booked': 'No se pudo completar: la agenda no responde en este momento. Díselo con calma, sugiere llamar más tarde y despídete. No digas que hay una cita agendada.',
-      'request': 'Tu tarea ahora: averiguar qué servicio quiere la persona y para qué día. Responde sus preguntas sobre servicios, precios y horario con la información que tienes. Busca el día en el calendario, nunca calcules una fecha: "el próximo lunes" es el primer lunes después de hoy, nunca hoy. Si el día de la semana y la fecha que dice la persona no coinciden en el calendario, pregúntale cuál de los dos quiere. Fuera de eso, no le pidas confirmar el servicio, el día ni la hora: al final el sistema le lee el resumen. En cuanto sepas el servicio y el día, llama a check_availability sin anunciarlo; pasa start si dijo una hora, y client_name si ya dijo el nombre y apellido de quien va a la cita. Si un resultado dice que ese día no se atiende, no tiene horas libres o que el horario ya no está libre, díselo y pide otro día u otra hora.',
+      'request': 'Tu tarea ahora: averiguar qué servicio quiere la persona y para qué día. Responde sus preguntas sobre servicios, precios y horario con la información que tienes. Busca el día en el calendario, nunca calcules una fecha: "el próximo lunes" es el primer lunes después de hoy, nunca hoy. Si nombra un día de la semana o un número de día, pásalos en weekday y day_number tal como los dijo, aunque no coincidan: el sistema los revisa. Fuera de eso, no le pidas confirmar el servicio, el día ni la hora: al final el sistema le lee el resumen. En cuanto sepas el servicio y el día, llama a check_availability sin anunciarlo; pasa start si dijo una hora, y client_name si ya dijo el nombre y apellido de quien va a la cita. Si un resultado dice que ese día no se atiende, no tiene horas libres o que el horario ya no está libre, díselo y pide otro día u otra hora.',
+      'which_day': 'Tu tarea ahora: el día. La persona nombró un día de la semana y una fecha que no coinciden, y el sistema acaba de preguntarle si la cita es para el {said_day} ({said_date}) o para el {weekday_day} ({weekday_date}). No repitas la pregunta: espera su respuesta, y nunca elijas por ella. Cuando elija, llama a check_availability con ese día y con lo que ya dijo: el servicio, y la hora y el nombre si los dijo; en weekday y day_number, solo lo que nombre en su respuesta.',
     }),
   })
 # ---

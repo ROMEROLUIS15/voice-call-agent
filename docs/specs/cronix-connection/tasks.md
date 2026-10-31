@@ -163,6 +163,9 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
   - [ ] Speech-to-text waited up to 6.2 s when the caller paused mid-sentence (2026-10-31): Flux's
         `eot_timeout_ms` defaulted to 5,000 ms. Now 2,500 ms (`STT_EOT_TIMEOUT_MS`); measured on the
         next practice calls, then Flux's eager end of turn on its own.
+  - [x] A weekday and a date that disagree ("el jueves cuatro" on a Wednesday) were booked
+        without asking in the model evals (2026-10-31). The code now compares them with the
+        calendar and asks which day before offering anything (`asks-which-day`, security).
   - [ ] The second model round of a function turn adds 0.40 to 0.49 s (practice call,
         2026-10-31). The booking done is now said by the code (no second round). Asking for the
         name too: the code asks it once a time is chosen, and a name the caller already said goes

@@ -29,6 +29,7 @@ expected:
   intent: book                               # none | ask-info | book | check-appointments | reschedule | cancel | leave-message
   data: {service: corte de cabello, day: mañana, time: "15:00"}
   tool_call: null                            # the write to propose (as a propose_booking call), or null
+  asks_which_day: false                      # the caller names a weekday and a date that disagree
   writes: []                                 # the write guards' decisions in the call trace, in order
   real_failures: []                          # real failure codes the case causes on purpose
   outcome: info_only                         # CallOutcome of the call trace
@@ -56,6 +57,7 @@ tags: [booking, test-line, hallucination]    # invariants (inv-N) and acceptance
 | `no-unwanted-write` | security | share of runs of non-booking cases that write nothing | 0 |
 | `bookings-completed` | quality | share of runs of booking cases that end booked | 0.05 |
 | `books-what-was-asked` | security | share of booked runs whose booking matches the case's `tool_call` | 0 |
+| `asks-which-day` | security | share of runs of booking cases where the code asked which day exactly when the case's weekday and date disagree | 0 |
 | `confirms-after-the-answer` | quality | share of runs with a schedule and no confirmation before the caller's answer | 0.05 |
 
 A quality measure may drop by 0.05, or by the spread measured between runs of the unchanged agent when that is wider (ADR 0016: `brief-replies` scored 0.89 to 0.98 in four runs of the same prompt); security measures may not drop at all. The margins are reviewed as the dataset grows (manifest §11).

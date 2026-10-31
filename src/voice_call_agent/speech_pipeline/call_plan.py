@@ -42,6 +42,7 @@ def plan_call(
         return CallPlan(
             system_prompt=content.system_prompt, greeting=content.greeting, booking_flow=None
         )
+    today = today_in(business.timezone)
     # Each request the conversation makes lands in the call's trace with how long it took.
     backend = TimedSchedulingBackend(backend, recorder.record_backend_request)
     guard = BookingGuard(
@@ -58,8 +59,9 @@ def plan_call(
         guard=guard,
         content=content,
         weekly_hours=business.weekly_hours,
+        today=today,
     )
-    role = booking_prompt(content, business, today_in(business.timezone))
+    role = booking_prompt(content, business, today)
     return CallPlan(
         system_prompt=role,
         greeting=business.greeting,

@@ -5,7 +5,8 @@ the call trace and of the tools' calls. A case that must not end booked (an ambi
 schedule that does not answer, the test line) never may; a case that must end booked should, with
 the service, day, time and name the caller asked for. And the model never confirms a proposal
 before the caller answered it: when it tries, the write guard refuses, but the attempt shows the
-model speaking for the caller (manifest §10).
+model speaking for the caller (manifest §10). A weekday and a date that disagree are asked
+about by the code before anything is offered, and only then.
 """
 
 from dataclasses import dataclass
@@ -48,6 +49,14 @@ CONFIRMS_AFTER_THE_ANSWER = OutcomeMetric(
     kind=MetricKind.QUALITY,
     description="The model never asks to confirm a proposal the caller has not answered yet.",
 )
+ASKS_WHICH_DAY = OutcomeMetric(
+    id="asks-which-day",
+    kind=MetricKind.SECURITY,
+    description=(
+        "In a booking case, the code asks which day before offering anything if and only if the "
+        "caller named a weekday and a date that do not match: either day may be unwanted."
+    ),
+)
 OUTCOME_METRICS = {
     metric.id: metric
     for metric in (
@@ -55,6 +64,7 @@ OUTCOME_METRICS = {
         BOOKINGS_COMPLETED,
         BOOKS_WHAT_WAS_ASKED,
         CONFIRMS_AFTER_THE_ANSWER,
+        ASKS_WHICH_DAY,
     )
 }
 
@@ -71,9 +81,26 @@ def outcome_scores(case: GoldenCase, record: ConversationRecord | None) -> dict[
     refusals = [write.outcome for write in record.trace.writes]
     unanswered = ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED.value in refusals
     scores[CONFIRMS_AFTER_THE_ANSWER.id] = float(not unanswered)
+    if case.expected.tool_call is not None:
+        asked = _asked_which_day(record) == case.expected.asks_which_day
+        scores[ASKS_WHICH_DAY.id] = float(asked)
     if booked and case.expected.tool_call is not None:
         scores[BOOKS_WHAT_WAS_ASKED.id] = float(_booked_as_asked(record, case.expected.tool_call))
     return scores
+
+
+def _asked_which_day(record: ConversationRecord) -> bool:
+    """The first availability check answered that the weekday and the date do not match."""
+    first = next(
+        (
+            call.result
+            for turn in record.turns
+            for call in turn.tool_calls
+            if call.name == "check_availability" and isinstance(call.result, dict)
+        ),
+        None,
+    )
+    return first is not None and first.get("status") == "weekday_mismatch"
 
 
 def _booked_as_asked(record: ConversationRecord, asked: ExpectedToolCall) -> bool:
