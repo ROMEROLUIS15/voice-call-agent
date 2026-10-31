@@ -22,6 +22,7 @@ from voice_call_agent.booking_flow.flow_arguments import (
     ProposeBookingArguments,
     SelectStartArguments,
 )
+from voice_call_agent.booking_flow.named_day import DayQuestion, day_question, weekday_index
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import spoken_day
 from voice_call_agent.observability.error_reporting import report_error
@@ -51,6 +52,7 @@ JsonObject = dict[str, Any]  # Any: a JSON value, as function results travel to 
 
 class Step(StrEnum):
     REQUEST = "request"
+    WHICH_DAY = "which_day"
     CHOOSE_TIME = "choose_time"
     NAME = "name"
     CONFIRM = "confirm"
@@ -101,8 +103,12 @@ class BookingSteps:
         guard: BookingGuard,
         content: ConversationContent,
         weekly_hours: WeeklyHours,
+        today: date,
     ) -> None:
+        """`today` is the date in the business's time zone: the other day asked about when a
+        weekday does not match the date is never in the past."""
         self._call_id = call_id
+        self._today = today
         self._weekly_hours = weekly_hours
         self._catalog = {service.id: service for service in catalog}
         self._backend = backend
@@ -113,6 +119,8 @@ class BookingSteps:
         self.proposal: Proposed | None = None
         self.booked: Proposed | None = None
         """The proposal the backend booked last: the code says it to the caller."""
+        self.day_question: DayQuestion | None = None
+        """A weekday and a date the caller named that do not match: the code asks which."""
 
     @property
     def catalog(self) -> list[ServiceOffering]:
@@ -158,10 +166,25 @@ class BookingSteps:
 
     async def _check_availability(self, call: CheckAvailabilityArguments) -> StepOutcome:
         # A new request: nothing chosen or proposed for the earlier one may be proposed or booked.
-        self.slot, self.choice, self.proposal = None, None, None
+        self.slot, self.choice, self.proposal, self.day_question = None, None, None, None
         service = self._catalog.get(call.service_id)
         if service is None:
             return StepOutcome({"status": "unknown_service"}, None)
+        weekday = None
+        if call.weekday is not None:
+            weekday = weekday_index(call.weekday, self._content.booking_briefing.weekdays)
+            if weekday is None:
+                report_error(ErrorCode.TOOL_ARGUMENTS_INVALID, fields="weekday")
+                return StepOutcome({"status": "invalid_arguments", "fields": ["weekday"]}, None)
+        question = day_question(call.day, call.day_number, weekday, self._today)
+        if question is not None:
+            # Two days were named: nothing is offered for either until the caller says which.
+            self.day_question = question
+            dates = {
+                "date": question.said_date.isoformat(),
+                "weekday_date": question.weekday_date.isoformat(),
+            }
+            return StepOutcome({"status": "weekday_mismatch", **dates}, Step.WHICH_DAY)
         result = await self._backend.availability(self._call_id, service.id, call.day)
         # The weekday is the code's, never the model's arithmetic (ADR 0019).
         day = {"day": call.day.isoformat(), "day_spoken": spoken_day(self._content, call.day)}

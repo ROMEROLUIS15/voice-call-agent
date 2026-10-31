@@ -6,6 +6,9 @@ greeting = "Hola, gracias por llamar. ¿En qué te puedo ayudar?"
 # A business's greeting when its backend gives only its name.
 business_greeting = "Hola, gracias por llamar a {business_name}. ¿En qué te puedo ayudar?"
 
+# The code asks which day when the weekday the caller named does not match the date, in the
+# same register: the date said, its real weekday, then both days to choose from.
+which_day = "El {date} es {weekday}. ¿La cita es para el {said_day} o para el {weekday_day}?"
 # The code asks whose name the appointment goes under once a time is chosen, in the same register.
 name_ask = "¿A nombre de quién sería la cita?"
 # The code reads back the proposal it validated, before the caller's yes (ADR 0019). Neither
