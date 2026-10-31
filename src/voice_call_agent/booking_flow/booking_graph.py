@@ -41,6 +41,7 @@ from voice_call_agent.booking_flow.spoken_free_times import (
 )
 from voice_call_agent.conversation_content.content_loader import BookingTasks, ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import (
+    booking_done,
     proposal_read_back,
     spoken_day,
     spoken_time,
@@ -161,8 +162,14 @@ class BookingGraph:
         return node
 
     def _booked(self) -> NodeConfig:
+        """The code says the booking is done; the model waits for the caller."""
         new = self._function("new_request", {}, self._steps.change_request)
-        return _node(Step.BOOKED, self._tasks.booked, [new])
+        node = _node(Step.BOOKED, self._tasks.booked, [new])
+        booked = self._steps.booked
+        if booked is not None:  # Always set on reaching this node; the guard keeps mypy honest.
+            node["pre_actions"] = [say(booking_done(self._content, booked.day, booked.start))]
+            node["respond_immediately"] = False
+        return node
 
     def _not_booked(self) -> NodeConfig:
         return _node(Step.NOT_BOOKED, self._tasks.not_booked, [])
