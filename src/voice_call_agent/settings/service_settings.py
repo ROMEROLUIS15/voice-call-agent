@@ -32,6 +32,8 @@ from voice_call_agent.settings.sections import (
     TwilioMediaStreamsSettings,
     WebhookProtectionSettings,
     WhatsAppCallingSettings,
+    comma_separated,
+    require_complete_group,
 )
 from voice_call_agent.settings.settings_errors import IncompleteSettingsError, UnsafeSettingsError
 
@@ -54,6 +56,8 @@ class ServiceSettings(BaseSettings):
     stt_model: str = "flux-general-multi"
     stt_eot_threshold: float = Field(default=0.8, ge=0.5, le=1.0)
     """Flux's end-of-turn confidence: higher waits longer before answering (manifest §10)."""
+    stt_eot_timeout_ms: int = Field(default=2500, ge=500, le=10_000)
+    """Silence after which Flux ends the turn whatever its confidence (manifest §10)."""
     tts_voice: str = "aura-2-selena-es"
 
     llm_provider: LanguageModelProvider = LanguageModelProvider.OPENROUTER
@@ -113,13 +117,13 @@ class ServiceSettings(BaseSettings):
     def _check_groups(self) -> Self:
         if self._llm_api_key() is None:
             raise IncompleteSettingsError(f"Missing API key for LLM provider '{self.llm_provider}'")
-        _require_complete_group(
+        require_complete_group(
             "Twilio Media Streams",
             self.public_base_url,
             self.twilio_account_sid,
             self.twilio_auth_token,
         )
-        _require_complete_group(
+        require_complete_group(
             "WhatsApp Calling",
             self.whatsapp_access_token,
             self.whatsapp_phone_number_id,
@@ -153,7 +157,7 @@ class ServiceSettings(BaseSettings):
                 "LOG_FILE_PATH needs ENVIRONMENT=development: Pipecat logs conversation content "
                 "at DEBUG"
             )
-        if "*" in _comma_separated(self.cors_allowed_origins):
+        if "*" in comma_separated(self.cors_allowed_origins):
             raise UnsafeSettingsError("CORS_ALLOWED_ORIGINS must list explicit origins, never '*'")
         try:
             parse(self.webhook_rate_limit)
@@ -169,6 +173,7 @@ class ServiceSettings(BaseSettings):
             deepgram_api_key=self.deepgram_api_key,
             stt_model=self.stt_model,
             eot_threshold=self.stt_eot_threshold,
+            eot_timeout_ms=self.stt_eot_timeout_ms,
             tts_voice=self.tts_voice,
         )
 
@@ -219,14 +224,14 @@ class ServiceSettings(BaseSettings):
         )
 
     def http_hardening(self) -> HttpHardeningSettings:
-        hosts = _comma_separated(self.allowed_hosts)
+        hosts = comma_separated(self.allowed_hosts)
         if self.public_base_url is not None and self.public_base_url.host:
             hosts = (*hosts, self.public_base_url.host)
         return HttpHardeningSettings(
             environment=self.environment,
             allowed_hosts=tuple(dict.fromkeys(hosts)),
             trusted_proxy_addresses=self.trusted_proxy_addresses,
-            cors_allowed_origins=_comma_separated(self.cors_allowed_origins),
+            cors_allowed_origins=comma_separated(self.cors_allowed_origins),
             max_request_body_bytes=self.max_request_body_bytes,
             max_websocket_message_bytes=self.max_websocket_message_bytes,
         )
@@ -288,13 +293,3 @@ class ServiceSettings(BaseSettings):
             LanguageModelProvider.OPENROUTER: self.openrouter_api_key,
         }
         return keys[self.llm_provider]
-
-
-def _require_complete_group(group: str, *values: object) -> None:
-    present = [value is not None for value in values]
-    if any(present) and not all(present):
-        raise IncompleteSettingsError(f"Incomplete {group} settings: set all of them or none")
-
-
-def _comma_separated(value: str) -> tuple[str, ...]:
-    return tuple(item.strip() for item in value.split(",") if item.strip())

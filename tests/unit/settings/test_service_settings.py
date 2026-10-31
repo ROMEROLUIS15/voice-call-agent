@@ -86,3 +86,11 @@ def test_supervision_and_logging_defaults() -> None:
 def test_concurrency_limit_must_be_positive() -> None:
     with pytest.raises(ValidationError):
         make_service_settings(max_concurrent_calls=0).call_supervision()
+
+
+def test_speech_ends_a_paused_turn_after_two_and_a_half_seconds_unless_configured() -> None:
+    # Flux's own default, 5 s, left a caller who paused mid-sentence waiting over 6 s.
+    assert make_service_settings().speech().eot_timeout_ms == 2500
+    assert make_service_settings(stt_eot_timeout_ms=1800).speech().eot_timeout_ms == 1800
+    with pytest.raises(ValidationError):
+        make_service_settings(stt_eot_timeout_ms=100)

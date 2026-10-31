@@ -160,6 +160,9 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         isolation. Instrumented with `EVENT_LOOP_STALLED` (where the loop was blocked); fixed once
         a stall names its cause. The two timeouts themselves came from the local function runtime,
         which restarted on its own.
+  - [ ] Speech-to-text waited up to 6.2 s when the caller paused mid-sentence (2026-10-31): Flux's
+        `eot_timeout_ms` defaulted to 5,000 ms. Now 2,500 ms (`STT_EOT_TIMEOUT_MS`); measured on the
+        next practice calls, then Flux's eager end of turn on its own.
   - [ ] Latency above the 1.0 s p50 target: 1.3 s and 1.7 s median per call, 2.3 to 2.8 s on
         turns with a function call (two model rounds). Speech-to-text took 1.5 to 3.0 s when the
         caller paused mid-sentence. Measured per segment before choosing a change.
