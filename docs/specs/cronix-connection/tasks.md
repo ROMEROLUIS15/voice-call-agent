@@ -155,6 +155,11 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         it said until 13:30. The code now says the free times on entering the choose-time node,
         at most four ranges, the closest to the time asked for, and the model waits for the
         choice; golden case `last-start-of-a-long-service-at-a-dental-clinic`, model evals.
+  - [ ] The agent's event loop stopped for 8.2 s right after the scheduling API timed out in a
+        practice call (2026-10-31), pausing every call of the instance; not reproduced in
+        isolation. Instrumented with `EVENT_LOOP_STALLED` (where the loop was blocked); fixed once
+        a stall names its cause. The two timeouts themselves came from the local function runtime,
+        which restarted on its own.
   - [ ] Latency above the 1.0 s p50 target: 1.3 s and 1.7 s median per call, 2.3 to 2.8 s on
         turns with a function call (two model rounds). Speech-to-text took 1.5 to 3.0 s when the
         caller paused mid-sentence. Measured per segment before choosing a change.

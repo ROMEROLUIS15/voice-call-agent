@@ -38,6 +38,7 @@ class ErrorCode(StrEnum):
     UNHANDLED_REQUEST_ERROR = "UNHANDLED_REQUEST_ERROR"
     TRACE_EXPORT_FAILED = "TRACE_EXPORT_FAILED"
     TRANSCRIPT_WRITE_FAILED = "TRANSCRIPT_WRITE_FAILED"
+    EVENT_LOOP_STALLED = "EVENT_LOOP_STALLED"
     # Scheduling backend (phase 1 on).
     SCHEDULING_BACKEND_UNAVAILABLE = "SCHEDULING_BACKEND_UNAVAILABLE"
     SCHEDULING_BACKEND_REJECTED = "SCHEDULING_BACKEND_REJECTED"
@@ -119,6 +120,7 @@ ERROR_CATALOG: dict[ErrorCode, ErrorSpec] = {
         _failure(ErrorCode.UNHANDLED_REQUEST_ERROR, _E, "unhandled error serving a request"),
         _failure(ErrorCode.TRACE_EXPORT_FAILED, _W, "a call trace could not be exported"),
         _failure(ErrorCode.TRANSCRIPT_WRITE_FAILED, _W, "a call transcript could not be written"),
+        _failure(ErrorCode.EVENT_LOOP_STALLED, _E, "the event loop was blocked; every call paused"),
         _failure(ErrorCode.WEBRTC_CLOSE_TIMED_OUT, _W, "closing a WebRTC peer did not finish"),
         _failure(ErrorCode.SCHEDULING_BACKEND_UNAVAILABLE, _E, "scheduling backend unavailable"),
         _failure(ErrorCode.SCHEDULING_BACKEND_REJECTED, _C, "scheduling backend refused a request"),
