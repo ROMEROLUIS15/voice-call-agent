@@ -22,7 +22,12 @@ from voice_call_agent.booking_flow.flow_arguments import (
     ProposeBookingArguments,
     SelectStartArguments,
 )
-from voice_call_agent.booking_flow.named_day import DayQuestion, day_question, weekday_index
+from voice_call_agent.booking_flow.named_day import (
+    DayQuestion,
+    NamedDay,
+    UnknownNamedDayError,
+    day_question,
+)
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import spoken_day
 from voice_call_agent.observability.error_reporting import report_error
@@ -170,21 +175,8 @@ class BookingSteps:
         service = self._catalog.get(call.service_id)
         if service is None:
             return StepOutcome({"status": "unknown_service"}, None)
-        weekday = None
-        if call.weekday is not None:
-            weekday = weekday_index(call.weekday, self._content.booking_briefing.weekdays)
-            if weekday is None:
-                report_error(ErrorCode.TOOL_ARGUMENTS_INVALID, fields="weekday")
-                return StepOutcome({"status": "invalid_arguments", "fields": ["weekday"]}, None)
-        question = day_question(call.day, call.day_number, weekday, self._today)
-        if question is not None:
-            # Two days were named: nothing is offered for either until the caller says which.
-            self.day_question = question
-            dates = {
-                "date": question.said_date.isoformat(),
-                "weekday_date": question.weekday_date.isoformat(),
-            }
-            return StepOutcome({"status": "weekday_mismatch", **dates}, Step.WHICH_DAY)
+        if (unsettled := self._ask_which_day(call)) is not None:
+            return unsettled
         result = await self._backend.availability(self._call_id, service.id, call.day)
         # The weekday is the code's, never the model's arithmetic (ADR 0019).
         day = {"day": call.day.isoformat(), "day_spoken": spoken_day(self._content, call.day)}
@@ -210,6 +202,32 @@ class BookingSteps:
         return StepOutcome(
             {"status": "choose_time", **day, "free_starts": starts}, Step.CHOOSE_TIME
         )
+
+    def _ask_which_day(self, call: CheckAvailabilityArguments) -> StepOutcome | None:
+        """Where to go when the weekday named does not match the date named; `None` if they
+        match, or the caller named no weekday."""
+        briefing = self._content.booking_briefing
+        named = NamedDay(call.weekday, call.day_number, call.month)
+        try:
+            question = day_question(
+                call.day,
+                named,
+                weekdays=briefing.weekdays,
+                months=briefing.months,
+                today=self._today,
+            )
+        except UnknownNamedDayError as error:
+            report_error(ErrorCode.TOOL_ARGUMENTS_INVALID, fields=",".join(error.fields))
+            return StepOutcome({"status": "invalid_arguments", "fields": error.fields}, None)
+        if question is None:
+            return None
+        # Two days were named: nothing is offered for either until the caller says which.
+        self.day_question = question
+        dates = {
+            "date": question.said_date.isoformat(),
+            "weekday_date": question.weekday_date.isoformat(),
+        }
+        return StepOutcome({"status": "weekday_mismatch", **dates}, Step.WHICH_DAY)
 
     async def _propose(self, slot: Slot, client_name: str) -> StepOutcome:
         result = await self._guard.propose(slot.service.id, slot.day, slot.start, client_name)

@@ -1,0 +1,33 @@
+id: weekday-and-date-with-month-disagree-at-a-barbershop
+title: The caller names a weekday, a day number and a month that do not match; the code asks about the date named, never another month
+source: practice-failure
+phase: 2
+status: active
+levels: [model]
+channel: twilio
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Buenas, quiero un corte de cabello para el viernes cinco de noviembre a las diez de la mañana, a nombre de Pedro Ejemplo.
+  - says: El jueves cinco, entonces.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: jueves cinco de noviembre
+    time: "10:00"
+    name: Pedro Ejemplo
+  tool_call:
+    name: propose_booking
+    arguments:
+      service_id: haircut
+      day: "2026-11-05"
+      start: "10:00"
+      client_name: Pedro Ejemplo
+  asks_which_day: true
+  outcome: booked
+  identity_verified: false
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, dates, any-business]
