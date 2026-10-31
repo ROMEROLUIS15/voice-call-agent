@@ -9,6 +9,8 @@ business_greeting = "Hola, gracias por llamar a {business_name}. ¿En qué te pu
 # The code reads back the proposal it validated, before the caller's yes (ADR 0019). Neither
 # "tú" nor "usted": the register is the business's.
 read_back = "Para confirmar: {service}, el {day}, a {time}, a nombre de {name}. ¿Está bien así?"
+# The code says the booking is done once the backend confirmed it, in the same register.
+booked = "Listo, la cita quedó agendada para el {day}, a {time}. ¿Algo más en lo que pueda ayudar?"
 
 # How the booking prompt states the business's date, hours and services (Monday first).
 [booking_briefing]

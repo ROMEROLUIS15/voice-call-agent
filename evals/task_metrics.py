@@ -55,9 +55,13 @@ TASK_METRICS: dict[str, TaskMetric] = {
 
 
 def task_scores(replies: list[str]) -> dict[str, float]:
-    """Share of the model's replies (the greeting excluded) that pass each measure."""
+    """Share of the model's replies (the greeting excluded) that pass each measure.
+
+    A conversation where the code said every line (a read-back, a booking announced) has no reply
+    of the model to measure: it gives no score, rather than zero.
+    """
     if not replies:
-        return {metric_id: 0.0 for metric_id in TASK_METRICS}
+        return {}
     return {
         metric.id: sum(metric.passes(reply) for reply in replies) / len(replies)
         for metric in TASK_METRICS.values()

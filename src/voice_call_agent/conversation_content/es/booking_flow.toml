@@ -11,7 +11,7 @@ name = """Tu tarea ahora: el nombre. Está libre {service_name}, el {day}, a {ti
 
 confirm = """Tu tarea ahora: la confirmación. El sistema acaba de leerle a la persona el resumen de la cita y le preguntó si está bien. Si lo acepta sin cambios, llama a confirm_booking: la cita no existe hasta que la función responde, así que nunca digas que está agendada o confirmada sin ese resultado. Si quiere cambiar algo, duda o dice que no, llama a change_request. No repitas el resumen."""
 
-booked = """La cita quedó agendada. Díselo en una frase y pregunta si necesita algo más. Si quiere otra cita, llama a new_request; si no, despídete con calidez."""
+booked = """Tu tarea ahora: el sistema acaba de decirle a la persona que la cita quedó agendada y le preguntó si necesita algo más. No repitas la confirmación. Si quiere otra cita, llama a new_request; si no, despídete con calidez."""
 
 not_booked = """No se pudo completar: la agenda no responde en este momento. Díselo con calma, sugiere llamar más tarde y despídete. No digas que hay una cita agendada."""
 

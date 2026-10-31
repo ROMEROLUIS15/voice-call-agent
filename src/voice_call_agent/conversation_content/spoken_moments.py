@@ -40,3 +40,8 @@ def proposal_read_back(
         time=spoken_time(content, start),
         name=client_name,
     )
+
+
+def booking_done(content: ConversationContent, day: date, start: time) -> str:
+    """What the caller hears once the backend confirmed the booking, built from what was booked."""
+    return content.booked.format(day=spoken_day(content, day), time=spoken_time(content, start))

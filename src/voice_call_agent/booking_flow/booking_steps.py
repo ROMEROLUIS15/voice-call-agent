@@ -111,6 +111,8 @@ class BookingSteps:
         self.slot: Slot | None = None
         self.choice: TimeChoice | None = None
         self.proposal: Proposed | None = None
+        self.booked: Proposed | None = None
+        """The proposal the backend booked last: the code says it to the caller."""
 
     @property
     def catalog(self) -> list[ServiceOffering]:
@@ -202,6 +204,7 @@ class BookingSteps:
     async def _confirm(self, proposal: Proposed) -> StepOutcome:
         result = await self._guard.confirm(proposal.proposal_id)
         if isinstance(result, Booked):
+            self.booked = proposal
             self.slot, self.choice, self.proposal = None, None, None
             return StepOutcome({"status": "booked"}, Step.BOOKED)
         if result.reason == ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED:

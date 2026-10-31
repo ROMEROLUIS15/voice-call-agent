@@ -53,7 +53,7 @@ Ask for an appointment by voice: the conversation is a Pipecat Flows graph (ADR 
 at a time: the agent checks the availability, the service says which ranges of times are free
 (and first why a requested time is not, such as a long service too close to closing), the agent
 asks for a time and for the name,
-the service reads the summary back, and the agent books only after you say yes (ADR 0011). Each decision lands in the call's trace
+the service reads the summary back, the agent books only after you say yes (ADR 0011), and the service tells you it is booked. Each decision lands in the call's trace
 (`writes`) with the `booked` outcome, and each request to the scheduling backend with how long
 it took (`backend_requests`).
 
