@@ -1,5 +1,6 @@
 """ASGI application: mounts the configured call entries over one speech engine."""
 
+import asyncio
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
@@ -34,6 +35,7 @@ from voice_call_agent.call_transports.whatsapp_calling.webhook_routes import (
     build_whatsapp_router,
 )
 from voice_call_agent.http_hardening.app_hardening import harden_app
+from voice_call_agent.observability.event_loop_watch import EventLoopStallWatch
 from voice_call_agent.settings.service_settings import ServiceSettings
 from voice_call_agent.speech_pipeline.conversation_runner import ConversationRunner
 
@@ -102,9 +104,12 @@ def _lifespan(
         acceptor = components.call_acceptor
         if acceptor is not None:
             await acceptor.start()
+        # One blocking call pauses every call of the instance: report it, with where it blocked.
+        stall_watch = asyncio.create_task(EventLoopStallWatch().watch(), name="event-loop-watch")
         try:
             yield
         finally:
+            stall_watch.cancel()
             # Under `GracefulHttpServer` the calls are already drained; under any other server
             # this is where they get their grace period.
             await components.supervisor.drain(components.shutdown_grace_seconds)
