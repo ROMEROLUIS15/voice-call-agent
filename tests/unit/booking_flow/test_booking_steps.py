@@ -1,7 +1,7 @@
 """The booking steps: each reports where the conversation goes, and only what the backend offered
 and the write guard validated moves the call towards a booking."""
 
-from datetime import time, timedelta
+from datetime import date, time, timedelta
 from typing import cast
 
 from tests.browser_peer import reported_error_codes
@@ -208,3 +208,26 @@ async def test_an_unknown_weekday_or_day_number_is_answered_with_its_field() -> 
     assert weekday.result == {"status": "invalid_arguments", "fields": ["weekday"]}
     assert number.result == {"status": "invalid_arguments", "fields": ["day_number"]}
     assert codes == ["TOOL_ARGUMENTS_INVALID", "TOOL_ARGUMENTS_INVALID"]
+
+
+async def test_the_month_said_counts_and_the_date_said_is_never_in_the_past() -> None:
+    # A practice call: "el próximo viernes, veintisiete de diciembre", and the day passed was
+    # Friday the sixth of November. The 27th nearest that day was in October, already gone.
+    steps = _steps(await guarded_call())
+    friday = (TUESDAY + timedelta(days=10)).isoformat()
+    said = {"day": friday, "weekday": "viernes", "day_number": 27, "month": "Diciembre"}
+    outcome = await steps.check_availability({**HAIRCUT, **said})
+    assert outcome.next_step is Step.WHICH_DAY
+    assert steps.day_question == DayQuestion(date(2026, 12, 27), date(2026, 12, 25))
+    # Without a month, the next date with that day number from today on: today is the 26th.
+    await steps.check_availability({**HAIRCUT, "weekday": "jueves", "day_number": 20})
+    assert steps.day_question == DayQuestion(date(2026, 11, 20), date(2026, 11, 19))
+
+
+async def test_an_unknown_month_or_a_date_that_does_not_exist_is_answered_with_its_field() -> None:
+    steps = _steps(await guarded_call())
+    month = await steps.check_availability({**HAIRCUT, "weekday": "martes", "month": "brumario"})
+    missing = {"weekday": "martes", "day_number": 31, "month": "noviembre"}
+    no_such_day = await steps.check_availability({**HAIRCUT, **missing})
+    assert month.result == {"status": "invalid_arguments", "fields": ["month"]}
+    assert no_such_day.result == {"status": "invalid_arguments", "fields": ["day_number", "month"]}
