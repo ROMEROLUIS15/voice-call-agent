@@ -1,12 +1,12 @@
 """The booking conversation as a Pipecat Flows graph (ADR 0019).
 
 Each node gives the model one task and only the functions that task needs. The code says the
-greeting, the free times to choose from, the question for the name, the read-back of the
-proposal and that it was booked, and routes on each function's outcome (`booking_steps`), as
-Pipecat's Flows examples route on a result field. Built per call from the call's business. Its
-services and the free starts are not enums in the function schemas: a provider that validates
-tool calls against the schema ends the turn on a value outside an enum and the agent falls silent
-(manifest §10). The code checks them instead
+greeting, which day when a weekday and a date disagree, the free times to choose from, the
+question for the name, the read-back of the proposal and that it was booked, and routes on each
+function's outcome (`booking_steps`), as Pipecat's Flows examples route on a result field. Built
+per call from the call's business. Its services and the free starts are not enums in the function
+schemas: a provider that validates tool calls against the schema ends the turn on a value outside
+an enum and the agent falls silent (manifest §10). The code checks them instead
 (`unknown_service`, `not_offered`), and the model corrects itself.
 """
 
@@ -46,6 +46,7 @@ from voice_call_agent.conversation_content.spoken_moments import (
     proposal_read_back,
     spoken_day,
     spoken_time,
+    which_day_question,
 )
 
 StepFunction = Callable[[Mapping[str, Any]], Awaitable[StepOutcome]]
@@ -90,6 +91,7 @@ class BookingGraph:
     def node(self, step: Step) -> NodeConfig:
         builders: dict[Step, Callable[[], NodeConfig]] = {
             Step.REQUEST: self._request,
+            Step.WHICH_DAY: self._which_day,
             Step.CHOOSE_TIME: self._choose_time,
             Step.NAME: self._name,
             Step.CONFIRM: self._confirm,
@@ -100,6 +102,23 @@ class BookingGraph:
 
     def _request(self) -> NodeConfig:
         return _node(Step.REQUEST, self._tasks.request, [self._check_availability()])
+
+    def _which_day(self) -> NodeConfig:
+        """The code asks which of the two days named, and the model waits for the answer."""
+        question = self._steps.day_question
+        if question is None:  # Only reached after check_availability set it.
+            return self._request()
+        said, other = question.said_date, question.weekday_date
+        task = self._tasks.which_day.format(
+            said_day=spoken_day(self._content, said),
+            said_date=said.isoformat(),
+            weekday_day=spoken_day(self._content, other),
+            weekday_date=other.isoformat(),
+        )
+        node = _node(Step.WHICH_DAY, task, [self._check_availability()])
+        node["pre_actions"] = [say(which_day_question(self._content, said, other))]
+        node["respond_immediately"] = False
+        return node
 
     def _check_availability(self) -> FlowsFunctionSchema:
         schema = _properties(CheckAvailabilityArguments)

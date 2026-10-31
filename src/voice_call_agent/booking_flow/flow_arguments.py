@@ -11,7 +11,7 @@ caller; what each step asks for is in the locale's booking flow texts.
 from datetime import date, time
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, WithJsonSchema
 
 ClockTime = Annotated[time, WithJsonSchema({"type": "string"})]
 """A time as HH:MM, checked by the code, not by the schema: a provider that validates tool calls
@@ -21,6 +21,16 @@ itself."""
 
 CalendarDay = Annotated[date, WithJsonSchema({"type": "string"})]
 """A day as YYYY-MM-DD, checked by the code for the same reason."""
+
+
+def _a_day_of_a_month(number: int) -> int:
+    if not 1 <= number <= 31:
+        raise ValueError("not a day of a month")
+    return number
+
+
+DayNumber = Annotated[int, AfterValidator(_a_day_of_a_month), WithJsonSchema({"type": "integer"})]
+"""A day of a month, 1 to 31, checked by the code for the same reason."""
 
 
 ClientName = Annotated[str, Field(min_length=1, max_length=120)]
@@ -39,6 +49,17 @@ class _Arguments(BaseModel):
 class CheckAvailabilityArguments(_Arguments):
     service_id: str = Field(description="The service's id, from the brackets in the service list.")
     day: CalendarDay = Field(description="The day, as YYYY-MM-DD.")
+    weekday: str | None = Field(
+        default=None,
+        description=(
+            "The weekday the caller named for this day in their latest words (lunes, martes…), "
+            "as they said it, even if it does not match the date; the system checks them."
+        ),
+    )
+    day_number: DayNumber | None = Field(
+        default=None,
+        description="The day of the month the caller named for this day, if they named one.",
+    )
     start: ClockTime | None = Field(
         default=None, description="The time the caller asked for, as HH:MM, if they named one."
     )

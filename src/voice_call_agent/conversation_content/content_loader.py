@@ -72,6 +72,8 @@ class BookingTasks(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     request: str
+    which_day: str
+    """Takes `{said_day}`, `{said_date}`, `{weekday_day}` and `{weekday_date}`."""
     choose_time: str
     """Takes `{service_name}`, `{day}`, `{free_times}` and `{requested}`."""
     name: str
@@ -164,6 +166,9 @@ class ConversationContent(BaseModel):
     """Takes `{business_name}`."""
     name_ask: str
     """What the code asks once a time is chosen and the name is not known yet."""
+    which_day: str
+    """What the code asks when the weekday named does not match the date; takes `{date}`,
+    `{weekday}`, `{said_day}` and `{weekday_day}`."""
     read_back: str
     """The proposal as the code reads it back before the caller's yes (ADR 0019)."""
     booked: str
@@ -185,6 +190,7 @@ class _Phrases(BaseModel):
     business_greeting: str
     """Takes `{business_name}`."""
     name_ask: str
+    which_day: str
     read_back: str
     booked: str
     booking_briefing: BookingBriefing
@@ -216,6 +222,7 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         greeting=phrases.greeting,
         business_greeting=phrases.business_greeting,
         name_ask=phrases.name_ask,
+        which_day=phrases.which_day,
         read_back=phrases.read_back,
         booked=phrases.booked,
         booking_briefing=phrases.booking_briefing,

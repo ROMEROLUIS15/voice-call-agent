@@ -30,3 +30,5 @@ The repository also built its own versions of pieces Pipecat ships: a conversati
 2026-10-31 · The booking done is also a line of the code, said once the backend confirmed it, and the model waits for the caller: announcing it took a second model round of about 0.4 s, and that the booking exists is a fact the code holds.
 
 2026-10-31 · The question for the name is also a line of the code, said once a time is chosen, and the model waits for the answer: asking it took a second model round. A name the caller already said goes with the availability check or the time choice (an optional `client_name`), which then propose at once and skip the question.
+
+2026-10-31 · A weekday and a date that disagree are found by the code, not the model: the model passes the weekday and the day number as the caller said them to `check_availability`, and the code compares them with the calendar. When they disagree nothing is offered, and a which-day node, whose question the code says, waits for the caller to choose. In the evals the model booked one of the two days without asking, though its task told it to ask.
