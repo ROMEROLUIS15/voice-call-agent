@@ -1,11 +1,12 @@
 """The booking conversation as a Pipecat Flows graph (ADR 0019).
 
 Each node gives the model one task and only the functions that task needs. The code says the
-greeting, the free times to choose from and the read-back of the proposal, and routes on each
-function's outcome (`booking_steps`), as Pipecat's Flows examples route on a result field. Built
-per call from the call's business. Its services and the free starts are not enums in the
-function schemas: a provider that validates tool calls against the schema ends the turn on a
-value outside an enum and the agent falls silent (manifest §10). The code checks them instead
+greeting, the free times to choose from, the question for the name, the read-back of the
+proposal and that it was booked, and routes on each function's outcome (`booking_steps`), as
+Pipecat's Flows examples route on a result field. Built per call from the call's business. Its
+services and the free starts are not enums in the function schemas: a provider that validates
+tool calls against the schema ends the turn on a value outside an enum and the agent falls silent
+(manifest §10). The code checks them instead
 (`unknown_service`, `not_offered`), and the model corrects itself.
 """
 
@@ -124,6 +125,7 @@ class BookingGraph:
         return node
 
     def _name(self) -> NodeConfig:
+        """The code asks for the name, and the model waits for the caller's answer."""
         slot = self._steps.slot
         if slot is None:  # Only reached once a start was chosen.
             return self._request()
@@ -135,7 +137,10 @@ class BookingGraph:
         propose = self._function(
             "propose_booking", _properties(ProposeBookingArguments), self._steps.propose_booking
         )
-        return _node(Step.NAME, task, [propose, self._check_availability()])
+        node = _node(Step.NAME, task, [propose, self._check_availability()])
+        node["pre_actions"] = [say(self._content.name_ask)]
+        node["respond_immediately"] = False
+        return node
 
     def _confirm(self) -> NodeConfig:
         """The code reads the proposal back, and the model waits for the caller's answer."""

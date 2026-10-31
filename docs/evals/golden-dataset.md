@@ -28,7 +28,7 @@ turns:                                       # what the caller says, in order
 expected:
   intent: book                               # none | ask-info | book | check-appointments | reschedule | cancel | leave-message
   data: {service: corte de cabello, day: mañana, time: "15:00"}
-  tool_call: null                            # the write to propose (propose_booking and its arguments), or null
+  tool_call: null                            # the write to propose (as a propose_booking call), or null
   writes: []                                 # the write guards' decisions in the call trace, in order
   real_failures: []                          # real failure codes the case causes on purpose
   outcome: info_only                         # CallOutcome of the call trace
