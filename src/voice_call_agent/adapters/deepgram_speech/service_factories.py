@@ -19,7 +19,9 @@ def flux_stt_factory(settings: SpeechSettings, language: Language) -> Callable[[
     Non-English speech needs the multilingual model (`flux-general-multi`): `flux-general-en`
     only understands English and rejects `language_hint`. `eot_threshold` is the confidence Flux
     needs to end the caller's turn: Deepgram's default, 0.7, can end it on a short word followed by
-    a pause, before the rest of the sentence (manifest §10).
+    a pause, before the rest of the sentence. `eot_timeout_ms` is the silence after which Flux ends
+    the turn anyway: its default, 5 s, left a caller who paused mid-sentence waiting over 6 s
+    (manifest §10).
     """
     api_key = settings.deepgram_api_key.get_secret_value()
 
@@ -30,6 +32,7 @@ def flux_stt_factory(settings: SpeechSettings, language: Language) -> Callable[[
                 model=settings.stt_model,
                 language_hints=[language],
                 eot_threshold=settings.eot_threshold,
+                eot_timeout_ms=settings.eot_timeout_ms,
             ),
         )
 
