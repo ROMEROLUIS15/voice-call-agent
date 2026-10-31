@@ -85,7 +85,8 @@ class Expectations(_Strict):
     data: dict[str, str] = Field(default_factory=dict)
     """What the caller asked for (service, day, time…), as the agent must understand it."""
     tool_call: ExpectedToolCall | None = None
-    """The write the agent must propose (`propose_booking` and its arguments); `None`: no write.
+    """The write the agent must propose, written as a `propose_booking` call with its arguments
+    (a name said with the request goes with the availability check instead); `None`: no write.
     At the conversation level the scripted model proposes it on the first caller turn and
     confirms it on the second."""
     writes: tuple[str, ...] = ()

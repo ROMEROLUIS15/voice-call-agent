@@ -134,6 +134,8 @@ class BookingSteps:
             # The model picked a time the caller has not chosen yet: the caller chooses it.
             return StepOutcome({"status": "waiting_for_the_choice"}, None)
         self.slot = Slot(self.choice.service, self.choice.day, call.start)
+        if call.client_name is not None:
+            return await _answering(self._propose(self.slot, call.client_name))
         return StepOutcome({"status": "selected", "start": clock_time(call.start)}, Step.NAME)
 
     async def propose_booking(self, arguments: Mapping[str, Any]) -> StepOutcome:
@@ -169,6 +171,8 @@ class BookingSteps:
             return StepOutcome({"status": "no_free_starts", **day}, None)
         if call.start is not None and call.start in result.slots:
             self.slot = Slot(service, call.day, call.start)
+            if call.client_name is not None:
+                return await self._propose(self.slot, call.client_name)
             status = {"status": "available", **day, "start": clock_time(call.start)}
             return StepOutcome(status, Step.NAME)
         self.choice = TimeChoice(

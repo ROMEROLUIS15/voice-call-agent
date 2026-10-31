@@ -1,6 +1,7 @@
 """A language model that answers with a fixed line, records what it was given and, when the case
-has a write, books it through the booking flow (ADR 0019): it checks the availability and proposes
-on the first caller turn, and confirms on the second, after the code read the proposal back."""
+has a write, books it through the booking flow (ADR 0019): it checks the availability with the
+name, which proposes, on the first caller turn, and confirms on the second, after the code read the
+proposal back."""
 
 from uuid import uuid4
 
@@ -58,8 +59,9 @@ class ScriptedLanguageModel(LLMService):
     ) -> FunctionCallFromLLM | None:
         """The function the booking flow's current node offers for the write, if it is due.
 
-        The availability check answers the first caller turn; the proposal is made as soon as
-        its node offers it; the confirmation answers the caller turn after the read-back.
+        The availability check, with the name the caller said, answers the first caller turn;
+        the proposal is made as soon as its node offers it (the name step, when the name was not
+        taken with the check); the confirmation answers the caller turn after the read-back.
         """
         if self._write is None or not messages:
             return None
@@ -67,7 +69,7 @@ class ScriptedLanguageModel(LLMService):
         write = self._write.arguments
         turn = len(self.caller_messages)
         if "check_availability" in offered and after_caller and turn == 1:
-            arguments = {key: write[key] for key in ("service_id", "day", "start")}
+            arguments = {key: write[key] for key in ("service_id", "day", "start", "client_name")}
             return _call("check_availability", arguments, context)
         if "propose_booking" in offered:
             return _call("propose_booking", {"client_name": write["client_name"]}, context)

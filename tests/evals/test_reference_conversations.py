@@ -16,7 +16,8 @@ from voice_call_agent.observability.call_trace import ServiceVersions
 from voice_call_agent.observability.conversation_transcript import ConversationTranscript
 
 CASES = runnable_cases(load_golden_dataset(), EvalLevel.CONVERSATION)
-BOOKING_SEQUENCE = ("check_availability", "propose_booking", "confirm_booking")
+BOOKING_SEQUENCE = ("check_availability", "confirm_booking")
+"""Every golden booking says the name with the request: the check proposes at once."""
 CONTENT = load_conversation_content()
 SCRIPTED_SERVICES = ServiceVersions(
     prompt_version=CONTENT.version,
@@ -76,11 +77,11 @@ def _assert_the_transcript_is_in_order(case: GoldenCase, record: ConversationRec
     if case.expected.tool_call is None:
         assert tools == []
         return
-    # The booking flow: availability and proposal on the first caller turn, the confirmation
-    # on the second, after the read-back (ADR 0019).
+    # The booking flow: availability, with the name, on the first caller turn, the
+    # confirmation on the second, after the read-back (ADR 0019).
     assert [name for _, name in tools] == list(BOOKING_SEQUENCE)
-    (checked, _), (proposed, _), (confirmed, _) = tools
-    assert callers[0] < checked <= proposed < callers[1] < confirmed
+    (checked, _), (confirmed, _) = tools
+    assert callers[0] < checked < callers[1] < confirmed
 
 
 def _assert_the_kept_transcript_shows_what_was_said(

@@ -80,8 +80,9 @@ def _booked_as_asked(record: ConversationRecord, asked: ExpectedToolCall) -> boo
     """The confirmed write matches the expected proposal, its name included.
 
     The call trace carries no names (free text cannot be redacted), so the name comes from the
-    last `propose_booking` call the write guard accepted: the booking flow confirms only the
-    proposal it last read back (ADR 0019).
+    last call the write guard accepted as a proposal: `propose_booking`, or the availability
+    check or the time choice when the caller had already said the name. The booking flow
+    confirms only the proposal it last read back (ADR 0019).
     """
     booked = [
         write
@@ -103,9 +104,7 @@ def _booked_as_asked(record: ConversationRecord, asked: ExpectedToolCall) -> boo
         call
         for turn in record.turns
         for call in turn.tool_calls
-        if call.name == "propose_booking"
-        and isinstance(call.result, dict)
-        and call.result.get("status") == "proposed"
+        if isinstance(call.result, dict) and call.result.get("status") == "proposed"
     ]
     if not proposals:
         return False

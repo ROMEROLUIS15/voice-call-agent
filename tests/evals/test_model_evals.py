@@ -233,6 +233,7 @@ def _record(
     outcome: CallOutcome,
     booking: tuple[str, date, time, str] | None = None,
     refusals: tuple[str, ...] = (),
+    proposed_by: str = "propose_booking",
 ) -> ConversationRecord:
     writes = [
         WriteDecision(
@@ -256,7 +257,7 @@ def _record(
             )
         )
         arguments: dict[str, object] = {"client_name": name}
-        calls.append(RecordedToolCall("propose_booking", arguments, {"status": "proposed"}))
+        calls.append(RecordedToolCall(proposed_by, arguments, {"status": "proposed"}))
     trace = make_call_trace().model_copy(update={"outcome": outcome, "writes": writes})
     return ConversationRecord(
         trace=trace,
@@ -279,6 +280,12 @@ BOOKED_AS_ASKED = {"bookings-completed": 1.0, "confirms-after-the-answer": 1.0}
         (
             "book-appointment-over-whatsapp",
             _record(CallOutcome.BOOKED, ASKED),
+            BOOKED_AS_ASKED | {"books-what-was-asked": 1.0},
+        ),
+        (
+            "book-appointment-over-whatsapp",
+            # The name said with the request: the availability check proposed it.
+            _record(CallOutcome.BOOKED, ASKED, proposed_by="check_availability"),
             BOOKED_AS_ASKED | {"books-what-was-asked": 1.0},
         ),
         (
