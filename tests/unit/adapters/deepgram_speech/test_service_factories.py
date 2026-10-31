@@ -23,6 +23,7 @@ SETTINGS = SpeechSettings(
     deepgram_api_key=SecretStr("key"),
     stt_model="flux-general-multi",
     eot_threshold=0.8,
+    eot_timeout_ms=2500,
     tts_voice="aura-2-selena-es",
 )
 ZERO_WIDTH_SPACE = chr(0x200B)
@@ -35,6 +36,7 @@ def test_flux_uses_the_multilingual_model_with_the_language_hint() -> None:
     assert stt_settings.model == "flux-general-multi"
     assert stt_settings.language_hints == [Language.ES]
     assert stt_settings.eot_threshold == 0.8
+    assert stt_settings.eot_timeout_ms == 2500
 
 
 def test_each_call_gets_its_own_services() -> None:

@@ -7,6 +7,8 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, SecretStr
 
+from voice_call_agent.settings.settings_errors import IncompleteSettingsError
+
 
 class _Section(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -26,6 +28,8 @@ class SpeechSettings(_Section):
     stt_model: str
     eot_threshold: float
     """Confidence the speech-to-text needs to end the caller's turn."""
+    eot_timeout_ms: int
+    """Silence after which the speech-to-text ends the turn whatever its confidence."""
     tts_voice: str
 
 
@@ -197,3 +201,15 @@ class ErrorTrackingSettings(_Section):
     environment: DeploymentEnvironment
     release: str
     traces_sample_rate: float = Field(ge=0, le=1)
+
+
+def comma_separated(value: str) -> tuple[str, ...]:
+    """`a, b,c` as `("a", "b", "c")`; blank items dropped."""
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def require_complete_group(group: str, *values: object) -> None:
+    """A group of settings is set whole or not at all."""
+    present = [value is not None for value in values]
+    if any(present) and not all(present):
+        raise IncompleteSettingsError(f"Incomplete {group} settings: set all of them or none")
