@@ -110,6 +110,26 @@ async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> No
     assert set(_functions(confirm)) == {"confirm_booking", "change_request"}
 
 
+async def test_the_booking_is_announced_by_the_code_and_the_model_waits() -> None:
+    call = await guarded_call()
+    graph, _ = _graph(call)
+    check = _functions(graph.initial_node())["check_availability"]
+    _, name_node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), start="15:30")
+    assert name_node is not None
+    _, confirm = await _run(_functions(name_node)["propose_booking"], client_name="Ana Ejemplo")
+    assert confirm is not None
+    call.caller_speaks()
+    _, booked = await _run(_functions(confirm)["confirm_booking"])
+    assert booked is not None and booked.get("name") == Step.BOOKED.value
+    # What the backend booked, said by the code: no second model round to announce it.
+    assert _said(booked) == [
+        "Listo, la cita quedó agendada para el martes veintisiete de octubre, a las tres y media "
+        "de la tarde. ¿Algo más en lo que pueda ayudar?"
+    ]
+    assert booked.get("respond_immediately") is False
+    assert set(_functions(booked)) == {"new_request"}
+
+
 async def test_a_step_that_stays_returns_no_node() -> None:
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]

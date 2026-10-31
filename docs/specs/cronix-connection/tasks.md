@@ -163,6 +163,9 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
   - [ ] Speech-to-text waited up to 6.2 s when the caller paused mid-sentence (2026-10-31): Flux's
         `eot_timeout_ms` defaulted to 5,000 ms. Now 2,500 ms (`STT_EOT_TIMEOUT_MS`); measured on the
         next practice calls, then Flux's eager end of turn on its own.
+  - [ ] The second model round of a function turn adds 0.40 to 0.49 s (practice call,
+        2026-10-31). The booking done is now said by the code (no second round); asking for the
+        name still takes one, since only the model knows whether the caller already said it.
   - [ ] Latency above the 1.0 s p50 target: 1.3 s and 1.7 s median per call, 2.3 to 2.8 s on
         turns with a function call (two model rounds). Speech-to-text took 1.5 to 3.0 s when the
         caller paused mid-sentence. Measured per segment before choosing a change.
