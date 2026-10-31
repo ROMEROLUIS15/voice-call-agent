@@ -101,6 +101,20 @@ async def test_only_an_offered_start_can_be_chosen_once_the_caller_answers() -> 
     assert steps.slot is not None and steps.slot.start == time(11, 0)
 
 
+async def test_a_name_already_said_goes_with_the_time_straight_to_the_proposal() -> None:
+    call = await guarded_call()
+    steps = _steps(call)
+    named = {"client_name": "Ana Ejemplo"}
+    requested = await steps.check_availability({**HAIRCUT, "start": "11:00", **named})
+    assert (requested.next_step, requested.result["status"]) == (Step.CONFIRM, "proposed")
+    assert steps.proposal is not None and steps.proposal.client_name == "Ana Ejemplo"
+    await steps.check_availability(HAIRCUT)
+    call.caller_speaks()
+    chosen = await steps.select_start({"start": "11:30", **named})
+    assert (chosen.next_step, chosen.result["status"]) == (Step.CONFIRM, "proposed")
+    assert steps.proposal is not None and steps.proposal.start == time(11, 30)
+
+
 async def test_the_proposal_is_validated_and_confirmed_only_after_the_caller_answers() -> None:
     call = await guarded_call()
     steps = _steps(call)

@@ -162,6 +162,8 @@ class ConversationContent(BaseModel):
     greeting: str
     business_greeting: str
     """Takes `{business_name}`."""
+    name_ask: str
+    """What the code asks once a time is chosen and the name is not known yet."""
     read_back: str
     """The proposal as the code reads it back before the caller's yes (ADR 0019)."""
     booked: str
@@ -182,6 +184,7 @@ class _Phrases(BaseModel):
     greeting: str
     business_greeting: str
     """Takes `{business_name}`."""
+    name_ask: str
     read_back: str
     booked: str
     booking_briefing: BookingBriefing
@@ -212,6 +215,7 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         booking_prompt=booking_prompt,
         greeting=phrases.greeting,
         business_greeting=phrases.business_greeting,
+        name_ask=phrases.name_ask,
         read_back=phrases.read_back,
         booked=phrases.booked,
         booking_briefing=phrases.booking_briefing,

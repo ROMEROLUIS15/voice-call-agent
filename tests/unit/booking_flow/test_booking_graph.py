@@ -100,6 +100,9 @@ async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> No
     _, name_node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), start="15:30")
     assert name_node is not None
     assert set(_functions(name_node)) == {"propose_booking", "check_availability"}
+    # The code asks for the name: no second model round to ask it.
+    assert _said(name_node) == ["¿A nombre de quién sería la cita?"]
+    assert name_node.get("respond_immediately") is False
     _, confirm = await _run(_functions(name_node)["propose_booking"], client_name="Ana Ejemplo")
     assert confirm is not None and confirm.get("name") == Step.CONFIRM.value
     assert confirm.get("respond_immediately") is False
@@ -108,6 +111,20 @@ async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> No
         "de la tarde, a nombre de Ana Ejemplo. ¿Está bien así?"
     ]
     assert set(_functions(confirm)) == {"confirm_booking", "change_request"}
+
+
+async def test_a_name_given_with_the_chosen_time_skips_asking_for_it() -> None:
+    call = await guarded_call()
+    graph, _ = _graph(call)
+    check = _functions(graph.initial_node())["check_availability"]
+    _, choose = await _run(check, service_id="haircut", day=TUESDAY.isoformat())
+    assert choose is not None
+    assert "client_name" not in _functions(choose)["select_start"].required
+    call.caller_speaks()
+    select = _functions(choose)["select_start"]
+    _, confirm = await _run(select, start="15:30", client_name="Ana Ejemplo")
+    assert confirm is not None and confirm.get("name") == Step.CONFIRM.value
+    assert _said(confirm)[0].endswith("a nombre de Ana Ejemplo. ¿Está bien así?")
 
 
 async def test_the_booking_is_announced_by_the_code_and_the_model_waits() -> None:
