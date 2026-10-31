@@ -106,7 +106,7 @@
       }),
     }),
     'tasks': dict({
-      'booked': 'La cita quedó agendada. Díselo en una frase y pregunta si necesita algo más. Si quiere otra cita, llama a new_request; si no, despídete con calidez.',
+      'booked': 'Tu tarea ahora: el sistema acaba de decirle a la persona que la cita quedó agendada y le preguntó si necesita algo más. No repitas la confirmación. Si quiere otra cita, llama a new_request; si no, despídete con calidez.',
       'choose_time': 'Tu tarea ahora: elegir la hora. El sistema acaba de decirle a la persona qué horas quedan. Para {service_name} el {day} quedan estas horas de inicio: {free_times}. {requested}No repitas las horas: espera a que elija, y nunca elijas por ella. Si pregunta por otra hora, respóndele con estos tramos. En cuanto elija una hora de inicio de esos tramos, llama a select_start con ella sin anunciarlo. Si prefiere otro día u otro servicio, llama a check_availability.',
       'confirm': 'Tu tarea ahora: la confirmación. El sistema acaba de leerle a la persona el resumen de la cita y le preguntó si está bien. Si lo acepta sin cambios, llama a confirm_booking: la cita no existe hasta que la función responde, así que nunca digas que está agendada o confirmada sin ese resultado. Si quiere cambiar algo, duda o dice que no, llama a change_request. No repitas el resumen.',
       'name': 'Tu tarea ahora: el nombre. Está libre {service_name}, el {day}, a {time}. Si la persona ya dijo el nombre y apellido de quien va a la cita, llama a propose_booking con ese nombre de inmediato. Si no, pregúntaselo; si la cita es para otra persona, pregunta el nombre de esa persona. Si cambia el servicio, el día o la hora, llama primero a check_availability con lo nuevo. No anuncies la propuesta: el sistema se la lee.',

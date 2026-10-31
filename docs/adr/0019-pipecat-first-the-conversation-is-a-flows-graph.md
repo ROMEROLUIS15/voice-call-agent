@@ -26,3 +26,5 @@ The repository also built its own versions of pieces Pipecat ships: a conversati
 2026-10-28 · The code's lines (the greeting, the read-back) are a custom pre-action instead of Flows' `tts_say`: Flows waits for `tts_say` to finish before applying the node, and a caller who speaks over it drops the frame it waits for (Pipecat issue #5263), so the confirmation node never applied. A start is taken only after the caller answers the offer.
 
 2026-10-29 · The free times to choose from are also a line of the code, said on entering the choose-time node, and the model waits for the choice: rewording the ranges, the model misstated where they ended.
+
+2026-10-31 · The booking done is also a line of the code, said once the backend confirmed it, and the model waits for the caller: announcing it took a second model round of about 0.4 s, and that the booking exists is a fact the code holds.

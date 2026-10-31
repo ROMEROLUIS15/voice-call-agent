@@ -423,3 +423,15 @@ def test_a_change_that_carries_its_measured_baseline_is_not_measured_again(
     # Only recorded, not measured: it is measured.
     save_baseline(EvalBaseline(fingerprint=fingerprint, inputs=inputs), carried)
     assert main(["--only-if-changed", "--compare-with", str(base)]) == EXIT_CANNOT_RUN
+
+
+def test_a_run_where_the_code_said_every_line_does_not_count_against_reply_measures() -> None:
+    # The read-back and the booking announcement are the code's: the model may say nothing.
+    case_id = "book-appointment-over-the-phone-line"
+    runs = [
+        case_run(case_id, {}, replies=("Claro, ¿para qué día?",)),
+        case_run(case_id, {}, repetition=2, replies=()),
+    ]
+    scores = aggregate_scores(runs)
+    assert scores["brief-replies"].score == 1.0
+    assert scores["speakable-replies"].score == 1.0

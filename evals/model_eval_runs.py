@@ -91,7 +91,7 @@ async def _run_case(
             case=case,
             repetition=repetition,
             agent_lines=[],
-            task_scores=task_scores([]) | outcome_scores(case, None),
+            task_scores={metric_id: 0.0 for metric_id in TASK_METRICS} | outcome_scores(case, None),
             judge_scores=[JudgeScore(c, 0.0, str(error)) for c in case.expected.quality],
             failure=str(error),
         )
