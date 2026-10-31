@@ -23,6 +23,15 @@ CalendarDay = Annotated[date, WithJsonSchema({"type": "string"})]
 """A day as YYYY-MM-DD, checked by the code for the same reason."""
 
 
+ClientName = Annotated[str, Field(min_length=1, max_length=120)]
+"""The first and last name of the person the appointment is for."""
+
+_NAME_IF_SAID = (
+    "The first and last name of the person the appointment is for, only if the caller already "
+    "said both: the system then proposes the booking at once instead of asking for the name."
+)
+
+
 class _Arguments(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -33,15 +42,15 @@ class CheckAvailabilityArguments(_Arguments):
     start: ClockTime | None = Field(
         default=None, description="The time the caller asked for, as HH:MM, if they named one."
     )
+    client_name: ClientName | None = Field(default=None, description=_NAME_IF_SAID)
 
 
 class SelectStartArguments(_Arguments):
     start: ClockTime = Field(description="One of the free start times offered, as HH:MM.")
+    client_name: ClientName | None = Field(default=None, description=_NAME_IF_SAID)
 
 
 class ProposeBookingArguments(_Arguments):
-    client_name: str = Field(
-        min_length=1,
-        max_length=120,
-        description="The first and last name of the person the appointment is for.",
+    client_name: ClientName = Field(
+        description="The first and last name of the person the appointment is for."
     )
