@@ -211,14 +211,14 @@ async def test_an_unknown_weekday_or_day_number_is_answered_with_its_field() -> 
 
 
 async def test_the_month_said_counts_and_the_date_said_is_never_in_the_past() -> None:
-    # A practice call: "el próximo viernes, veintisiete de diciembre", and the day passed was
-    # Friday the sixth of November. The 27th nearest that day was in October, already gone.
+    # A weekday, a day number and a month that disagree, and a day passed in another month:
+    # the 20th nearest Tuesday the third of November is in October, already gone.
     steps = _steps(await guarded_call())
-    friday = (TUESDAY + timedelta(days=10)).isoformat()
-    said = {"day": friday, "weekday": "viernes", "day_number": 27, "month": "Diciembre"}
+    tuesday = (TUESDAY + timedelta(days=7)).isoformat()
+    said = {"day": tuesday, "weekday": "martes", "day_number": 20, "month": "Diciembre"}
     outcome = await steps.check_availability({**HAIRCUT, **said})
     assert outcome.next_step is Step.WHICH_DAY
-    assert steps.day_question == DayQuestion(date(2026, 12, 27), date(2026, 12, 25))
+    assert steps.day_question == DayQuestion(date(2026, 12, 20), date(2026, 12, 22))
     # Without a month, the next date with that day number from today on: today is the 26th.
     await steps.check_availability({**HAIRCUT, "weekday": "jueves", "day_number": 20})
     assert steps.day_question == DayQuestion(date(2026, 11, 20), date(2026, 11, 19))
