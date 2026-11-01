@@ -161,20 +161,36 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         a stall names its cause. The two timeouts themselves came from the local function runtime,
         which restarted on its own.
   - [ ] Speech-to-text waited up to 6.2 s when the caller paused mid-sentence (2026-10-31): Flux's
-        `eot_timeout_ms` defaulted to 5,000 ms. Now 2,500 ms (`STT_EOT_TIMEOUT_MS`); measured on the
-        next practice calls, then Flux's eager end of turn on its own.
+        `eot_timeout_ms` defaulted to 5,000 ms. Now 2,500 ms (`STT_EOT_TIMEOUT_MS`). In three
+        practice calls after it (2026-10-31), speech-to-text took 0.3 to 1.8 s per turn, never
+        above 2 s; once it closed a turn mid-sentence ("Quiero para"), and the agent asked again.
+        Whether the cap or Flux's own end of turn closed it is not in the log. Next: Flux's eager
+        end of turn on its own.
   - [x] A weekday and a date that disagree ("el jueves cuatro" on a Wednesday) were booked
         without asking in the model evals (2026-10-31). The code now compares them with the
         calendar and asks which day before offering anything (`asks-which-day`, security). In a
         practice call the first version asked about a past October day for "viernes veintisiete
         de diciembre": it ignored the month. The date named now comes from the caller's day
-        number and month, the next one from today.
+        number and month, the next one from today. Checked in a practice call (2026-10-31): "el
+        próximo lunes, diecisiete de noviembre" asked about Tuesday the 17th or Monday the 16th,
+        a closed Sunday was said as closed, and a December day outside the prompt's calendar was
+        booked on its right weekday, in the local Cronix's database.
   - [ ] The second model round of a function turn adds 0.40 to 0.49 s (practice call,
         2026-10-31). The booking done is now said by the code (no second round). Asking for the
         name too: the code asks it once a time is chosen, and a name the caller already said goes
         with the availability check or the time choice, which propose at once. Measured in a
         practice call on 2026-10-31 for the booking done: one model round of 0.67 s instead of
-        two.
+        two. In the last practice call (11 turns, 12 model requests), only a result that stays on
+        its step still took two rounds: a closed day, 2.0 s of model time. Next: the code says
+        those results too (a closed day, a day without free starts, a time taken since offered).
+  - [ ] The model reasons before every function call, the main part of a function turn's model
+        time (2026-10-31): at the low reasoning effort the service sends, 277 to 400 reasoning
+        tokens before `check_availability`, 1.11 s median; with reasoning off, 0 tokens and
+        0.66 s, with the same arguments. A short reply: 0.56 s and 0.39 s. Five requests each with
+        the prompt of a practice call, through Together. Next: reasoning off, adopted only if the
+        model evals hold, the security measures above all (`asks-which-day`,
+        `books-what-was-asked`, `invents-nothing`), since dates and functions are what the
+        reasoning may have been protecting.
   - [ ] Latency above the 1.0 s p50 target: 1.3 s and 1.7 s median per call, 2.3 to 2.8 s on
         turns with a function call (two model rounds). Speech-to-text took 1.5 to 3.0 s when the
         caller paused mid-sentence. Measured per segment before choosing a change.
