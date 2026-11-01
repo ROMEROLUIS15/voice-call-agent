@@ -10,9 +10,11 @@ Before touching code: [`CLAUDE.md`](CLAUDE.md), [constitution](docs/specs/consti
 [architecture decisions](docs/adr/README.md), [threat model](docs/security/threat-model.md) and
 [golden dataset](docs/evals/golden-dataset.md).
 
-**Status: phase 0, with phase 2 started** (without Cronix). The agent talks in Spanish and measures
-latency per segment and per channel; against the development practice schedule it already books by
-voice, with proposals validated by code and confirmed by the caller. v1 books appointments; checking,
+**Status: phase 0, with phase 2 started.** The agent talks in Spanish and measures latency per
+segment and per channel; it books by voice against the development practice schedule and, through
+Cronix's scheduling API, against a local Cronix, with proposals validated by code and confirmed by
+the caller (`docs/specs/cronix-connection/tasks.md`: practice calls against the local Cronix done; lowering
+latency, then WhatsApp with Meta's test number, next). v1 books appointments; checking,
 rescheduling and cancelling follow in v1.1 (manifest §2). The phone line is the main path: the
 WhatsApp entry is paused until Meta enables *Calling* on the number (manifest §10).
 
@@ -165,10 +167,10 @@ Each figure states its date and what it was measured with; what is not measured 
 | What | Result | Measured with |
 |---|---|---|
 | Language model, time to the first token (on a call the segment of manifest §6 also includes turn detection) | `deepseek/deepseek-v4.1-flash` on Together, reasoning effort `low`: p50 391 ms, p90 665 ms (176 responses of the model evals, 2026-10-28, ADR 0020). Earlier, Groq `openai/gpt-oss-120b` with reasoning effort `low`: p50 375 ms, p95 571 ms. With Groq's default effort: 544 / 976 ms. DeepSeek `deepseek-flash`, thinking off: 776 / 937 ms | 2026-10-19; 20 streamed answers per configuration to five caller turns with fictitious data; conversation content `es-c3d0810115bd`; from a GitHub-hosted runner (pull request #3, closed without merging) |
-| Latency per segment and channel on real calls | Not measured yet | |
+| Latency per segment and channel on real calls | Not measured yet on real calls. Practice calls (browser entry, local Cronix, development machine): per turn p50 / p90 speech-to-text 581 / 956 ms, language model 778 / 1,664 ms, text-to-speech 252 / 276 ms (turns where the model spoke), total 1,711 / 2,614 ms, above the 1.0 s p50 target | 2026-10-31; 29 turns of three practice calls; call traces (`var/call_traces.jsonl`); `docs/specs/cronix-connection/tasks.md` D4 holds the plan to lower it |
 | Speech-to-text on phone audio | Not measured yet | |
-| Golden dataset success (model level, baseline) | `invents-nothing`, `no-unwanted-write` and `books-what-was-asked` 1.00 (security), `bookings-completed` 1.00, `confirms-after-the-answer` 1.00, `natural-spanish` 1.00, `admits-test-line` 1.00, `speakable-replies` 1.00, `brief-replies` 0.83 | 2026-10-28; 27 cases, 3 repetitions; `deepseek/deepseek-v4.1-flash` through OpenRouter (Together served all 176 responses), judge `google/gemini-3.6-flash`; measured locally with the service's defaults (ADR 0020). `brief-replies` is within its margin of the earlier model's 0.93 (ADR 0016) |
-| Cost per call | Not measured yet; every call trace carries its estimate | |
+| Golden dataset success (model level, baseline) | `invents-nothing`, `no-unwanted-write`, `books-what-was-asked` and `asks-which-day` 1.00 (security), `bookings-completed` 1.00, `confirms-after-the-answer` 1.00, `natural-spanish` 1.00, `admits-test-line` 1.00, `speakable-replies` 1.00, `brief-replies` 0.81 | 2026-10-31; 23 cases, 3 repetitions; `deepseek/deepseek-v4.1-flash` through OpenRouter (Together), judge `google/gemini-3.6-flash`; measured locally with the service's defaults (ADR 0020). `brief-replies` is within its margin (ADR 0016); the free times, the question for the name, which day when a weekday and a date disagree, the read-back and the booking done are said by the code |
+| Cost per call | Practice calls of about two minutes, booked: 0.056 to 0.062 USD estimated (model, speech-to-text and text-to-speech; no telephony) | 2026-10-31; three call traces, price table `2026-10-28.1` |
 | Capacity per instance | Not measured yet (phase 4) | |
 
 ## Quality gate
