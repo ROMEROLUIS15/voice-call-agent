@@ -103,18 +103,25 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
 - [x] **B6. The dialed number** (Cronix pull request #32): `phone_agent_lines`, each number unique
       and pointing at one business, with row-level security and no policies (the service only);
       lines are added with SQL when a number is bought, no screen yet.
-- [ ] **B7. The v1 endpoints** of the contract, the phone line only, with the business always from
+- [x] **B7. The v1 endpoints** of the contract, the phone line only, with the business always from
       the call record (`phone_agent_calls`) and every request signed by the agent:
   - [x] start of call, availability and end of call (Cronix pull request #32): tried end to end
         against the local Cronix with the function served and invented data;
-  - [ ] booking (Cronix pull request #34): `fn_book_appointment_wa` with the caller's number,
+  - [x] booking (Cronix pull request #34): `fn_book_appointment_wa` with the caller's number,
         `OUTSIDE_HOURS` and `SLOT_CONFLICT` from the shared resolver, the idempotency key claimed
         before booking (`phone_agent_requests`), and the owner notified after the response
         through WhatsApp's notification pipeline, moved to `_shared` for both channels; tried end
         to end against the local Cronix.
 - [ ] **B8. Tests**: pgTAP for the functions and isolation between businesses, `deno test` for the
-      endpoints, two bookings of the same time at once.
-- [ ] **B9. A pull request in Cronix**, then deployed, after the local tries of Stage D.
+      endpoints, two bookings of the same time at once. On Cronix's `main` (checked 2026-10-31):
+      pgTAP asserts row-level security on `phone_agent_lines` and `phone_agent_calls` and that
+      neither `authenticated` nor `anon` reads them (`supabase/tests/rls_policies.test.sql`);
+      `deno test` files for the endpoints and the booking (`phone-agent-api/__tests__/`). To
+      verify before ticking: a test of two bookings of the same time at once through the
+      endpoint, beyond B3's lock.
+- [x] **B9. A pull request in Cronix**, then deployed, after the local tries of Stage D: pull
+      requests #32 and #34 to #38 merged to `develop` and `main`, `phone-agent-api` deployed to
+      production (see Decisions, 2026-10-29).
 
 ## Stage C: the Cronix adapter (agent)
 
@@ -163,18 +170,18 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
   - [ ] Speech-to-text waited up to 6.2 s when the caller paused mid-sentence (2026-10-31): Flux's
         `eot_timeout_ms` defaulted to 5,000 ms. Now 2,500 ms (`STT_EOT_TIMEOUT_MS`). In three
         practice calls after it (2026-10-31), speech-to-text took 0.3 to 1.8 s per turn, never
-        above 2 s; once it closed a turn mid-sentence ("Quiero para"), and the agent asked again.
+        above 2 s; once it closed a turn after its first two words, and the agent asked again.
         Whether the cap or Flux's own end of turn closed it is not in the log. Next: Flux's eager
         end of turn on its own.
   - [x] A weekday and a date that disagree ("el jueves cuatro" on a Wednesday) were booked
         without asking in the model evals (2026-10-31). The code now compares them with the
         calendar and asks which day before offering anything (`asks-which-day`, security). In a
-        practice call the first version asked about a past October day for "viernes veintisiete
-        de diciembre": it ignored the month. The date named now comes from the caller's day
-        number and month, the next one from today. Checked in a practice call (2026-10-31): "el
-        próximo lunes, diecisiete de noviembre" asked about Tuesday the 17th or Monday the 16th,
-        a closed Sunday was said as closed, and a December day outside the prompt's calendar was
-        booked on its right weekday, in the local Cronix's database.
+        practice call the first version asked about a past day of the current month for a date
+        named two months ahead: it ignored the month. The date named now comes from the caller's
+        day number and month, the next one from today. Checked in a practice call (2026-10-31):
+        a weekday and a date that disagreed were asked about with the right two days, a closed
+        day was said as closed, and a day outside the prompt's two-week calendar was booked on
+        its right weekday, in the local Cronix's database.
   - [ ] The second model round of a function turn adds 0.40 to 0.49 s (practice call,
         2026-10-31). The booking done is now said by the code (no second round). Asking for the
         name too: the code asks it once a time is chosen, and a name the caller already said goes
@@ -191,9 +198,12 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         model evals hold, the security measures above all (`asks-which-day`,
         `books-what-was-asked`, `invents-nothing`), since dates and functions are what the
         reasoning may have been protecting.
-  - [ ] Latency above the 1.0 s p50 target: 1.3 s and 1.7 s median per call, 2.3 to 2.8 s on
-        turns with a function call (two model rounds). Speech-to-text took 1.5 to 3.0 s when the
-        caller paused mid-sentence. Measured per segment before choosing a change.
+  - [ ] Latency above the 1.0 s p50 target. First practice calls: 1.3 s and 1.7 s median per
+        call, 2.3 to 2.8 s on turns with a function call (two model rounds); speech-to-text took
+        1.5 to 3.0 s when the caller paused mid-sentence. After the changes of 2026-10-31 (three
+        practice calls, 29 turns): total p50 1.71 s, p90 2.61 s; speech-to-text p50 581 ms, p90
+        956 ms; language model p50 778 ms, p90 1,664 ms; text-to-speech p50 252 ms. The model is
+        the largest part, and the plan below lowers it first.
   - [x] The time spent in the scheduling API is visible per request: each request of the
         conversation lands in the call's trace (`backend_requests`: operation, start, duration,
         outcome) and in Sentry (a `scheduling.request` span, the `voice.scheduling.request`
@@ -227,6 +237,41 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
           voice E2E on `main` only (#41).
         - Result: with the function in `sa-east-1`, about 75 ms of function time per request
           after the first (440 ms on a new instance), within the 300 ms target.
+
+## Plan from here (2026-10-31)
+
+In this order. Each step is one pull request, measured before it is merged; a step that changes
+what the model reads or says needs model evals (`--write-baseline`, about 0.40 USD a run).
+
+1. **Reasoning off for the language model.** `LOW_REASONING` in
+   `adapters/language_model_providers/openrouter_model.py` sends `reasoning.effort=low`; the
+   model still reasons 277 to 400 tokens before a function call. Turn it off with OpenRouter's
+   `reasoning.enabled=false`: the D4 measurement sent it through the service's own routing
+   (Together, then Venice, every parameter required) and Together answered; Venice is still to be
+   checked with it. Expected: about
+   0.45 s less per function turn and 0.17 s per reply (D4 measurement). Adopted only if the
+   model evals keep every security measure at 1.00 (`asks-which-day`, `books-what-was-asked`,
+   `invents-nothing`, `no-unwanted-write`) and the quality ones within their margins; then a
+   practice call measured per segment. If a security measure drops, reasoning stays low and the
+   drop is recorded here.
+2. **The code says the results that keep the caller on the same step.** A closed day, a day
+   without free starts, a time taken since it was offered: today the model reads the result
+   and speaks in a second round (2.0 s of model time for a closed day in the last practice
+   call). The code says them from the backend's result, as it already says the free times, the
+   question for the name, which day, the read-back and the booking done; phrases in the locale's
+   `phrases.toml`, the model waits. Model evals and a practice call with a closed day.
+3. **Flux's eager end of turn** (`enable_eager_end_of_turn`), measured alone: speech-to-text
+   p50 is 581 ms. Read Pipecat's Flux service first: an eager end of turn may start a model
+   request that is thrown away when the caller goes on, which costs tokens.
+4. **Watch for event loop stalls**: none in the 2026-10-31 practice calls. If
+   `EVENT_LOOP_STALLED` appears, its `blocked_at` names the blocking call; fix it then.
+5. **Cronix's disk IO** (the maintainer): once the dashboard's Disk IO Balance stays high,
+   re-enable `cron-ai-alerts` and `ai-agent-error-rate-check`.
+6. **Stage E** below: WhatsApp with Meta's test number.
+
+Waiting on the maintainer, not on code: a Venezuelan number for the phone line (phase 0), and
+the server in São Paulo (Fly.io `gru` or AWS Lightsail `sa-east-1`; not chosen), contracted only
+when a channel is unblocked or a tunnel does not carry WhatsApp's audio.
 
 ## Stage E: WhatsApp calls with Meta's test number
 
@@ -292,3 +337,13 @@ limit (manifest §10).
   user for about ten minutes.
 - 2026-10-29 · Stored responses of idempotency keys are deleted after 7 days by a daily job in
   Cronix (pull request #35), as the contract says.
+- 2026-10-31 · The code says every fixed line of the booking: the free times, the question for the
+  name, the read-back and the booking done; a name the caller already said goes with the time and
+  proposes at once. Each line the code says is one model round less.
+- 2026-10-31 · A weekday and a date that disagree are found by the code: the model passes them as
+  the caller said them (weekday, day number, month) and the code asks which day, from the
+  calendar, before offering anything; measured by `asks-which-day`, a security measure.
+- 2026-10-31 · Speech-to-text closes a turn after 2.5 s of silence (`STT_EOT_TIMEOUT_MS`) instead
+  of Flux's 5 s.
+- 2026-10-31 · Next is reasoning off, then the code saying the results that keep the caller on
+  the same step (Plan from here).
