@@ -151,3 +151,11 @@ Documentation is updated as part of the change, not afterwards. **Before every c
 **Working rule.** Whoever implements and sees that the implementation fails, that the design is wrong or that a better path exists stops and says so at once, with evidence: where the error is and the alternative path with its trade-off, even if it contradicts an earlier decision. They do not keep insisting on the same path nor harden it. The maintainers decide.
 
 **The working code decides, and governance is questioned too.** A rule of this repository (this constitution, `CLAUDE.md`, the ADR policy, documentation processes, CI) that blocks a better technical path, slows work without protecting anything real, creates a technical, security or reputational risk, or contradicts another rule or the code, is changed, not worked around: whoever meets it proposes the concrete change at once, with evidence. It is not applied in silence.
+
+## 18. Measure before stating
+
+Every claim about this system, written in the repository or said by whoever works on it, rests on a measurement taken for it: a command run, a file read, a test or eval result, a trace. "Not measured, but I suppose", "it should", "it probably" are not answers.
+
+*   **Measure first.** Before answering, read the code, run the command or the test, or read the trace that settles the question, and give the result with its evidence (`file:line`, the command and its output, the date).
+*   **When it cannot be measured yet,** say what blocks the measurement (an account, a phone number, real calls) and what would measure it. Never fill the gap with a guess.
+*   **Record the measurement** where the next one finds it, with its date and what it was measured with: the README's measured results, the tasks of the feature, the ADR that decided on it. A recorded measurement is reused while the code it measured has not changed, instead of measuring again.
