@@ -99,6 +99,9 @@ class RecordingTextToSpeech(TTSService):
         self.last_reply_completed_at = 0.0
         self._reply_says_something = False
         self._calls_in_progress: set[str] = set()
+        self._counted_model_reply_open = False
+        """The last reply counted is a model response nothing has followed yet: a function call
+        it made, which a provider's response announces after its end, takes it back."""
         self._greeted = False
         self.code_lines: list[str] = []
         """What the code said after the greeting, such as a proposal's read-back."""
@@ -124,8 +127,9 @@ class RecordingTextToSpeech(TTSService):
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         self._follow_the_model(frame)
         await super().process_frame(frame, direction)
-        # A response that only calls a tool is not a reply: the reply follows the tool's result.
-        # What the code says after the greeting, such as a proposal's read-back, is one.
+        # A response that calls a tool is not a reply, even with a line said before the call:
+        # the reply follows the tool's result. What the code says after the greeting, such as a
+        # proposal's read-back, is one.
         model_reply = (
             isinstance(frame, LLMFullResponseEndFrame)
             and self._reply_says_something
@@ -140,6 +144,8 @@ class RecordingTextToSpeech(TTSService):
         if model_reply or code_reply:
             self.replies_completed += 1
             self.last_reply_completed_at = time.monotonic()
+        if model_reply or code_reply or isinstance(frame, LLMFullResponseStartFrame):
+            self._counted_model_reply_open = model_reply
 
     def _follow_the_model(self, frame: Frame) -> None:
         if isinstance(frame, LLMFullResponseStartFrame):
@@ -148,6 +154,9 @@ class RecordingTextToSpeech(TTSService):
             self._reply_says_something = True
         elif isinstance(frame, FunctionCallInProgressFrame):
             self._calls_in_progress.add(frame.tool_call_id)
+            if self._counted_model_reply_open:
+                self.replies_completed -= 1
+                self._counted_model_reply_open = False
         elif isinstance(frame, FunctionCallResultFrame):
             self._calls_in_progress.discard(frame.tool_call_id)
             call = RecordedToolCall(frame.function_name, dict(frame.arguments), frame.result)

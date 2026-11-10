@@ -44,6 +44,8 @@ class CaseRun:
     failure: str | None = None
     turns: tuple[SpokenTurn, ...] = ()
     """The call in order, as the judge read it."""
+    model_replies: tuple[str, ...] = ()
+    """The model's own replies, which the deterministic measures score (not the code's lines)."""
     llm_upstreams: dict[str, int] = field(default_factory=dict)
     """Responses served by each upstream provider of the model under test."""
 
@@ -102,6 +104,7 @@ async def _run_case(
         task_scores=task_scores(record.model_replies) | outcome_scores(case, record),
         judge_scores=await judge.score(case, record),
         turns=record.turns,
+        model_replies=tuple(record.model_replies),
         llm_upstreams=record.trace.llm_upstreams,
     )
 
