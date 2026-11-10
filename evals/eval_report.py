@@ -3,8 +3,8 @@
 from collections import Counter
 
 from evals.eval_baseline import EvalBaseline, MetricComparison, Verdict
-from evals.judge_scoring import JUDGE_PASS_THRESHOLD
 from evals.model_eval_runs import CaseRun
+from evals.task_metrics import TASK_METRICS
 
 _ROLE_LABEL = {"assistant": "Agent", "user": "Caller"}
 
@@ -37,7 +37,7 @@ def render_report(
         "|---|---|---|---|---|---|",
         *(_comparison_row(comparison) for comparison in comparisons),
         "",
-        "## Cases (first repetition, and every judge score below the threshold)",
+        "## Cases (first repetition, and every repetition that lowered a measure)",
     ]
     for run in runs:
         lines.extend(_case_section(run))
@@ -77,17 +77,31 @@ def _comparison_row(comparison: MetricComparison) -> str:
 
 
 def _case_section(run: CaseRun) -> list[str]:
-    low_scores = [s for s in run.judge_scores if s.score < JUDGE_PASS_THRESHOLD]
-    if run.repetition != 1 and not low_scores and run.failure is None:
+    """The conversation and every score below 1.00 that lowered a measure: a measure is the
+    mean of its scores, so any of them lowers it, not only those under the judge's threshold."""
+    low_judge = [s for s in run.judge_scores if s.score < 1.0]
+    low_tasks = {metric: score for metric, score in run.task_scores.items() if score < 1.0}
+    if run.repetition != 1 and not low_judge and not low_tasks and run.failure is None:
         return []
     lines = ["", f"### {run.case.id} · repetition {run.repetition}", ""]
     if run.failure is not None:
         lines.append(f"Conversation failed: {run.failure}")
-    elif run.repetition == 1:
+    else:
         for turn in run.turns:
             lines.extend(f"- Tool `{call.name}`: {call.result}" for call in turn.tool_calls)
             lines.append(f"- {_ROLE_LABEL[turn.role]}: {turn.text}")
     lines.extend(
-        f"- Judge `{score.criterion_id}` {score.score:.2f}: {score.reason}" for score in low_scores
+        f"- Judge `{score.criterion_id}` {score.score:.2f}: {score.reason}" for score in low_judge
     )
+    lines.extend(_task_line(run, metric, score) for metric, score in low_tasks.items())
     return lines
+
+
+def _task_line(run: CaseRun, metric_id: str, score: float) -> str:
+    """A deterministic measure below 1.00, with the model's replies that failed it when it
+    judges replies."""
+    metric = TASK_METRICS.get(metric_id)
+    if metric is None:
+        return f"- `{metric_id}` {score:.2f}"
+    failed = [reply for reply in run.model_replies if not metric.passes(reply)]
+    return f"- `{metric_id}` {score:.2f}, failed by: {' / '.join(failed)}"
