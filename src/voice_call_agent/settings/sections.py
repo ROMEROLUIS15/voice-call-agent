@@ -91,6 +91,8 @@ class SchedulingApiSettings(_Section):
     read_timeout_seconds: float = Field(default=1.5, gt=0)
     """Contract §7: the caller is waiting."""
     write_timeout_seconds: float = Field(default=3.0, gt=0)
+    region: str | None = Field(default=None, pattern=r"^[a-z]{2}-[a-z]+-[0-9]$")
+    """Region the API's functions run in, near its database; `None` lets the host choose."""
 
 
 class TwilioMediaStreamsSettings(_Section):

@@ -68,6 +68,9 @@ class FakeCronixApi:
         self.requests: list[tuple[str, str, dict[str, Any] | None, str | None]] = []
         self.reply: Reply = lambda route, body: (200, {"success": True})
         self.delay_s = 0.0
+        self.regions: list[str | None] = []
+        self.peers: set[object] = set()
+        self.url = ""
 
     async def handle(self, request: web.Request) -> web.Response:
         raw = await request.text()
@@ -79,6 +82,9 @@ class FakeCronixApi:
         if not hmac.compare_digest(expected, request.headers.get("X-Cronix-Signature", "")):
             return web.Response(status=401)
         body = await request.json() if raw else None
+        self.regions.append(request.headers.get("x-region"))
+        if request.transport is not None:
+            self.peers.add(request.transport.get_extra_info("peername"))
         self.requests.append((request.method, route, body, request.headers.get("Idempotency-Key")))
         await asyncio.sleep(self.delay_s)
         status, payload = self.reply(route, body)
@@ -92,14 +98,21 @@ async def cronix() -> AsyncIterator[tuple[FakeCronixApi, CronixSchedulingBackend
     app.router.add_route("*", "/functions/phone-agent-api/{tail:.*}", api.handle)
     server = TestServer(app)
     await server.start_server()
-    settings = SchedulingApiSettings(
-        base_url=str(server.make_url("/functions/phone-agent-api")),
+    api.url = str(server.make_url("/functions/phone-agent-api"))
+    backend = CronixSchedulingBackend(SignedApi(_settings(api.url)), lambda name: f"Hola, {name}.")
+    yield api, backend
+    await backend.close()
+    await server.close()
+
+
+def _settings(url: str, region: str | None = None) -> SchedulingApiSettings:
+    return SchedulingApiSettings(
+        base_url=url,
         signing_secret=SecretStr(SECRET),
         read_timeout_seconds=0.5,
         write_timeout_seconds=0.5,
+        region=region,
     )
-    yield api, CronixSchedulingBackend(SignedApi(settings), lambda name: f"Hola, {name}.")
-    await server.close()
 
 
 async def test_a_call_starts_by_its_dialed_number_and_brings_the_business_context(
@@ -242,3 +255,38 @@ async def test_the_call_is_closed_with_its_outcome(
     api, backend = cronix
     await backend.close_call("CA1", CallOutcome.BOOKED)
     assert api.requests == [("POST", "/v1/calls/CA1/end", {"outcome": "booked"}, None)]
+
+
+async def test_the_requests_of_a_call_share_one_connection(
+    cronix: tuple[FakeCronixApi, CronixSchedulingBackend],
+) -> None:
+    api, backend = cronix
+    api.reply = lambda route, body: (200, {"success": True, "date": "2030-06-17", "slots": []})
+    for _ in range(3):
+        await backend.availability("CA1", "s1", date(2030, 6, 17))
+    await backend.close_call("CA1", CallOutcome.BOOKED)
+    assert len(api.requests) == 4
+    assert len(api.peers) == 1  # One TLS handshake per connection, not one per request.
+
+
+async def test_requests_name_the_configured_region_and_none_by_default(
+    cronix: tuple[FakeCronixApi, CronixSchedulingBackend],
+) -> None:
+    api, backend = cronix
+    api.reply = lambda route, body: (200, {"success": True, "date": "2030-06-17", "slots": []})
+    await backend.availability("CA1", "s1", date(2030, 6, 17))
+    pinned = CronixSchedulingBackend(SignedApi(_settings(api.url, "sa-east-1")), str)
+    await pinned.availability("CA1", "s1", date(2030, 6, 17))
+    await pinned.close_call("CA1", CallOutcome.BOOKED)
+    await pinned.close()
+    assert api.regions == [None, "sa-east-1", "sa-east-1"]
+
+
+async def test_a_closed_api_can_be_closed_again(
+    cronix: tuple[FakeCronixApi, CronixSchedulingBackend],
+) -> None:
+    api, backend = cronix
+    api.reply = lambda route, body: (200, {"success": True, "date": "2030-06-17", "slots": []})
+    await backend.availability("CA1", "s1", date(2030, 6, 17))
+    await backend.close()
+    await backend.close()  # The fixture closes it once more on teardown.

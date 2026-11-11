@@ -27,6 +27,7 @@ class AppUnderTest:
     replay_guard: InMemoryReplayGuard = field(default_factory=lambda: InMemoryReplayGuard(300))
     business_resolver: BusinessResolver | None = None
     practice_lines: tuple[PracticeLine, ...] = ()
+    closed: list[str] = field(default_factory=list)
 
     def build(self, **settings_overrides: object) -> ASGIApp:
         components = ServiceComponents(
@@ -39,5 +40,9 @@ class AppUnderTest:
             shutdown_grace_seconds=1,
             business_resolver=self.business_resolver,
             practice_lines=self.practice_lines,
+            closed_on_shutdown=(self._close,),
         )
         return build_asgi_app(make_service_settings(**settings_overrides), components)
+
+    async def _close(self) -> None:
+        self.closed.append("scheduling api")
