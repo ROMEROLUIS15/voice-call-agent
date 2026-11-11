@@ -22,3 +22,9 @@ coverage.xml
 
 # Personal instructions for coding agents, per developer (never committed)
 CLAUDE.local.md
+
+# Maintainers' own notes and guides, kept outside the repository
+/GUIA_PRUEBAS_VOICE_AI.pdf
+/voice-ai-testing-guide.md
+/pipecat-investigation.md
+/docs/ai-engineering.md

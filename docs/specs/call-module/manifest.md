@@ -1,6 +1,6 @@
 # 📋 Domain Manifest: Call Agent (WhatsApp + Phone Line)
 
-Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md`, the architecture decisions in `../../adr/`, the threat model in `../../security/threat-model.md`, the golden dataset in `../../evals/golden-dataset.md` and the AI engineering practices in `../../ai-engineering.md`.
+Defines what the Cronix call agent does, how it is built and when a phase counts as done. Read it with `../constitution.md`, `../cronix-phone-api-contract.md`, the architecture decisions in `../../adr/`, the threat model in `../../security/threat-model.md` and the golden dataset in `../../evals/golden-dataset.md`.
 
 ## 1. Purpose
 
@@ -210,7 +210,7 @@ v1 is accepted with AC-2, AC-3, AC-4, AC-6, AC-8, AC-9, AC-10 and AC-11, plus AC
 
 ### 9.1 Registered work per phase (not implemented)
 
-Registered on 2026-10-19; what each item solves and how it applies here is in [`docs/ai-engineering.md`](../../ai-engineering.md).
+Registered on 2026-10-19.
 
 *   **Phase 0:** measure speech-to-text on real phone audio (names, numbers, national ID numbers, fillers); a measured results section in `README.md` (latency p50/p95 per segment, golden dataset success, cost per call, capacity per instance), updated with every measurement.
 *   **Phase 2:** tool arguments defined once as Pydantic models, with a test that fails on a hand-written schema (done); each proposal and confirmation in the call trace (done: the decision, the caller turn count and the slot, without the client's name or the caller's words; the latency of each step is pending); property-based tests (Hypothesis) proving there is never a write without confirmation (done); redaction patterns for identity documents (pending).
