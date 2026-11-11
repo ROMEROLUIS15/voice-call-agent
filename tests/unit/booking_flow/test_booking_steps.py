@@ -426,3 +426,19 @@ async def test_a_service_added_in_a_later_turn_is_queued_without_dropping_the_fi
     # The model says it in one sentence: nothing else moves.
     assert (added.next_step, added.result["status"], added.silent) == (None, "queued", False)
     assert steps.slot is not None and steps.slot.service.id == "haircut"
+
+
+async def test_a_proposal_tells_the_model_what_it_proposes_but_not_the_name() -> None:
+    steps = _steps(await guarded_call())
+    outcome = await steps.check_availability(
+        {**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"}
+    )
+    # What the code reads back is in the result, so the model and the judge see where each fact
+    # came from; the name stays out, as it may be anyone's.
+    assert outcome.result == {
+        "status": "proposed",
+        "service": "Corte",
+        "day": "2026-10-27",
+        "day_spoken": "martes veintisiete de octubre",
+        "start": "11:00",
+    }

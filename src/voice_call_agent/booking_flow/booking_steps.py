@@ -245,7 +245,9 @@ class BookingSteps:
         result = await self._guard.propose(slot.service.id, slot.day, slot.start, client_name)
         if isinstance(result, Proposed):
             self.proposal = result
-            return StepOutcome({"status": "proposed"}, Step.CONFIRM)
+            day = {"day": slot.day.isoformat(), "day_spoken": spoken_day(self._content, slot.day)}
+            proposed = {"service": result.service_name, **day, "start": clock_time(slot.start)}
+            return StepOutcome({"status": "proposed", **proposed}, Step.CONFIRM)  # No name.
         if result.reason is ProposalRefusal.SLOT_NOT_OFFERED and result.available_starts:
             self._offer_times(slot.service, slot.day, result.available_starts, slot.start)
             return StepOutcome({"status": "slot_taken"}, Step.CHOOSE_TIME)
