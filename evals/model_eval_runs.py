@@ -13,6 +13,7 @@ from evals.conversation_harness.call_transcript import SpokenTurn
 from evals.conversation_harness.conversation_driver import (
     ConversationRecord,
     ConversationStalledError,
+    LanguageModelConnectionLostError,
     hold_conversation,
 )
 from evals.eval_baseline import MetricScore
@@ -24,7 +25,7 @@ from evals.task_metrics import TASK_METRICS, task_scores
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.observability.call_trace import ServiceVersions
 
-_CONCURRENT_CONVERSATIONS = 3
+CONCURRENT_CONVERSATIONS = 3
 """Keeps the provider's rate limits out of the measurement."""
 
 
@@ -44,6 +45,13 @@ class CaseRun:
     failure: str | None = None
     turns: tuple[SpokenTurn, ...] = ()
     """The call in order, as the judge read it."""
+    model_replies: tuple[str, ...] = ()
+    """The model's own replies, which the deterministic measures score (not the code's lines)."""
+    model_cost_usd: float | None = None
+    """The conversation's estimated cost from the price table: the model's, since the harness's
+    speech services are scripted."""
+    llm_turn_ms: tuple[float, ...] = ()
+    """The model's time on each measured turn of the call trace."""
     llm_upstreams: dict[str, int] = field(default_factory=dict)
     """Responses served by each upstream provider of the model under test."""
 
@@ -55,6 +63,25 @@ class ModelUnderTest:
     create_language_model: Callable[[str], AIService]
 
 
+async def _hold_conversation(case: GoldenCase, model: ModelUnderTest) -> ConversationRecord:
+    """The conversation, held once more when the provider's connection dropped: a network cut
+    says nothing about the agent, and without this one cut stops the whole paid run. A second
+    cut, or any other provider failure, still stops it."""
+
+    async def hold() -> ConversationRecord:
+        return await hold_conversation(
+            case,
+            content=model.content,
+            services=model.services,
+            create_language_model=model.create_language_model,
+        )
+
+    try:
+        return await hold()
+    except LanguageModelConnectionLostError:
+        return await hold()
+
+
 async def run_cases(
     cases: list[GoldenCase],
     model: ModelUnderTest,
@@ -62,7 +89,7 @@ async def run_cases(
     repetitions: int = REPETITIONS,
 ) -> list[CaseRun]:
     """Every case `repetitions` times, a few conversations at a time."""
-    slots = asyncio.Semaphore(_CONCURRENT_CONVERSATIONS)
+    slots = asyncio.Semaphore(CONCURRENT_CONVERSATIONS)
 
     async def run(case: GoldenCase, repetition: int) -> CaseRun:
         async with slots:
@@ -79,12 +106,7 @@ async def _run_case(
     case: GoldenCase, repetition: int, model: ModelUnderTest, judge: ConversationScorer
 ) -> CaseRun:
     try:
-        record = await hold_conversation(
-            case,
-            content=model.content,
-            services=model.services,
-            create_language_model=model.create_language_model,
-        )
+        record = await _hold_conversation(case, model)
     except ConversationStalledError as error:
         # A model that stalls the call scores zero on everything this case measures.
         return CaseRun(
@@ -102,6 +124,9 @@ async def _run_case(
         task_scores=task_scores(record.model_replies) | outcome_scores(case, record),
         judge_scores=await judge.score(case, record),
         turns=record.turns,
+        model_replies=tuple(record.model_replies),
+        model_cost_usd=record.trace.cost.usd,
+        llm_turn_ms=tuple(turn.llm_ms for turn in record.trace.turns),
         llm_upstreams=record.trace.llm_upstreams,
     )
 

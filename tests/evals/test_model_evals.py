@@ -401,6 +401,48 @@ def test_the_report_counts_the_upstreams_that_served_the_model() -> None:
     assert "Upstream providers: Cerebras 1, Groq 4 responses." in report
 
 
+def test_the_report_shows_every_repetition_that_lowered_a_measure() -> None:
+    long_reply = "Claro. Te cuento algo. Y otra cosa más."
+    lowered = case_run(
+        "booking-request-on-the-test-line",
+        {"admits-test-line": 0.7},
+        repetition=2,
+        replies=("Esta línea está en pruebas.", long_reply),
+    )
+    lowered = replace(lowered, turns=(SpokenTurn(role="assistant", text=long_reply),))
+    perfect = case_run("booking-request-on-the-test-line", {"admits-test-line": 1.0}, 3)
+    report = render_report(
+        model_label="openrouter m",
+        judge_model="j",
+        baseline=UNMEASURED,
+        comparisons=[],
+        runs=[lowered, perfect],
+    )
+    assert "### booking-request-on-the-test-line · repetition 2" in report
+    assert "repetition 3" not in report
+    assert "- Judge `admits-test-line` 0.70: because" in report
+    assert f"- `brief-replies` 0.50, failed by: {long_reply}" in report
+    assert f"- Agent: {long_reply}" in report
+
+
+def test_the_report_gives_the_model_cost_and_its_time_per_turn() -> None:
+    first = replace(
+        case_run("booking-request-on-the-test-line", {}),
+        model_cost_usd=0.002,
+        llm_turn_ms=(400.0, 600.0),
+    )
+    second = replace(first, repetition=2, model_cost_usd=0.003, llm_turn_ms=(800.0,))
+    report = render_report(
+        model_label="openrouter m",
+        judge_model="j",
+        baseline=UNMEASURED,
+        comparisons=[],
+        runs=[first, second],
+    )
+    assert "Model under test: estimated 0.005 USD for 2 conversations" in report
+    assert "model time per turn p50 600 ms, p90 800 ms (3 turns" in report
+
+
 def test_the_evals_need_both_keys() -> None:
     assert main([]) == EXIT_CANNOT_RUN
 
