@@ -117,3 +117,38 @@ def test_the_conversation_level_covers_greeting_interruption_identity_and_bookin
     tags = {tag for case in CASES for tag in case.tags}
     assert {"greeting", "interruption", "identity", "booking"} <= tags
     assert {case.channel.value for case in CASES} == {"twilio", "whatsapp"}
+
+
+BOOKINGS = [case for case in CASES if case.expected.tool_call is not None]
+
+
+@pytest.mark.parametrize("case", BOOKINGS, ids=[case.id for case in BOOKINGS])
+async def test_a_line_said_with_a_function_call_does_not_end_the_turn(case: GoldenCase) -> None:
+    """A real model may say a line in the response that calls a function, and takes a while to
+    answer. The harness still waits for the reply that follows the function's result before the
+    caller speaks again, and for the answer to the caller's confirmation before it hangs up."""
+    models: list[ScriptedLanguageModel] = []
+
+    def create_language_model(system_prompt: str) -> AIService:
+        models.append(
+            ScriptedLanguageModel(
+                system_prompt,
+                case.expected.tool_call,
+                says_before_calls="Perfecto, reviso.",
+                answers_after_s=0.3,
+            )
+        )
+        return models[-1]
+
+    record = await hold_conversation(
+        case,
+        content=CONTENT,
+        services=SCRIPTED_SERVICES,
+        create_language_model=create_language_model,
+    )
+
+    [model] = models
+    assert model.caller_messages == [turn.says for turn in case.turns]
+    tools = [call.name for turn in record.turns for call in turn.tool_calls]
+    assert tools == list(BOOKING_SEQUENCE)
+    assert record.trace.outcome == case.expected.outcome

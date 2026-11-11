@@ -13,6 +13,7 @@ from evals.conversation_harness.call_transcript import SpokenTurn
 from evals.conversation_harness.conversation_driver import (
     ConversationRecord,
     ConversationStalledError,
+    LanguageModelConnectionLostError,
     hold_conversation,
 )
 from evals.eval_baseline import MetricScore
@@ -44,6 +45,8 @@ class CaseRun:
     failure: str | None = None
     turns: tuple[SpokenTurn, ...] = ()
     """The call in order, as the judge read it."""
+    model_replies: tuple[str, ...] = ()
+    """The model's own replies, which the deterministic measures score (not the code's lines)."""
     llm_upstreams: dict[str, int] = field(default_factory=dict)
     """Responses served by each upstream provider of the model under test."""
 
@@ -53,6 +56,25 @@ class ModelUnderTest:
     content: ConversationContent
     services: ServiceVersions
     create_language_model: Callable[[str], AIService]
+
+
+async def _hold_conversation(case: GoldenCase, model: ModelUnderTest) -> ConversationRecord:
+    """The conversation, held once more when the provider's connection dropped: a network cut
+    says nothing about the agent, and without this one cut stops the whole paid run. A second
+    cut, or any other provider failure, still stops it."""
+
+    async def hold() -> ConversationRecord:
+        return await hold_conversation(
+            case,
+            content=model.content,
+            services=model.services,
+            create_language_model=model.create_language_model,
+        )
+
+    try:
+        return await hold()
+    except LanguageModelConnectionLostError:
+        return await hold()
 
 
 async def run_cases(
@@ -79,12 +101,7 @@ async def _run_case(
     case: GoldenCase, repetition: int, model: ModelUnderTest, judge: ConversationScorer
 ) -> CaseRun:
     try:
-        record = await hold_conversation(
-            case,
-            content=model.content,
-            services=model.services,
-            create_language_model=model.create_language_model,
-        )
+        record = await _hold_conversation(case, model)
     except ConversationStalledError as error:
         # A model that stalls the call scores zero on everything this case measures.
         return CaseRun(
@@ -102,6 +119,7 @@ async def _run_case(
         task_scores=task_scores(record.model_replies) | outcome_scores(case, record),
         judge_scores=await judge.score(case, record),
         turns=record.turns,
+        model_replies=tuple(record.model_replies),
         llm_upstreams=record.trace.llm_upstreams,
     )
 

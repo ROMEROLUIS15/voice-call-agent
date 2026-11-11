@@ -3,6 +3,7 @@ has a write, books it through the booking flow (ADR 0019): it checks the availab
 name, which proposes, on the first caller turn, and confirms on the second, after the code read the
 proposal back."""
 
+import asyncio
 from uuid import uuid4
 
 from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
@@ -28,11 +29,22 @@ SCRIPTED_REPLY = "Te escucho."
 class ScriptedLanguageModel(LLMService):
     """Stands in for the provider in reference conversations, where the reply does not matter."""
 
-    def __init__(self, system_prompt: str, write: ExpectedToolCall | None = None) -> None:
+    def __init__(
+        self,
+        system_prompt: str,
+        write: ExpectedToolCall | None = None,
+        says_before_calls: str | None = None,
+        answers_after_s: float = 0.0,
+    ) -> None:
         super().__init__(settings=complete_settings(LLMSettings, system_instruction=system_prompt))
         self.system_prompt = system_prompt
         self.caller_messages: list[str] = []
         self._write = write
+        self._says_before_calls = says_before_calls
+        """A line said in the same response as each function call, as a real model may say
+        ("Perfecto, reviso el miércoles."): the response ends before the call runs."""
+        self._answers_after_s = answers_after_s
+        """How long each answer takes, as a provider's does; the harness must wait for it."""
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
@@ -45,9 +57,15 @@ class ScriptedLanguageModel(LLMService):
         self.caller_messages = [
             str(message.get("content", "")) for message in messages if message.get("role") == "user"
         ]
+        if self._answers_after_s:
+            await asyncio.sleep(self._answers_after_s)
         if call := self._tool_call_due(messages, frame.context):
-            # No response frames around a call alone: the harness counts replies by them, and
-            # the reply comes after the tool's result.
+            # The reply comes after the tool's result. A line said with the call ends its
+            # response before the call runs, in the order a provider's response arrives.
+            if self._says_before_calls:
+                await self.push_frame(LLMFullResponseStartFrame())
+                await self.push_frame(LLMTextFrame(self._says_before_calls))
+                await self.push_frame(LLMFullResponseEndFrame())
             await self.run_function_calls([call])
             return
         await self.push_frame(LLMFullResponseStartFrame())
