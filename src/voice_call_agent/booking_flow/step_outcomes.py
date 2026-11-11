@@ -39,6 +39,9 @@ class StepOutcome:
     said: str | None = None
     """A line the code says on moving to `next_step`, from the backend's answer; the model then
     waits for the caller instead of saying it in a second round."""
+    silent: bool = False
+    """Stay on the current step without the model speaking: another function called in the
+    same response decides where the conversation goes (a second service, queued)."""
 
 
 def validated_arguments[ArgumentsT: BaseModel](

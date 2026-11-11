@@ -4,7 +4,7 @@ The clock is fixed so that "mañana" is always the same day: Monday 26 October 2
 Caracas, where the practice businesses are.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from uuid import uuid4
 
 from evals.golden_cases import ScheduleCondition
@@ -56,6 +56,36 @@ class _FullyBooked(InMemorySchedule):
         return AvailableSlots(day=day, slots=[]) if isinstance(result, AvailableSlots) else result
 
 
+class _OthersBookedAroundEleven(InMemorySchedule):
+    """Other callers booked tomorrow 10:30 to 11:00 and 11:30 to 12:30, before this call: a
+    service right after or right before eleven cannot be given to this caller."""
+
+    _OTHERS = ((time(10, 30), "shave"), (time(11, 30), "haircut-and-beard"))
+    _TOMORROW = date(2026, 10, 27)
+
+    async def availability(self, call_id: str, service_id: str, day: date) -> AvailabilityResult:
+        await self._book_the_others()
+        return await super().availability(call_id, service_id, day)
+
+    async def _book_the_others(self) -> None:
+        if getattr(self, "_others_booked", False):
+            return
+        self._others_booked = True
+        for start, service_id in self._OTHERS:
+            other = build_browser_session(f"other-caller-{uuid4().hex}")
+            await self.resolve_call_business(other)
+            await super().book_appointment(
+                BookingRequest(
+                    call_id=other.call_id,
+                    service_id=service_id,
+                    day=self._TOMORROW,
+                    start=start,
+                    client_name="Otra Persona",
+                    idempotency_key=uuid4(),
+                )
+            )
+
+
 def schedule_for(condition: ScheduleCondition, business: str | None) -> InMemorySchedule | None:
     """The practice schedule in the case's state, on the harness clock, where every call reaches
     `business`; `None`: no backend."""
@@ -64,6 +94,7 @@ def schedule_for(condition: ScheduleCondition, business: str | None) -> InMemory
         ScheduleCondition.SLOT_TAKEN: _SlotTakenBeforeConfirmation,
         ScheduleCondition.UNAVAILABLE: _UnavailableForBookings,
         ScheduleCondition.FULLY_BOOKED: _FullyBooked,
+        ScheduleCondition.OTHERS_BOOKED_AROUND_ELEVEN: _OthersBookedAroundEleven,
     }
     kind = kinds.get(condition)
     if kind is None or business is None:

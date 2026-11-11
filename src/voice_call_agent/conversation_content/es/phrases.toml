@@ -16,6 +16,8 @@ name_ask = "¿A nombre de quién sería la cita?"
 read_back = "Para confirmar: {service}, el {day}, a {time}, a nombre de {name}. ¿Está bien así?"
 # The code says the booking is done once the backend confirmed it, in the same register.
 booked = "Listo, la cita quedó agendada para el {day}, a {time}. ¿Algo más en lo que pueda ayudar?"
+# The code says a booking is done and goes on with the next service the caller asked for.
+booked_next = "Listo, la cita de {service} quedó agendada para el {day}, a {time}. Ahora, la de {next}."
 # The code says the results that keep the caller on the request, from the backend's answer: the
 # model does not improvise them in a second round. Same register: neither "tú" nor "usted".
 closed_day = "El {day} no se atiende. ¿Para qué otro día sería la cita?"

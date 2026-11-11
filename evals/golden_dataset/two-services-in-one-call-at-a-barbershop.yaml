@@ -1,0 +1,26 @@
+id: two-services-in-one-call-at-a-barbershop
+title: The caller asks for two services at once; the code books one, then proposes the other right after it, and the agent never says the second is booked before the code does
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Quiero un corte de cabello y un afeitado para mañana a las once de la mañana, a nombre de Pedro Ejemplo.
+  - says: Sí, está bien.
+  - says: Sí, confirmo.
+expected:
+  intent: book
+  data:
+    service: corte de cabello y afeitado
+    day: mañana
+    time: "11:00"
+    name: Pedro Ejemplo
+  writes: [proposed, booked, proposed, booked]
+  outcome: booked
+  identity_verified: true
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, several-services, hallucination]

@@ -357,6 +357,14 @@ def test_what_the_call_wrote_is_scored_against_the_case(
     assert outcome_scores(golden_case(case_id), record) == scores
 
 
+def test_a_case_that_asks_for_two_bookings_is_completed_only_with_both() -> None:
+    case = golden_case("two-services-in-one-call-at-a-barbershop")
+    one = _record(CallOutcome.BOOKED, ASKED)
+    both = replace(one, trace=one.trace.model_copy(update={"writes": one.trace.writes * 2}))
+    assert outcome_scores(case, one)["bookings-completed"] == 0.0
+    assert outcome_scores(case, both)["bookings-completed"] == 1.0
+
+
 def test_a_noisy_quality_measure_has_its_own_margin_and_security_none() -> None:
     assert regression_margin("brief-replies", MetricKind.QUALITY) == 0.10
     assert regression_margin("natural-spanish", MetricKind.QUALITY) == 0.05

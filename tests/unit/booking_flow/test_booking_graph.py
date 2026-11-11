@@ -2,14 +2,18 @@
 read-back, and transitions that follow each function's outcome (ADR 0019)."""
 
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
-from pipecat.flows import FlowManager, FlowsFunctionSchema, NodeConfig
+from pipecat.flows import NO_RESPONSE, FlowManager, FlowsFunctionSchema, NodeConfig
 from pipecat.frames.frames import TTSSpeakFrame
 
 from tests.practice_catalogs import MONDAY, TWO_BUSINESSES
 from tests.write_guard_fixtures import CALL_ID, TUESDAY, GuardedCall, guarded_call
-from voice_call_agent.booking_flow.booking_graph import BookingGraph, booking_functions, say
+from voice_call_agent.booking_flow.booking_graph import (
+    BookingGraph,
+    booking_functions,
+    say,
+)
 from voice_call_agent.booking_flow.booking_steps import BookingSteps
 from voice_call_agent.booking_flow.step_outcomes import Step
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
@@ -186,6 +190,32 @@ async def test_a_line_the_code_says_on_a_result_is_spoken_and_the_model_waits() 
         "El domingo uno de noviembre no se atiende. ¿Para qué otro día sería la cita?"
     ]
     assert node["respond_immediately"] is False
+
+
+async def test_a_service_queued_in_the_same_turn_keeps_the_first_ones_node() -> None:
+    graph, _ = _graph(await guarded_call())
+    check = _functions(graph.initial_node())["check_availability"]
+    await _run(check, service_id="haircut", day_number=TUESDAY.day, start="11:00")
+    result, node = await _run(check, service_id="full", day_number=TUESDAY.day, start="11:00")
+    assert result["status"] == "queued"
+    assert cast(object, node) is NO_RESPONSE  # Flows' sentinel: stay silent on the node.
+
+
+async def test_the_next_service_is_announced_in_one_line_with_its_read_back() -> None:
+    call = await guarded_call()
+    graph, _ = _graph(call)
+    check = _functions(graph.initial_node())["check_availability"]
+    said = {"day_number": TUESDAY.day, "start": "11:00"}
+    await _run(check, service_id="haircut", client_name="Ana Ejemplo", **said)
+    await _run(check, service_id="full", **said)
+    call.caller_speaks()
+    confirm = _functions(graph.node(Step.CONFIRM))["confirm_booking"]
+    _, node = await _run(confirm)
+    assert node is not None and node["name"] == "confirm"
+    # One line, so the caller hears one reply: the booking done, the next service, its read-back.
+    [line] = _said(node)
+    assert line.startswith("Listo, la cita de corte quedó agendada")
+    assert "Ahora, la de corte y barba. Para confirmar: Corte y barba" in line
 
 
 async def test_not_booked_offers_nothing_more_to_call() -> None:

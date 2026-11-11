@@ -248,6 +248,14 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         - Result: with the function in `sa-east-1`, about 75 ms of function time per request
           after the first (440 ms on a new instance), within the 300 ms target.
 
+  - [x] Two services asked for in one call (practice call, 2026-11-11): the model checked both
+        in one response and said both were booked, but Flows kept only the last transition and
+        only one was booked. The code now queues a second service and books it after the first,
+        saying both in one line; on the same day the next one starts right after the first by
+        each service's duration, else at the nearest free start, never over another booking.
+        Golden cases `two-services-in-one-call-at-a-barbershop` and
+        `two-services-around-other-bookings-at-a-barbershop`, model evals every measure 1.00.
+
 ## Plan from here (2026-10-31)
 
 In this order. Each step is one pull request, measured before it is merged; a step that changes

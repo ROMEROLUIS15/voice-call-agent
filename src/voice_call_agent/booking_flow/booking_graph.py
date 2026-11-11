@@ -14,6 +14,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from pipecat.flows import (
+    NO_RESPONSE,
     ActionConfig,
     FlowArgs,
     FlowManager,
@@ -21,6 +22,9 @@ from pipecat.flows import (
     FlowsFunctionSchema,
     NodeConfig,
 )
+
+# `_NoResponse` is the type of Flows' public `NO_RESPONSE` sentinel, which it does not export.
+from pipecat.flows.types import _NoResponse
 from pipecat.frames.frames import TTSSpeakFrame
 from pydantic import BaseModel
 
@@ -62,6 +66,9 @@ FUNCTION_DESCRIPTIONS = {
     "new_request": "The caller wants another appointment.",
 }
 """What each function is for, as the model reads it; the same in every call."""
+
+NextNode = NodeConfig | _NoResponse | None
+"""Where a function sends the call: a node, staying silent on the current one, or staying."""
 
 
 class BookingGraph:
@@ -203,16 +210,23 @@ class BookingGraph:
     ) -> FlowsFunctionSchema:
         """A function of a node: it runs its step and moves to the node its outcome names."""
 
-        async def run(
-            args: FlowArgs, flow_manager: FlowManager
-        ) -> tuple[JsonObject, NodeConfig | None]:
+        async def run(args: FlowArgs, flow_manager: FlowManager) -> tuple[JsonObject, NextNode]:
             outcome = await step(args)
+            if outcome.silent:
+                return outcome.result, NO_RESPONSE
             if outcome.next_step is None:
                 return outcome.result, None
             node = self.node(outcome.next_step)
             if outcome.said is not None:
-                # The code says the result, and the model waits for the caller.
-                node["pre_actions"] = [say(outcome.said), *node.get("pre_actions", [])]
+                # The code says the result, and the model waits for the caller: one line with
+                # the node's own, so the caller hears one reply (the harness counts them too).
+                actions = node.get("pre_actions", [])
+                lines = [
+                    outcome.said,
+                    *(action["text"] for action in actions if action["type"] == "say"),
+                ]
+                others = [action for action in actions if action["type"] != "say"]
+                node["pre_actions"] = [say(" ".join(lines)), *others]
                 node["respond_immediately"] = False
             return outcome.result, node
 
