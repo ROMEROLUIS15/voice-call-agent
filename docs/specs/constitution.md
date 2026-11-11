@@ -61,7 +61,7 @@ Non-negotiable rules for all code in this repository, a real-time Python voice s
 
 Documentation is updated as part of the change, not afterwards. **Before every commit and every push**, without being asked:
 
-*   **`README.md`** is updated if anything it describes changed: installation, usage, architecture, status or environment variables.
+*   **`README.md` describes the current state, always.** Every change that is accepted (merged, or measured and adopted) updates, in the same pull request, every README section it affects: status, how a call works, architecture, external services, how to run it, project structure, observability, evals, security, operations, measured results and environment variables. A measurement that changes a figure updates the measured results table with its date and what it was measured with. The pull request lists the README sections it changed, or says why none changed (`.github/pull_request_template.md`); a reviewer does not approve one that leaves the README describing something that is no longer true.
 *   **Public documentation in `docs/`** reflects every addition, removal or behaviour change: the specs (`docs/specs/`) and the architecture decisions (`docs/adr/`). No task is done until the manifest of the module it touched is updated. The manifest describes the current state, not its history: what changed, when and why lives in the pull request and in git.
 *   If a change does not affect documentation, the change summary says so explicitly ("no documentation changes because …"); it is never omitted silently.
 *   Removing code or a feature removes its documentation: documentation never describes something that no longer exists.
