@@ -429,7 +429,6 @@ code: they hold the non-negotiable rules on language, naming, typing, secrets an
 | [Cronix contract](docs/specs/cronix-phone-api-contract.md) | The signed HTTP API between the agent and the scheduling backend |
 | [Cronix connection tasks](docs/specs/cronix-connection/tasks.md) | What was built, what was measured and the plan from here |
 | [Architecture decisions](docs/adr/README.md) | Every decision taken, with its reasons |
-| [AI engineering practices](docs/ai-engineering.md) | Practices for an agent that writes to a real system, and their status |
 | [Threat model](docs/security/threat-model.md) | Threats, controls and accepted risks |
 | [Golden dataset](docs/evals/golden-dataset.md) | The eval cases, measures and margins |
 | [Alerts](docs/observability/alerts.md) | Production monitors |
