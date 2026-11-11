@@ -4,6 +4,7 @@ name, which proposes, on the first caller turn, and confirms on the second, afte
 proposal back."""
 
 import asyncio
+from datetime import date
 from uuid import uuid4
 
 from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
@@ -22,6 +23,7 @@ from pipecat.services.settings import LLMSettings
 
 from evals.conversation_harness.scripted_settings import complete_settings
 from evals.golden_cases import ExpectedToolCall
+from voice_call_agent.conversation_content.content_loader import load_conversation_content
 
 SCRIPTED_REPLY = "Te escucho."
 
@@ -87,7 +89,11 @@ class ScriptedLanguageModel(LLMService):
         write = self._write.arguments
         turn = len(self.caller_messages)
         if "check_availability" in offered and after_caller and turn == 1:
-            arguments = {key: write[key] for key in ("service_id", "day", "start", "client_name")}
+            arguments = {key: write[key] for key in ("service_id", "start", "client_name")}
+            # The day as a caller says it, its number and month: the code works the date out.
+            day = date.fromisoformat(write["day"])
+            months = load_conversation_content().booking_briefing.months
+            arguments |= {"day_number": str(day.day), "month": months[day.month - 1]}
             return _call("check_availability", arguments, context)
         if "propose_booking" in offered:
             return _call("propose_booking", {"client_name": write["client_name"]}, context)

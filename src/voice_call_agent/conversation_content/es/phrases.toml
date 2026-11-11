@@ -30,11 +30,6 @@ closed_day = "{weekday} cerrado"
 service = "{name} [{id}]: {minutes} minutos"
 price = ", precio {price} {currency}"
 no_price = ", precio no publicado"
-# The calendar of the coming days: the model looks a day up instead of computing it (ADR 0019).
-calendar_day = "{weekday} {day} de {month}{note}: {iso_date}{closed}"
-calendar_today = " (hoy)"
-calendar_tomorrow = " (mañana)"
-calendar_closed = ", cerrado"
 
 # How dates and times are said aloud (the read-back, a day in a tool's result).
 # The currency a business gives its prices in (ISO 4217), as it is said.

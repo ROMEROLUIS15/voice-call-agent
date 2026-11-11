@@ -8,7 +8,7 @@ Descriptions are in English: they describe an interface to the model, not what i
 caller; what each step asks for is in the locale's booking flow texts.
 """
 
-from datetime import date, time
+from datetime import time
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, WithJsonSchema
@@ -18,9 +18,6 @@ ClockTime = Annotated[time, WithJsonSchema({"type": "string"})]
 against the schema ends the turn on a mismatch (a `format`, a `pattern`, an `enum`) and the agent
 falls silent (manifest §10). The code answers `invalid_arguments` instead and the model corrects
 itself."""
-
-CalendarDay = Annotated[date, WithJsonSchema({"type": "string"})]
-"""A day as YYYY-MM-DD, checked by the code for the same reason."""
 
 
 def _a_day_of_a_month(number: int) -> int:
@@ -47,20 +44,21 @@ class _Arguments(BaseModel):
 
 
 class CheckAvailabilityArguments(_Arguments):
+    """The day as the caller said it: the code works the date out, never the model (ADR 0019)."""
+
     service_id: str = Field(description="The service's id, from the brackets in the service list.")
-    day: CalendarDay | None = Field(
-        default=None,
-        description=(
-            "The day from the calendar, as YYYY-MM-DD, only when the caller named it in a way the "
-            'other fields cannot say ("el lunes de la semana que viene"); otherwise leave it '
-            "out: the system works the date out from weekday, day_number, month or relative_day."
-        ),
-    )
     relative_day: str | None = Field(
         default=None,
         description=(
             "today, tomorrow or day_after_tomorrow, when the caller named the day that way "
             "(hoy, mañana, pasado mañana)."
+        ),
+    )
+    next_week: bool | None = Field(
+        default=None,
+        description=(
+            "true when the caller said the weekday is next week's (\"el miércoles de la semana "
+            'que viene"); a weekday alone is the next one from tomorrow on.'
         ),
     )
     weekday: str | None = Field(
