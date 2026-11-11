@@ -3,7 +3,7 @@
 from collections import Counter
 
 from evals.eval_baseline import EvalBaseline, MetricComparison, Verdict
-from evals.model_eval_runs import CaseRun
+from evals.model_eval_runs import CONCURRENT_CONVERSATIONS, CaseRun
 from evals.task_metrics import TASK_METRICS
 
 _ROLE_LABEL = {"assistant": "Agent", "user": "Caller"}
@@ -30,6 +30,7 @@ def render_report(
         f"{max((run.repetition for run in runs), default=0)} repetitions per case.",
         _baseline_line(baseline),
         _upstreams_line(runs),
+        _model_spend_line(runs),
         "",
         f"**{verdict}**",
         "",
@@ -65,6 +66,22 @@ def _upstreams_line(runs: list[CaseRun]) -> str:
         "Upstream providers: "
         + ", ".join(f"{name} {count}" for name, count in sorted(served.items()))
         + " responses."
+    )
+
+
+def _model_spend_line(runs: list[CaseRun]) -> str:
+    """What the model under test cost and how long it took per turn. Conversations run a few at
+    a time on a development machine, so the time is the model's in a run, not a call's latency;
+    the judge's cost is the run's total, on the provider's activity page, minus this."""
+    costs = [run.model_cost_usd for run in runs if run.model_cost_usd is not None]
+    turns = sorted(ms for run in runs for ms in run.llm_turn_ms)
+    if not costs or not turns:
+        return "Model under test: no cost or time measured."
+    p50, p90 = turns[len(turns) // 2], turns[min(len(turns) - 1, int(len(turns) * 0.9))]
+    return (
+        f"Model under test: estimated {sum(costs):.3f} USD for {len(costs)} conversations; "
+        f"model time per turn p50 {p50:.0f} ms, p90 {p90:.0f} ms ({len(turns)} turns, "
+        f"{CONCURRENT_CONVERSATIONS} conversations at a time)."
     )
 
 

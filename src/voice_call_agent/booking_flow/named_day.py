@@ -15,6 +15,10 @@ from datetime import date, timedelta
 
 _MONTHS_AHEAD = 12
 """How far from today a day number without a month is looked for."""
+RELATIVE_DAYS = {"today": 0, "tomorrow": 1, "day_after_tomorrow": 2}
+_DAY_FIELDS = ["weekday", "day_number", "relative_day"]
+"""The arguments a day can be said with: one of them is needed."""
+"""The days a caller names from today ("mañana"), as the model passes them, and their offset."""
 
 
 @dataclass(frozen=True)
@@ -42,6 +46,38 @@ class UnknownNamedDayError(Exception):
     def __init__(self, fields: list[str]) -> None:
         super().__init__(", ".join(fields))
         self.fields = fields
+
+
+def day_said(
+    named: NamedDay,
+    relative_day: str | None,
+    next_week: bool | None,
+    *,
+    weekdays: Sequence[str],
+    months: Sequence[str],
+    today: date,
+) -> date:
+    """The day the caller asked for, worked out by the code from their words.
+
+    In order: a day named from today ("mañana"); a day number, with its month if one was named,
+    the next such date from today on; a weekday of next week, in the coming Monday-to-Sunday
+    week; a weekday alone, the next one from tomorrow on, so "el lunes" said on a Monday is next
+    week's. A weekday that does not match the day is left to `day_question`.
+    """
+    if relative_day is not None:
+        offset = RELATIVE_DAYS.get(relative_day.strip().casefold())
+        if offset is None:
+            raise UnknownNamedDayError(["relative_day"])
+        return today + timedelta(days=offset)
+    month = _index(named.month, months, "month")
+    if named.day_number is not None:
+        return _date_named(named.day_number, month, today)
+    weekday = _index(named.weekday, weekdays, "weekday")
+    if weekday is None:
+        raise UnknownNamedDayError(["weekday"] if next_week else _DAY_FIELDS)
+    if next_week:
+        return today + timedelta(days=7 - today.weekday() + weekday)
+    return today + timedelta(days=(weekday - today.weekday() - 1) % 7 + 1)
 
 
 def day_question(
