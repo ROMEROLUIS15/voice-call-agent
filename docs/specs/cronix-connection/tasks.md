@@ -255,6 +255,18 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         each service's duration, else at the nearest free start, never over another booking.
         Golden cases `two-services-in-one-call-at-a-barbershop` and
         `two-services-around-other-bookings-at-a-barbershop`, model evals every measure 1.00.
+  - [x] Availability checks against production's Cronix timed out (two practice calls with the
+        browser entry and a business of the maintainer's, 2026-11-11): the business was resolved
+        and its services read, but each call ended with the agenda unavailable and nothing
+        booked. Availability took 1,498 to 3,001 ms: each attempt has 1.5 s and one retry, and
+        about 2.8 s was a first attempt cut and a retry that answered. Measured with 12 signed
+        read-only requests per variant: a new connection per request and no region, p50
+        1,339 ms, the function in `ca-central-1`; the region pinned, 1,029 ms; the connection
+        reused, 900 ms; both, 589 ms, at most 1,117 ms, none over 1.5 s. The adapter now keeps
+        one pooled connection (kept 120 s idle: the API's side kept one open after 70 s) and
+        sends `x-region` from `SCHEDULING_API_REGION`; through the adapter afterwards, p50
+        536 to 580 ms. The first request on a new connection still took 2.3 to 2.6 s; in a call
+        that is `calls/start`, with the 3 s write timeout.
 
 ## Plan from here (2026-10-31)
 

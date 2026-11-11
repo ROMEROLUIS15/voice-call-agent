@@ -160,6 +160,7 @@ The agent retries `429`, `503`, a timeout and a connection failure, with the sam
 ## 7. Agent-side timeouts
 
 *   Reads: 1.5 s. Writes: 3 s. Configured in the adapter's settings (phase 1).
+*   Every request of the agent goes through one pooled connection, kept 120 s idle, and carries `x-region` with the region of the API's database when `SCHEDULING_API_REGION` is set (`sa-east-1`), so the function runs next to the data instead of next to the caller.
 *   If a write times out, the agent assumes **neither** success nor failure: it calls `GET /v1/my-appointments` to check the real state before saying anything.
 
 ## 8. Changes on the Cronix side

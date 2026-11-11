@@ -96,8 +96,18 @@ def test_the_scheduling_api_needs_its_url_and_secret_and_https_in_production() -
         environment="development",
     ).scheduling_api()
     assert api is not None and api.base_url.endswith("/phone-agent-api")
+    assert api.region is None  # Not set: the API's host picks where its functions run.
     assert "s3cret" not in repr(api)  # A SecretStr: never printed.
     assert make_service_settings().scheduling_api() is None
+    pinned = make_service_settings(
+        scheduling_backend="api",
+        scheduling_api_url="https://api.example.com/fn",
+        scheduling_api_signing_secret="s3cret",
+        scheduling_api_region="sa-east-1",
+    ).scheduling_api()
+    assert pinned is not None and pinned.region == "sa-east-1"
+    with pytest.raises(ValidationError, match="scheduling_api_region"):
+        make_service_settings(scheduling_api_region="sa-east-1; x=1")
 
 
 def test_practice_lines_take_only_fictitious_numbers() -> None:

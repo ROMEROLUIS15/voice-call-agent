@@ -55,6 +55,10 @@ class CronixSchedulingBackend:
         self._api = api
         self._greeting = greeting
 
+    async def close(self) -> None:
+        """Closes the API's pooled connections, once the calls are over."""
+        await self._api.close()
+
     async def resolve_call_business(self, session: CallSession) -> CallStartResolution:
         # v1 serves the phone line: Cronix refuses another entry (contract §4).
         result = await self._api.post(

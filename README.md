@@ -140,7 +140,7 @@ The full architecture, invariants (INV-1 to INV-8) and latency budget are in the
 | **Deepgram** | Flux speech-to-text (`flux-general-multi`) and Aura-2 text-to-speech (`aura-2-selena-es`) | `DEEPGRAM_API_KEY`, `STT_*`, `TTS_VOICE` | Every call |
 | **OpenRouter** | The language model `deepseek/deepseek-v4.1-flash`, routed to Together and, when Together fails, to Venice (ADR 0020); also the judge of the model evals | `LLM_PROVIDER=openrouter`, `OPENROUTER_API_KEY` | Every call (default provider) |
 | Groq, Google, OpenAI | Alternative language model providers, used to measure candidates | `LLM_PROVIDER`, `LLM_MODEL` and the provider's key | Optional |
-| **Cronix** | Scheduling backend: business resolution, availability, booking, end of call ([contract](docs/specs/cronix-phone-api-contract.md)) | `SCHEDULING_BACKEND=api`, `SCHEDULING_API_URL`, `SCHEDULING_API_SIGNING_SECRET` | Real bookings |
+| **Cronix** | Scheduling backend: business resolution, availability, booking, end of call ([contract](docs/specs/cronix-phone-api-contract.md)) | `SCHEDULING_BACKEND=api`, `SCHEDULING_API_URL`, `SCHEDULING_API_SIGNING_SECRET`, `SCHEDULING_API_REGION` | Real bookings |
 | **Twilio** | Phone-line entry (Media Streams) | `PUBLIC_BASE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | Phone calls |
 | **Meta WhatsApp Cloud API** | WhatsApp Calling entry (WebRTC) | `WHATSAPP_*` (all four or none) | WhatsApp calls (paused) |
 | **Sentry** | Error tracking, one transaction per call, metrics and alerts | `SENTRY_DSN` | Optional; recommended in production |
@@ -210,6 +210,10 @@ uv run voice-call-agent
 `PRACTICE_LINES` lists the lines the practice page offers, each a line of a business in that
 Cronix. Only fictitious numbers (555-0100 to 555-0199) are accepted, so the page never dials a
 real business.
+
+Against a deployed Cronix, `SCHEDULING_API_REGION=sa-east-1` (the default in `.env.example`) runs
+its functions next to its database; the agent keeps one pooled connection to the API for every
+request.
 
 ### 4. Phone line (Twilio)
 
@@ -385,6 +389,7 @@ Each figure states its date and what it was measured with; what is not measured 
 | Speech-to-text on phone audio | Not measured: it needs real phone-line calls, blocked until the line has a Venezuelan number | |
 | Golden dataset success (model level, baseline) | Every measure 1.00: `invents-nothing`, `no-unwanted-write`, `books-what-was-asked` and `asks-which-day` (security), `bookings-completed`, `confirms-after-the-answer`, `natural-spanish`, `admits-test-line`, `speakable-replies` and `brief-replies` | 2026-11-11; 26 cases, including two services in one call booked back to back, and around other callers' bookings, 3 repetitions; `deepseek/deepseek-v4.1-flash` at low reasoning effort through OpenRouter (Together), judge `google/gemini-3.6-flash`; measured locally with the service's defaults. The day is worked out by the code from the caller's words, and the free times, the question for the name, which day when a weekday and a date disagree, a closed day, a day without free starts, a time taken before the confirmation, a backend that does not answer, the read-back and the booking done are said by the code. In that run the model under test cost an estimated 0.179 USD and took p50 820 ms, p90 1,878 ms per turn, three conversations at a time (not a call's latency) |
 | Reasoning off | Not adopted: the security measures held at 1.00 in three runs, but the model asked for a name, a time or a surname the caller had already given, and `bookings-completed` ranged from 0.89 to 1.00 | 2026-11-10; three model evals runs, same cases and judge (manifest §10) |
+| Scheduling API, one availability check | Production Cronix from a development machine: p50 1,339 ms, 2 of 12 over the 1.5 s read timeout, with a new connection per request and the function run in `ca-central-1`; with a pooled connection and `SCHEDULING_API_REGION=sa-east-1`: p50 536 to 589 ms, at most 1,117 ms, none over 1.5 s. The first request on a new connection took 2.3 to 2.6 s | 2026-11-11; 12 signed read-only requests per variant against one business |
 | Cost per call | Practice calls of about two minutes, booked: 0.056 to 0.062 USD estimated (model, speech-to-text and text-to-speech; no telephony) | 2026-10-31; three call traces, price table `2026-10-28.1` |
 | Capacity per instance | Not measured: it needs a load test on the production server, which is not contracted yet (phase 4) | |
 

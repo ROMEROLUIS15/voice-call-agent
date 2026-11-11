@@ -5,6 +5,11 @@ Every request carries `X-Cronix-Timestamp` and `X-Cronix-Signature`, an HMAC-SHA
 its query string. A request is retried once on a 429, a 503, a timeout or a connection failure:
 reads are safe to repeat, and every write carries its idempotency key, so a repeated booking
 returns the stored answer instead of booking twice.
+
+Requests share one connection pool: a new connection per request paid its TLS handshake on every
+availability check. With a region set, each request carries `x-region`, so the API's functions
+run next to its database instead of next to the caller (measured 2026-11-11 against production:
+a median of 1,339 ms per availability check before, 589 ms with both).
 """
 
 import hashlib
@@ -26,6 +31,7 @@ from voice_call_agent.settings.sections import SchedulingApiSettings
 JsonObject = dict[str, Any]  # Any: JSON values as the API returns them.
 
 _RETRIED_STATUSES = frozenset({429, 503})
+_KEEPALIVE_S = 120.0
 
 
 def signature(secret: str, timestamp: str, method: str, route: str, body: str) -> str:
@@ -41,6 +47,13 @@ class SignedApi:
     ) -> None:
         self._settings = settings
         self._clock = clock
+        self._http: aiohttp.ClientSession | None = None
+
+    async def close(self) -> None:
+        """Closes the pooled connections; a later request opens new ones."""
+        if self._http is not None:
+            await self._http.close()
+            self._http = None
 
     async def get(self, route: str) -> JsonObject:
         return await self._send("GET", route, "", self._settings.read_timeout_seconds, None)
@@ -84,16 +97,28 @@ class SignedApi:
         }
         if idempotency_key is not None:
             headers["Idempotency-Key"] = idempotency_key
-        async with (
-            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=limit_s)) as http,
-            http.request(
-                method, self._settings.base_url + route, data=body or None, headers=headers
-            ) as response,
-        ):
+        if self._settings.region is not None:
+            headers["x-region"] = self._settings.region
+        async with self._session().request(
+            method,
+            self._settings.base_url + route,
+            data=body or None,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=limit_s),
+        ) as response:
             payload: object = None
             if response.content_type == "application/json":
                 payload = await response.json()
             return response.status, payload
+
+    def _session(self) -> aiohttp.ClientSession:
+        """The pooled session, opened on the first request: it needs the running event loop."""
+        if self._http is None or self._http.closed:
+            # aiohttp drops an idle connection after 15 s, shorter than a caller's pause between
+            # two checks; the API's side kept one open after 70 s idle (measured 2026-11-11).
+            keepalive = aiohttp.TCPConnector(keepalive_timeout=_KEEPALIVE_S)
+            self._http = aiohttp.ClientSession(connector=keepalive)
+        return self._http
 
 
 def _path(route: str) -> str:
