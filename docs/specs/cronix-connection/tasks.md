@@ -190,14 +190,21 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         two. In the last practice call (11 turns, 12 model requests), only a result that stays on
         its step still took two rounds: a closed day, 2.0 s of model time. Next: the code says
         those results too (a closed day, a day without free starts, a time taken since offered).
-  - [ ] The model reasons before every function call, the main part of a function turn's model
+  - [x] The model reasons before every function call, the main part of a function turn's model
         time (2026-10-31): at the low reasoning effort the service sends, 277 to 400 reasoning
         tokens before `check_availability`, 1.11 s median; with reasoning off, 0 tokens and
         0.66 s, with the same arguments. A short reply: 0.56 s and 0.39 s. Five requests each with
         the prompt of a practice call, through Together. Next: reasoning off, adopted only if the
         model evals hold, the security measures above all (`asks-which-day`,
         `books-what-was-asked`, `invents-nothing`), since dates and functions are what the
-        reasoning may have been protecting.
+        reasoning may have been protecting. Measured on 2026-11-10 in three model evals runs with
+        reasoning off: the security measures held at 1.00, but the model asked for a name, a time
+        or a surname the caller had already given instead of calling the function, and
+        `bookings-completed` ranged from 0.89 to 1.00. Not adopted: reasoning stays low. What
+        those runs found was kept: the day is worked out by the code from the caller's words
+        (no date argument, no calendar in the prompt), the test line always offers to keep
+        talking, and the agent never announces a function nor speaks another language. New
+        baseline with low reasoning on 2026-11-10, no regression (golden dataset).
   - [ ] Latency above the 1.0 s p50 target. First practice calls: 1.3 s and 1.7 s median per
         call, 2.3 to 2.8 s on turns with a function call (two model rounds); speech-to-text took
         1.5 to 3.0 s when the caller paused mid-sentence. After the changes of 2026-10-31 (three
@@ -243,7 +250,8 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
 In this order. Each step is one pull request, measured before it is merged; a step that changes
 what the model reads or says needs model evals (`--write-baseline`, about 0.40 USD a run).
 
-1. **Reasoning off for the language model.** `LOW_REASONING` in
+1. **Reasoning off for the language model** (done 2026-11-10: not adopted, see D4; reasoning
+   stays low). `LOW_REASONING` in
    `adapters/language_model_providers/openrouter_model.py` sends `reasoning.effort=low`; the
    model still reasons 277 to 400 tokens before a function call. Turn it off with OpenRouter's
    `reasoning.enabled=false`: the D4 measurement sent it through the service's own routing
