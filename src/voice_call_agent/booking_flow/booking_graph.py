@@ -1,13 +1,12 @@
-"""The booking conversation as a Pipecat Flows graph (ADR 0019).
+"""The booking conversation as a Pipecat Flows graph (ADR 0019), built per call from its business.
 
 Each node gives the model one task and only the functions that task needs. The code says the
-greeting, which day when a weekday and a date disagree, the free times to choose from, the
-question for the name, the read-back of the proposal and that it was booked, and routes on each
-function's outcome (`booking_steps`), as Pipecat's Flows examples route on a result field. Built
-per call from the call's business. Its services and the free starts are not enums in the function
-schemas: a provider that validates tool calls against the schema ends the turn on a value outside
-an enum and the agent falls silent (manifest §10). The code checks them instead
-(`unknown_service`, `not_offered`), and the model corrects itself.
+greeting, which day when a weekday and a date disagree, the free times, the question for the
+name, the read-back of the proposal and that it was booked, and routes on each function's outcome
+(`booking_steps`), as Pipecat's Flows examples route on a result field. Services and free starts
+are not enums in the function schemas: a provider that validates tool calls against the schema
+ends the turn on a value outside an enum and the agent falls silent (manifest §10). The code
+checks them instead (`unknown_service`, `not_offered`), and the model corrects itself.
 """
 
 from collections.abc import Awaitable, Callable, Mapping
@@ -175,6 +174,7 @@ class BookingGraph:
             proposal.day,
             proposal.start,
             proposal.client_name,
+            [waiting.service.name for waiting in self._steps.pending],
         )
         node = _node(
             Step.CONFIRM,
@@ -182,6 +182,7 @@ class BookingGraph:
             [
                 self._function("confirm_booking", {}, self._steps.confirm_booking),
                 self._function("change_request", {}, self._steps.change_request),
+                self._check_availability(),  # Another service besides it: read back with it.
             ],
         )
         node["pre_actions"] = [say(read_back)]

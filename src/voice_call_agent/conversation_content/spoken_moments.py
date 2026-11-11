@@ -4,6 +4,7 @@ The code states these facts instead of the model working them out: a model that 
 weekday or reads back a summary gets them wrong (manifest §10, ADR 0019).
 """
 
+from collections.abc import Sequence
 from datetime import date, time
 
 from voice_call_agent.conversation_content.content_loader import ConversationContent
@@ -43,15 +44,27 @@ def which_day_question(content: ConversationContent, said_date: date, weekday_da
 
 
 def proposal_read_back(
-    content: ConversationContent, service: str, day: date, start: time, client_name: str
+    content: ConversationContent,
+    service: str,
+    day: date,
+    start: time,
+    client_name: str,
+    waiting: Sequence[str] = (),
 ) -> str:
-    """The proposal as the caller hears it before saying yes, built from what will be written."""
-    return content.read_back.format(
-        service=service,
-        day=spoken_day(content, day),
-        time=spoken_time(content, start),
-        name=client_name,
-    )
+    """The proposal as the caller hears it before saying yes, built from what will be written,
+    and the services that wait for it ('Después seguimos con corte y barba')."""
+    said = {
+        "service": service,
+        "day": spoken_day(content, day),
+        "time": spoken_time(content, start),
+        "name": client_name,
+    }
+    if not waiting:
+        return content.read_back.format(**said)
+    names = [_in_a_sentence(name) for name in waiting]
+    joiner = content.booking_flow.choices.said.last_joiner
+    listed = joiner.join([", ".join(names[:-1]), names[-1]]) if len(names) > 1 else names[0]
+    return content.read_back_then.format(**said, next=listed)
 
 
 def day_closed(content: ConversationContent, day: date) -> str:

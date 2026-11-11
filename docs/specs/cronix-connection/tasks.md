@@ -267,6 +267,14 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         sends `x-region` from `SCHEDULING_API_REGION`; through the adapter afterwards, p50
         536 to 580 ms. The first request on a new connection still took 2.3 to 2.6 s; in a call
         that is `calls/start`, with the 3 s write timeout.
+  - [x] A service added at the read-back was lost (practice call against production's Cronix,
+        2026-11-11): two services were asked for; the read-back did not say the second waited,
+        the caller asked for it again, the model changed the request, and the second replaced
+        the first, then the first the second; one was booked, with no notice. The request now
+        lasts through a change at the read-back, a service is queued once, the confirmation
+        offers `check_availability` for an added service, and the read-back says the services
+        that wait. Golden case `a-service-added-at-the-read-back-at-a-barbershop`; model evals
+        with no regression (`brief-replies` 0.97, within its margin; the rest 1.00).
 
 ## Plan from here (2026-10-31)
 

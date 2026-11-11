@@ -1,0 +1,27 @@
+id: a-service-added-at-the-read-back-at-a-barbershop
+title: The caller adds a second service while the first is read back; the code reads the first back again saying the second waits, books both one after the other, and drops neither
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Quiero un corte de cabello para mañana a las once de la mañana, a nombre de Pedro Ejemplo.
+  - says: Sí, pero también necesito un afeitado ese mismo día, seguido del corte.
+  - says: Sí, está bien.
+  - says: Sí, confirmo.
+expected:
+  intent: book
+  data:
+    service: corte de cabello y afeitado
+    day: mañana
+    time: "11:00"
+    name: Pedro Ejemplo
+  writes: [proposed, booked, proposed, booked]
+  outcome: booked
+  identity_verified: true
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, several-services, read-back]

@@ -359,9 +359,13 @@ async def test_a_second_service_in_the_same_turn_waits_for_the_first() -> None:
     )
     second = await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
     assert first.next_step is Step.CONFIRM
-    # Queued, and silent: it must not replace the first one's step.
-    assert (second.next_step, second.result["status"], second.silent) == (None, "queued", True)
+    # Queued behind the proposal, which is read back again saying the second waits.
+    assert (second.next_step, second.result["status"]) == (Step.CONFIRM, "queued")
     assert steps.proposal is not None and steps.proposal.service_name == "Corte"
+    steps = _steps(await guarded_call())  # Without a proposal yet, it queues in silence.
+    await steps.check_availability({**HAIRCUT, "start": "11:00"})
+    silent = await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
+    assert (silent.next_step, silent.result["status"], silent.silent) == (None, "queued", True)
 
 
 async def test_once_the_first_is_booked_the_next_is_proposed_right_after_it() -> None:
@@ -426,6 +430,29 @@ async def test_a_service_added_in_a_later_turn_is_queued_without_dropping_the_fi
     # The model says it in one sentence: nothing else moves.
     assert (added.next_step, added.result["status"], added.silent) == (None, "queued", False)
     assert steps.slot is not None and steps.slot.service.id == "haircut"
+
+
+async def test_a_service_repeated_after_a_change_is_queued_once_and_the_first_is_kept() -> None:
+    call = await guarded_call()
+    steps = _steps(call)
+    await steps.check_availability({**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"})
+    await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
+    call.caller_speaks()
+    # At the read-back the caller asks again for the second service, and the model changes.
+    await steps.change_request({})
+    added = await steps.check_availability({**HAIRCUT, "service_id": "full", "in_addition": True})
+    # Nothing was chosen any more, yet the second waits for the first instead of replacing it.
+    assert added.result == {"status": "queued", "service": "Corte y barba", "after": "Corte"}
+    assert [waiting.service.id for waiting in steps.pending] == ["full"]
+    again = await steps.check_availability(
+        {**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"}
+    )
+    assert again.next_step is Step.CONFIRM and [w.service.id for w in steps.pending] == ["full"]
+    call.caller_speaks()
+    booked = await steps.confirm_booking({})
+    assert (booked.next_step, booked.result["status"]) == (Step.CONFIRM, "booked")
+    assert steps.proposal is not None and steps.proposal.service_name == "Corte y barba"
+    assert steps.proposal.start == time(11, 30)
 
 
 async def test_a_proposal_tells_the_model_what_it_proposes_but_not_the_name() -> None:
