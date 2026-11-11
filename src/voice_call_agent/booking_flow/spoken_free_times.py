@@ -5,7 +5,7 @@ The code says them because the model, rewording the ranges, misstated where they
 practice call: what the caller hears comes from the starts the backend offered.
 """
 
-from voice_call_agent.booking_flow.booking_steps import TimeChoice
+from voice_call_agent.booking_flow.booking_state import TimeChoice
 from voice_call_agent.booking_flow.free_ranges import (
     FreeRange,
     Unavailable,

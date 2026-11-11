@@ -64,6 +64,25 @@ def day_full(content: ConversationContent, day: date) -> str:
     return content.no_free_starts.format(day=spoken_day(content, day))
 
 
+def booked_then(
+    content: ConversationContent, service: str, day: date, start: time, following: str
+) -> str:
+    """'Listo, la cita de corte de cabello quedó agendada para el martes…, a las once de la
+    mañana. Ahora, la de corte y barba.': the booking done, then the next service asked for."""
+    return content.booked_next.format(
+        service=_in_a_sentence(service),
+        day=spoken_day(content, day),
+        time=spoken_time(content, start),
+        next=_in_a_sentence(following),
+    )
+
+
+def _in_a_sentence(name: str) -> str:
+    """A catalog name inside a sentence: 'Corte de cabello' → 'corte de cabello'; a name whose
+    second letter is a capital (an acronym) is kept."""
+    return name[:1].lower() + name[1:] if name[1:2].islower() else name
+
+
 def booking_done(content: ConversationContent, day: date, start: time) -> str:
     """What the caller hears once the backend confirmed the booking, built from what was booked."""
     return content.booked.format(day=spoken_day(content, day), time=spoken_time(content, start))

@@ -80,6 +80,13 @@ class CheckAvailabilityArguments(_Arguments):
         default=None, description="The time the caller asked for, as HH:MM, if they named one."
     )
     client_name: ClientName | None = Field(default=None, description=_NAME_IF_SAID)
+    in_addition: bool | None = Field(
+        default=None,
+        description=(
+            'true when the caller wants this service besides the one being booked ("y también '
+            'una manicura"), not instead of it: the system books it next.'
+        ),
+    )
 
 
 class SelectStartArguments(_Arguments):

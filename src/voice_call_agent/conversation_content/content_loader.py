@@ -168,6 +168,9 @@ class ConversationContent(BaseModel):
     """The proposal as the code reads it back before the caller's yes (ADR 0019)."""
     booked: str
     """What the code says once the backend booked it; takes `{day}` and `{time}`."""
+    booked_next: str
+    """What the code says once a booking is done and another service waits; takes `{service}`,
+    `{day}`, `{time}` and `{next}`."""
     closed_day: str
     """What the code says when the business does not open that day; takes `{day}`."""
     no_free_starts: str
@@ -196,6 +199,7 @@ class _Phrases(BaseModel):
     which_day: str
     read_back: str
     booked: str
+    booked_next: str
     closed_day: str
     no_free_starts: str
     slot_taken: str
@@ -232,6 +236,7 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         which_day=phrases.which_day,
         read_back=phrases.read_back,
         booked=phrases.booked,
+        booked_next=phrases.booked_next,
         closed_day=phrases.closed_day,
         no_free_starts=phrases.no_free_starts,
         slot_taken=phrases.slot_taken,

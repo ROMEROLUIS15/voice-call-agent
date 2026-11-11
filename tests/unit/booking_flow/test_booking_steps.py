@@ -156,12 +156,15 @@ async def test_the_proposal_is_validated_and_confirmed_only_after_the_caller_ans
 
 
 async def test_a_new_availability_check_drops_what_the_earlier_request_left_pending() -> None:
-    steps = _steps(await guarded_call())
+    call = await guarded_call()
+    steps = _steps(call)
     await steps.check_availability({**HAIRCUT, "start": "11:00"})
     await steps.propose_booking({"client_name": "Ana Ejemplo"})
+    call.caller_speaks()  # A change comes in a later turn: one in the same response adds.
     outcome = await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
     assert outcome.next_step is Step.NAME and steps.proposal is None
     assert steps.slot is not None and steps.slot.service.id == "full"
+    call.caller_speaks()
     closed = await steps.check_availability(
         {"service_id": "haircut", "day_number": (TUESDAY + timedelta(days=5)).day}
     )
@@ -346,3 +349,52 @@ async def test_a_time_taken_before_the_confirmation_is_said_by_the_code() -> Non
     outcome = await steps.confirm_booking({})
     assert (outcome.next_step, outcome.result["status"]) == (Step.REQUEST, "slot_taken")
     assert outcome.said == "Esa hora se acaba de ocupar. ¿Para qué otra hora o día sería la cita?"
+
+
+# Several services in one call: the code books them one after the other (manifest §4).
+async def test_a_second_service_in_the_same_turn_waits_for_the_first() -> None:
+    steps = _steps(await guarded_call())
+    first = await steps.check_availability(
+        {**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"}
+    )
+    second = await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
+    assert first.next_step is Step.CONFIRM
+    # Queued, and silent: it must not replace the first one's step.
+    assert (second.next_step, second.result["status"], second.silent) == (None, "queued", True)
+    assert steps.proposal is not None and steps.proposal.service_name == "Corte"
+
+
+async def test_once_the_first_is_booked_the_code_goes_on_with_the_next_under_the_same_name() -> (
+    None
+):
+    call = await guarded_call()
+    steps = _steps(call)
+    await steps.check_availability({**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"})
+    await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
+    call.caller_speaks()
+    booked = await steps.confirm_booking({})
+    # Eleven is taken by the first booking now: the caller chooses another time.
+    assert (booked.next_step, booked.result["status"]) == (Step.CHOOSE_TIME, "booked")
+    assert booked.said == (
+        "Listo, la cita de corte quedó agendada para el martes veintisiete de "
+        "octubre, a las once de la mañana. Ahora, la de corte y barba."
+    )
+    call.caller_speaks()
+    chosen = await steps.select_start({"start": "12:00"})
+    # The name goes with it; the read-back says it, so the caller can correct it.
+    assert chosen.next_step is Step.CONFIRM
+    assert steps.proposal is not None and steps.proposal.client_name == "Ana Ejemplo"
+    assert steps.proposal.service_name == "Corte y barba"
+
+
+async def test_a_service_added_in_a_later_turn_is_queued_without_dropping_the_first() -> None:
+    call = await guarded_call()
+    steps = _steps(call)
+    await steps.check_availability({**HAIRCUT, "start": "11:00"})
+    call.caller_speaks()
+    added = await steps.check_availability(
+        {**HAIRCUT, "service_id": "full", "start": "12:00", "in_addition": True}
+    )
+    # The model says it in one sentence: nothing else moves.
+    assert (added.next_step, added.result["status"], added.silent) == (None, "queued", False)
+    assert steps.slot is not None and steps.slot.service.id == "haircut"

@@ -10,10 +10,10 @@ fills: Pipecat's state is an untyped dict, and the write guard needs typed, vali
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from datetime import date, time
 from typing import Any
 
+from voice_call_agent.booking_flow.booking_state import PendingRequest, Slot, TimeChoice
 from voice_call_agent.booking_flow.flow_arguments import (
     CheckAvailabilityArguments,
     ProposeBookingArguments,
@@ -34,13 +34,17 @@ from voice_call_agent.booking_flow.step_outcomes import (
     validated_arguments,
 )
 from voice_call_agent.conversation_content.content_loader import ConversationContent
-from voice_call_agent.conversation_content.spoken_moments import day_closed, day_full, spoken_day
+from voice_call_agent.conversation_content.spoken_moments import (
+    booked_then,
+    day_closed,
+    day_full,
+    spoken_day,
+)
 from voice_call_agent.observability.error_reporting import report_error
 from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.scheduling_backend.scheduling_models import (
     AvailableSlots,
     ClosedDay,
-    OpeningHours,
     ServiceOffering,
     WeeklyHours,
 )
@@ -53,29 +57,6 @@ from voice_call_agent.write_guards.booking_guard import (
     Proposed,
     clock_time,
 )
-
-
-@dataclass(frozen=True)
-class Slot:
-    """A service, day and start time the backend offered for this call."""
-
-    service: ServiceOffering
-    day: date
-    start: time
-
-
-@dataclass(frozen=True)
-class TimeChoice:
-    """The free starts of a day the caller chooses from, and the start asked for if taken."""
-
-    service: ServiceOffering
-    day: date
-    starts: list[time]
-    taken: time | None
-    offered_at_turn: int
-    hours: OpeningHours | None
-    """The day's opening hours, to say why `taken` is not offered."""
-    """The caller's turns when the starts were offered: a start is chosen only after another."""
 
 
 class BookingSteps:
@@ -108,6 +89,12 @@ class BookingSteps:
         """The proposal the backend booked last: the code says it to the caller."""
         self.day_question: DayQuestion | None = None
         """A weekday and a date the caller named that do not match: the code asks which."""
+        self.pending: list[PendingRequest] = []
+        """Services asked for besides the one being booked, booked next in order."""
+        self._request: tuple[str, int] | None = None
+        """The service id of the request being booked and the caller's turn it started on."""
+        self._client_name: str | None = None
+        """The name of the last booking, for the next service: the read-back says it."""
 
     @property
     def catalog(self) -> list[ServiceOffering]:
@@ -129,8 +116,8 @@ class BookingSteps:
             # The model picked a time the caller has not chosen yet: the caller chooses it.
             return StepOutcome({"status": "waiting_for_the_choice"}, None)
         self.slot = Slot(self.choice.service, self.choice.day, call.start)
-        if call.client_name is not None:
-            return await answering(self._content, self._propose(self.slot, call.client_name))
+        if (name := call.client_name or self._client_name) is not None:
+            return await answering(self._content, self._propose(self.slot, name))
         return StepOutcome({"status": "selected", "start": clock_time(call.start)}, Step.NAME)
 
     async def propose_booking(self, arguments: Mapping[str, Any]) -> StepOutcome:
@@ -147,19 +134,46 @@ class BookingSteps:
         return await answering(self._content, self._confirm(self.proposal))
 
     async def change_request(self, _arguments: Mapping[str, Any]) -> StepOutcome:
-        """The caller wants something else: back to the request, nothing pending is kept."""
+        """The caller wants something else: back to the request, nothing chosen or proposed is
+        kept; the services waiting for this one still wait."""
         self.slot, self.choice, self.proposal = None, None, None
         return StepOutcome({"status": "changing"}, Step.REQUEST)
 
     async def _check_availability(self, call: CheckAvailabilityArguments) -> StepOutcome:
-        # A new request: nothing chosen or proposed for the earlier one may be proposed or booked.
-        self.slot, self.choice, self.proposal, self.day_question = None, None, None, None
         service = self._catalog.get(call.service_id)
         if service is None:
             return StepOutcome({"status": "unknown_service"}, None)
+        adds = self._adds_to_the_request(service, call.in_addition)
+        if not adds:
+            # A new request: nothing chosen or proposed for the earlier one is proposed or booked.
+            self.slot, self.choice, self.proposal, self.day_question = None, None, None, None
+            self._request = (service.id, self._guard.caller_turns())
         asked = self._settle_day(call)
         if isinstance(asked, StepOutcome):
             return asked
+        if adds:
+            self.pending.append(PendingRequest(service, asked, call.start, call.client_name))
+            # Asked in the same response as the request: it must not replace that one's step.
+            same_turn = self._request is not None and self._request[1] == self._guard.caller_turns()
+            return StepOutcome(
+                {"status": "queued", "service": service.name}, None, silent=same_turn
+            )
+        self.pending = [waiting for waiting in self.pending if waiting.service.id != service.id]
+        return await self._offer(service, asked, call.start, call.client_name)
+
+    def _adds_to_the_request(self, service: ServiceOffering, in_addition: bool | None) -> bool:
+        """A different service asked for while one is being booked, in the same response or
+        said to be besides it, waits for it; otherwise it replaces it."""
+        if self._request is None or not (self.slot or self.choice or self.proposal):
+            return False
+        service_id, turn = self._request
+        same_turn = turn == self._guard.caller_turns()
+        return service.id != service_id and (same_turn or bool(in_addition))
+
+    async def _offer(
+        self, service: ServiceOffering, asked: date, start: time | None, client_name: str | None
+    ) -> StepOutcome:
+        """The service's availability that day, and where the conversation goes with it."""
         result = await self._backend.availability(self._call_id, service.id, asked)
         # The weekday is the code's, never the model's arithmetic (ADR 0019).
         day = {"day": asked.isoformat(), "day_spoken": spoken_day(self._content, asked)}
@@ -171,17 +185,17 @@ class BookingSteps:
         if not result.slots:
             said = day_full(self._content, asked)
             return StepOutcome({"status": "no_free_starts", **day}, Step.REQUEST, said)
-        if call.start is not None and call.start in result.slots:
-            self.slot = Slot(service, asked, call.start)
-            if call.client_name is not None:
-                return await self._propose(self.slot, call.client_name)
-            status = {"status": "available", **day, "start": clock_time(call.start)}
+        if start is not None and start in result.slots:
+            self.slot = Slot(service, asked, start)
+            if (name := client_name or self._client_name) is not None:
+                return await self._propose(self.slot, name)
+            status = {"status": "available", **day, "start": clock_time(start)}
             return StepOutcome(status, Step.NAME)
         self.choice = TimeChoice(
             service,
             asked,
             result.slots,
-            call.start,
+            start,
             self._guard.caller_turns(),
             self._weekly_hours.on(asked),
         )
@@ -239,9 +253,11 @@ class BookingSteps:
     async def _confirm(self, proposal: Proposed) -> StepOutcome:
         result = await self._guard.confirm(proposal.proposal_id)
         if isinstance(result, Booked):
-            self.booked = proposal
-            self.slot, self.choice, self.proposal = None, None, None
-            return StepOutcome({"status": "booked"}, Step.BOOKED)
+            self.booked, self._client_name = proposal, proposal.client_name
+            self.slot, self.choice, self.proposal, self._request = None, None, None, None
+            if not self.pending:
+                return StepOutcome({"status": "booked"}, Step.BOOKED)
+            return await self._book_the_next(proposal)
         if result.reason == ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED:
             return StepOutcome({"status": "waiting_for_the_answer"}, None)
         if result.reason == ConfirmationRefusal.BACKEND_UNAVAILABLE:
@@ -249,3 +265,22 @@ class BookingSteps:
         # The backend refused the write, such as a slot taken since it was offered.
         self.slot, self.proposal = None, None
         return StepOutcome({"status": "slot_taken"}, Step.REQUEST, self._content.slot_taken)
+
+    async def _book_the_next(self, done: Proposed) -> StepOutcome:
+        """The code says the booking is done and goes on with the next service asked for."""
+        following = self.pending.pop(0)
+        self._request = (following.service.id, self._guard.caller_turns())
+        offered = await self._offer(
+            following.service, following.day, following.start, following.client_name
+        )
+        said = booked_then(
+            self._content, done.service_name, done.day, done.start, following.service.name
+        )
+        if offered.said is not None:
+            said = f"{said} {offered.said}"
+        result = {
+            "status": "booked",
+            "next_service": following.service.name,
+            "next": offered.result,
+        }
+        return StepOutcome(result, offered.next_step or Step.REQUEST, said)
