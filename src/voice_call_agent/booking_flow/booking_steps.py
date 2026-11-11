@@ -9,13 +9,10 @@ The call's booking state lives in this object rather than in `FlowManager.state`
 fills: Pipecat's state is an untyped dict, and the write guard needs typed, validated values.
 """
 
-from collections.abc import Awaitable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, time
-from enum import StrEnum
 from typing import Any
-
-from pydantic import BaseModel, ValidationError
 
 from voice_call_agent.booking_flow.flow_arguments import (
     CheckAvailabilityArguments,
@@ -29,16 +26,20 @@ from voice_call_agent.booking_flow.named_day import (
     day_question,
     day_said,
 )
+from voice_call_agent.booking_flow.step_outcomes import (
+    Step,
+    StepOutcome,
+    answering,
+    backend_unavailable,
+    validated_arguments,
+)
 from voice_call_agent.conversation_content.content_loader import ConversationContent
-from voice_call_agent.conversation_content.spoken_moments import spoken_day
+from voice_call_agent.conversation_content.spoken_moments import day_closed, day_full, spoken_day
 from voice_call_agent.observability.error_reporting import report_error
 from voice_call_agent.observability.error_taxonomy import ErrorCode
-from voice_call_agent.scheduling_backend.scheduling_errors import (
-    SchedulingBackendError,
-    SchedulingBackendUnavailableError,
-)
 from voice_call_agent.scheduling_backend.scheduling_models import (
     AvailableSlots,
+    ClosedDay,
     OpeningHours,
     ServiceOffering,
     WeeklyHours,
@@ -52,26 +53,6 @@ from voice_call_agent.write_guards.booking_guard import (
     Proposed,
     clock_time,
 )
-
-JsonObject = dict[str, Any]  # Any: a JSON value, as function results travel to the model.
-
-
-class Step(StrEnum):
-    REQUEST = "request"
-    WHICH_DAY = "which_day"
-    CHOOSE_TIME = "choose_time"
-    NAME = "name"
-    CONFIRM = "confirm"
-    BOOKED = "booked"
-    NOT_BOOKED = "not_booked"
-
-
-@dataclass(frozen=True)
-class StepOutcome:
-    result: JsonObject
-    """What the model gets back."""
-    next_step: Step | None
-    """Where the conversation goes; `None` stays on the current step."""
 
 
 @dataclass(frozen=True)
@@ -133,13 +114,13 @@ class BookingSteps:
         return list(self._catalog.values())
 
     async def check_availability(self, arguments: Mapping[str, Any]) -> StepOutcome:
-        call = _arguments(CheckAvailabilityArguments, arguments)
+        call = validated_arguments(CheckAvailabilityArguments, arguments)
         if isinstance(call, StepOutcome):
             return call
-        return await _answering(self._check_availability(call))
+        return await answering(self._content, self._check_availability(call))
 
     async def select_start(self, arguments: Mapping[str, Any]) -> StepOutcome:
-        call = _arguments(SelectStartArguments, arguments)
+        call = validated_arguments(SelectStartArguments, arguments)
         if isinstance(call, StepOutcome):
             return call
         if self.choice is None or call.start not in self.choice.starts:
@@ -149,21 +130,21 @@ class BookingSteps:
             return StepOutcome({"status": "waiting_for_the_choice"}, None)
         self.slot = Slot(self.choice.service, self.choice.day, call.start)
         if call.client_name is not None:
-            return await _answering(self._propose(self.slot, call.client_name))
+            return await answering(self._content, self._propose(self.slot, call.client_name))
         return StepOutcome({"status": "selected", "start": clock_time(call.start)}, Step.NAME)
 
     async def propose_booking(self, arguments: Mapping[str, Any]) -> StepOutcome:
-        call = _arguments(ProposeBookingArguments, arguments)
+        call = validated_arguments(ProposeBookingArguments, arguments)
         if isinstance(call, StepOutcome):
             return call
         if self.slot is None:
             return StepOutcome({"status": "no_slot_chosen"}, Step.REQUEST)
-        return await _answering(self._propose(self.slot, call.client_name))
+        return await answering(self._content, self._propose(self.slot, call.client_name))
 
     async def confirm_booking(self, _arguments: Mapping[str, Any]) -> StepOutcome:
         if self.proposal is None:
             return StepOutcome({"status": "nothing_to_confirm"}, Step.REQUEST)
-        return await _answering(self._confirm(self.proposal))
+        return await answering(self._content, self._confirm(self.proposal))
 
     async def change_request(self, _arguments: Mapping[str, Any]) -> StepOutcome:
         """The caller wants something else: back to the request, nothing pending is kept."""
@@ -182,10 +163,14 @@ class BookingSteps:
         result = await self._backend.availability(self._call_id, service.id, asked)
         # The weekday is the code's, never the model's arithmetic (ADR 0019).
         day = {"day": asked.isoformat(), "day_spoken": spoken_day(self._content, asked)}
+        if isinstance(result, ClosedDay):
+            said = day_closed(self._content, asked)
+            return StepOutcome({"status": result.kind, **day}, Step.REQUEST, said)
         if not isinstance(result, AvailableSlots):
             return StepOutcome({"status": result.kind, **day}, None)
         if not result.slots:
-            return StepOutcome({"status": "no_free_starts", **day}, None)
+            said = day_full(self._content, asked)
+            return StepOutcome({"status": "no_free_starts", **day}, Step.REQUEST, said)
         if call.start is not None and call.start in result.slots:
             self.slot = Slot(service, asked, call.start)
             if call.client_name is not None:
@@ -260,35 +245,7 @@ class BookingSteps:
         if result.reason == ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED:
             return StepOutcome({"status": "waiting_for_the_answer"}, None)
         if result.reason == ConfirmationRefusal.BACKEND_UNAVAILABLE:
-            return StepOutcome({"status": "backend_unavailable"}, Step.NOT_BOOKED)
+            return backend_unavailable(self._content)
         # The backend refused the write, such as a slot taken since it was offered.
         self.slot, self.proposal = None, None
-        return StepOutcome({"status": "slot_taken"}, Step.REQUEST)
-
-
-def _arguments[ArgumentsT: BaseModel](
-    model: type[ArgumentsT], arguments: Mapping[str, Any]
-) -> ArgumentsT | StepOutcome:
-    """The validated arguments, or the answer that says which were wrong (never their values,
-    which may hold a name)."""
-    try:
-        return model.model_validate(arguments)
-    except ValidationError as error:
-        fields = sorted({".".join(str(part) for part in item["loc"]) for item in error.errors()})
-        report_error(ErrorCode.TOOL_ARGUMENTS_INVALID, fields=",".join(fields))
-        return StepOutcome({"status": "invalid_arguments", "fields": fields}, None)
-
-
-async def _answering(work: Awaitable[StepOutcome]) -> StepOutcome:
-    """The step's outcome, or the answer that the backend did not respond."""
-    try:
-        return await work
-    except SchedulingBackendError as error:
-        unavailable = isinstance(error, SchedulingBackendUnavailableError)
-        report_error(
-            ErrorCode.SCHEDULING_BACKEND_UNAVAILABLE
-            if unavailable
-            else ErrorCode.SCHEDULING_BACKEND_REJECTED,
-            error=error,
-        )
-        return StepOutcome({"status": "backend_unavailable"}, Step.NOT_BOOKED)
+        return StepOutcome({"status": "slot_taken"}, Step.REQUEST, self._content.slot_taken)

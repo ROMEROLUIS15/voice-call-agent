@@ -1,0 +1,22 @@
+id: day-without-free-starts-at-a-barbershop
+title: The day asked for is open but has no free start left; the code says so and the agent offers no time that day
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: fully-booked
+business: practice-barbershop
+language: es
+turns:
+  - says: Hola, quiero un corte de cabello para mañana a las tres de la tarde.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "15:00"
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, no-free-starts, hallucination, any-business]

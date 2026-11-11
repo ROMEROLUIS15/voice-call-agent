@@ -182,14 +182,17 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         a weekday and a date that disagreed were asked about with the right two days, a closed
         day was said as closed, and a day outside the prompt's two-week calendar was booked on
         its right weekday, in the local Cronix's database.
-  - [ ] The second model round of a function turn adds 0.40 to 0.49 s (practice call,
+  - [x] The second model round of a function turn adds 0.40 to 0.49 s (practice call,
         2026-10-31). The booking done is now said by the code (no second round). Asking for the
         name too: the code asks it once a time is chosen, and a name the caller already said goes
         with the availability check or the time choice, which propose at once. Measured in a
         practice call on 2026-10-31 for the booking done: one model round of 0.67 s instead of
         two. In the last practice call (11 turns, 12 model requests), only a result that stays on
-        its step still took two rounds: a closed day, 2.0 s of model time. Next: the code says
-        those results too (a closed day, a day without free starts, a time taken since offered).
+        its step still took two rounds: a closed day, 2.0 s of model time. The code now says
+        those results too (2026-11-11): a closed day, a day without free starts, a time taken
+        before the confirmation and a backend that does not answer, and the model waits. Model
+        evals: every measure 1.00 (golden case `day-without-free-starts-at-a-barbershop` added).
+        A practice call with a closed day is still to measure the time saved per segment.
   - [x] The model reasons before every function call, the main part of a function turn's model
         time (2026-10-31): at the low reasoning effort the service sends, 277 to 400 reasoning
         tokens before `check_availability`, 1.11 s median; with reasoning off, 0 tokens and
@@ -262,7 +265,8 @@ what the model reads or says needs model evals (`--write-baseline`, about 0.40 U
    `invents-nothing`, `no-unwanted-write`) and the quality ones within their margins; then a
    practice call measured per segment. If a security measure drops, reasoning stays low and the
    drop is recorded here.
-2. **The code says the results that keep the caller on the same step.** A closed day, a day
+2. **The code says the results that keep the caller on the same step** (done 2026-11-11, model
+   evals every measure 1.00; the practice call is pending). A closed day, a day
    without free starts, a time taken since it was offered: today the model reads the result
    and speaks in a second round (2.0 s of model time for a closed day in the last practice
    call). The code says them from the backend's result, as it already says the free times, the

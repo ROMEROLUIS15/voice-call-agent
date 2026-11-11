@@ -7,11 +7,20 @@ from typing import cast
 from tests.browser_peer import reported_error_codes
 from tests.practice_catalogs import MONDAY, TWO_BUSINESSES
 from tests.write_guard_fixtures import CALL_ID, TUESDAY, GuardedCall, guarded_call
-from voice_call_agent.booking_flow.booking_steps import BookingSteps, Step
+from voice_call_agent.booking_flow.booking_steps import BookingSteps
 from voice_call_agent.booking_flow.named_day import DayQuestion
+from voice_call_agent.booking_flow.step_outcomes import Step
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
+from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
 from voice_call_agent.scheduling_backend.scheduling_errors import (
     SchedulingBackendUnavailableError,
+)
+from voice_call_agent.scheduling_backend.scheduling_models import (
+    AvailableSlots,
+    BookingRequest,
+    WriteRejected,
+    WriteRejectionReason,
+    WriteResult,
 )
 from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBackend
 
@@ -61,7 +70,11 @@ async def test_a_closed_day_or_an_unknown_service_stays_on_the_request() -> None
     sunday = TUESDAY + timedelta(days=5)
     closed = await steps.check_availability({"service_id": "haircut", "day_number": sunday.day})
     unknown = await steps.check_availability({**HAIRCUT, "service_id": "massage"})
-    assert (closed.next_step, closed.result["status"]) == (None, "closed_day")
+    assert (closed.next_step, closed.result["status"]) == (Step.REQUEST, "closed_day")
+    assert (
+        closed.said
+        == "El domingo uno de noviembre no se atiende. ¿Para qué otro día sería la cita?"
+    )
     assert closed.result["day_spoken"] == "domingo uno de noviembre"
     assert (unknown.next_step, unknown.result["status"]) == (None, "unknown_service")
 
@@ -86,6 +99,11 @@ async def test_a_backend_that_does_not_answer_ends_in_not_booked() -> None:
     assert (outcome.next_step, outcome.result) == (
         Step.NOT_BOOKED,
         {"status": "backend_unavailable"},
+    )
+    # The code says it, in two sentences, and nothing booked: the model does not improvise it.
+    assert outcome.said == (
+        "En este momento la agenda no responde, así que la cita no quedó agendada. "
+        "Lo mejor es volver a llamar más tarde."
     )
     assert codes == ["SCHEDULING_BACKEND_UNAVAILABLE"]
 
@@ -147,7 +165,7 @@ async def test_a_new_availability_check_drops_what_the_earlier_request_left_pend
     closed = await steps.check_availability(
         {"service_id": "haircut", "day_number": (TUESDAY + timedelta(days=5)).day}
     )
-    assert closed.next_step is None and steps.slot is None
+    assert closed.next_step is Step.REQUEST and steps.slot is None
     assert (await steps.propose_booking({"client_name": "Ana Ejemplo"})).next_step is Step.REQUEST
 
 
@@ -288,3 +306,43 @@ async def test_a_day_that_cannot_be_worked_out_is_answered_with_its_fields() -> 
     assert week_alone.result == {"status": "invalid_arguments", "fields": ["weekday"]}
     assert own_date.result["status"] == "invalid_arguments"
     assert codes[:3] == ["TOOL_ARGUMENTS_INVALID"] * 3
+
+
+class _Delegating:
+    """The practice schedule, with one of its answers replaced."""
+
+    def __init__(self, schedule: InMemorySchedule) -> None:
+        self._schedule = schedule
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._schedule, name)
+
+
+async def test_a_day_without_free_starts_is_said_by_the_code() -> None:
+    class _Full(_Delegating):
+        async def availability(self, _call: str, _service: str, day: date) -> AvailableSlots:
+            return AvailableSlots(day=day, slots=[])
+
+    call = await guarded_call()
+    steps = _steps(call, cast(SchedulingBackend, _Full(call.backend)))
+    outcome = await steps.check_availability(HAIRCUT)
+    assert (outcome.next_step, outcome.result["status"]) == (Step.REQUEST, "no_free_starts")
+    assert outcome.said == (
+        "El martes veintisiete de octubre ya no quedan horas libres. "
+        "¿Para qué otro día sería la cita?"
+    )
+
+
+async def test_a_time_taken_before_the_confirmation_is_said_by_the_code() -> None:
+    class _Taken(_Delegating):
+        async def book_appointment(self, _request: BookingRequest) -> WriteResult:
+            return WriteRejected(reason=WriteRejectionReason.SLOT_CONFLICT)
+
+    call = await guarded_call(lambda practice: cast(SchedulingBackend, _Taken(practice)))
+    steps = _steps(call)
+    await steps.check_availability({**HAIRCUT, "start": "11:00"})
+    await steps.propose_booking({"client_name": "Ana Ejemplo"})
+    call.caller_speaks()
+    outcome = await steps.confirm_booking({})
+    assert (outcome.next_step, outcome.result["status"]) == (Step.REQUEST, "slot_taken")
+    assert outcome.said == "Esa hora se acaba de ocupar. ¿Para qué otra hora o día sería la cita?"

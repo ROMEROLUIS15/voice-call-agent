@@ -4,7 +4,7 @@ The clock is fixed so that "mañana" is always the same day: Monday 26 October 2
 Caracas, where the practice businesses are.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 from evals.golden_cases import ScheduleCondition
@@ -14,7 +14,12 @@ from voice_call_agent.practice_schedule.practice_catalog import load_practice_ca
 from voice_call_agent.scheduling_backend.scheduling_errors import (
     SchedulingBackendUnavailableError,
 )
-from voice_call_agent.scheduling_backend.scheduling_models import BookingRequest, WriteResult
+from voice_call_agent.scheduling_backend.scheduling_models import (
+    AvailabilityResult,
+    AvailableSlots,
+    BookingRequest,
+    WriteResult,
+)
 
 HARNESS_NOW = datetime(2026, 10, 26, 14, 10, tzinfo=UTC)
 """Monday 10:10 in Caracas (UTC-4): "mañana" is Tuesday 27."""
@@ -43,6 +48,14 @@ class _UnavailableForBookings(InMemorySchedule):
         raise SchedulingBackendUnavailableError("the schedule does not answer in this case")
 
 
+class _FullyBooked(InMemorySchedule):
+    """Every open day has every start taken: the business is open, with no free time left."""
+
+    async def availability(self, call_id: str, service_id: str, day: date) -> AvailabilityResult:
+        result = await super().availability(call_id, service_id, day)
+        return AvailableSlots(day=day, slots=[]) if isinstance(result, AvailableSlots) else result
+
+
 def schedule_for(condition: ScheduleCondition, business: str | None) -> InMemorySchedule | None:
     """The practice schedule in the case's state, on the harness clock, where every call reaches
     `business`; `None`: no backend."""
@@ -50,6 +63,7 @@ def schedule_for(condition: ScheduleCondition, business: str | None) -> InMemory
         ScheduleCondition.OPEN: InMemorySchedule,
         ScheduleCondition.SLOT_TAKEN: _SlotTakenBeforeConfirmation,
         ScheduleCondition.UNAVAILABLE: _UnavailableForBookings,
+        ScheduleCondition.FULLY_BOOKED: _FullyBooked,
     }
     kind = kinds.get(condition)
     if kind is None or business is None:

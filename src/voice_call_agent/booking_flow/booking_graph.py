@@ -24,12 +24,7 @@ from pipecat.flows import (
 from pipecat.frames.frames import TTSSpeakFrame
 from pydantic import BaseModel
 
-from voice_call_agent.booking_flow.booking_steps import (
-    BookingSteps,
-    JsonObject,
-    Step,
-    StepOutcome,
-)
+from voice_call_agent.booking_flow.booking_steps import BookingSteps
 from voice_call_agent.booking_flow.flow_arguments import (
     CheckAvailabilityArguments,
     ProposeBookingArguments,
@@ -40,6 +35,7 @@ from voice_call_agent.booking_flow.spoken_free_times import (
     free_times_said,
     requested_for_model,
 )
+from voice_call_agent.booking_flow.step_outcomes import JsonObject, Step, StepOutcome
 from voice_call_agent.conversation_content.content_loader import BookingTasks, ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import (
     booking_done,
@@ -211,7 +207,14 @@ class BookingGraph:
             args: FlowArgs, flow_manager: FlowManager
         ) -> tuple[JsonObject, NodeConfig | None]:
             outcome = await step(args)
-            return outcome.result, (self.node(outcome.next_step) if outcome.next_step else None)
+            if outcome.next_step is None:
+                return outcome.result, None
+            node = self.node(outcome.next_step)
+            if outcome.said is not None:
+                # The code says the result, and the model waits for the caller.
+                node["pre_actions"] = [say(outcome.said), *node.get("pre_actions", [])]
+                node["respond_immediately"] = False
+            return outcome.result, node
 
         return FlowsFunctionSchema(
             name=name,

@@ -54,6 +54,16 @@ def proposal_read_back(
     )
 
 
+def day_closed(content: ConversationContent, day: date) -> str:
+    """'El domingo uno de noviembre no se atiende…': the day as the calendar says it."""
+    return content.closed_day.format(day=spoken_day(content, day))
+
+
+def day_full(content: ConversationContent, day: date) -> str:
+    """'El martes veintisiete de octubre ya no quedan horas libres…'."""
+    return content.no_free_starts.format(day=spoken_day(content, day))
+
+
 def booking_done(content: ConversationContent, day: date, start: time) -> str:
     """What the caller hears once the backend confirmed the booking, built from what was booked."""
     return content.booked.format(day=spoken_day(content, day), time=spoken_time(content, start))
