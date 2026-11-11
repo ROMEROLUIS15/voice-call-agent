@@ -201,6 +201,23 @@ async def test_a_service_queued_in_the_same_turn_keeps_the_first_ones_node() -> 
     assert cast(object, node) is NO_RESPONSE  # Flows' sentinel: stay silent on the node.
 
 
+async def test_the_next_service_is_announced_in_one_line_with_its_free_times() -> None:
+    call = await guarded_call()
+    graph, _ = _graph(call)
+    check = _functions(graph.initial_node())["check_availability"]
+    said = {"day_number": TUESDAY.day, "start": "11:00"}
+    await _run(check, service_id="haircut", client_name="Ana Ejemplo", **said)
+    await _run(check, service_id="full", **said)
+    call.caller_speaks()
+    confirm = _functions(graph.node(Step.CONFIRM))["confirm_booking"]
+    _, node = await _run(confirm)
+    assert node is not None and node["name"] == "choose_time"
+    # One line, so the caller hears one reply: the booking done, the next service, its times.
+    [line] = _said(node)
+    assert line.startswith("Listo, la cita de corte quedó agendada")
+    assert "Ahora, la de corte y barba. A las once de la mañana ya está ocupado." in line
+
+
 async def test_not_booked_offers_nothing_more_to_call() -> None:
     graph, _ = _graph(await guarded_call())
     assert _functions(graph.node(Step.NOT_BOOKED)) == {}

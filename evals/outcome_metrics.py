@@ -75,7 +75,10 @@ def outcome_scores(case: GoldenCase, record: ConversationRecord | None) -> dict[
     if case.expected.outcome is not CallOutcome.BOOKED:
         scores = {NO_UNWANTED_WRITE.id: float(not booked)}
     else:
-        scores = {BOOKINGS_COMPLETED.id: float(booked)}
+        # A case that asks for several bookings in one call is completed only with all of them.
+        wanted = max(1, case.expected.writes.count("booked"))
+        done = 0 if record is None else _bookings(record)
+        scores = {BOOKINGS_COMPLETED.id: float(booked and done >= wanted)}
     if record is None or case.business is None:
         return scores
     refusals = [write.outcome for write in record.trace.writes]
@@ -87,6 +90,14 @@ def outcome_scores(case: GoldenCase, record: ConversationRecord | None) -> dict[
     if booked and case.expected.tool_call is not None:
         scores[BOOKS_WHAT_WAS_ASKED.id] = float(_booked_as_asked(record, case.expected.tool_call))
     return scores
+
+
+def _bookings(record: ConversationRecord) -> int:
+    """The bookings the backend confirmed in the call."""
+    return sum(
+        write.action is WriteAction.CONFIRM_BOOKING and write.outcome == "booked"
+        for write in record.trace.writes
+    )
 
 
 def _asked_which_day(record: ConversationRecord) -> bool:

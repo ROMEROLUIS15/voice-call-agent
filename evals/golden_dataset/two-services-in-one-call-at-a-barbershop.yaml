@@ -20,6 +20,7 @@ expected:
     day: mañana
     time: "11:00"
     name: Pedro Ejemplo
+  writes: [proposed, booked, proposed, booked]
   outcome: booked
   identity_verified: true
   quality: [invents-nothing, natural-spanish]
