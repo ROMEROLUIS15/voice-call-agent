@@ -213,7 +213,12 @@ class BookingSteps:
         weekdays, months, today = briefing.weekdays, briefing.months, self._today
         try:
             day = day_said(
-                call.day, named, call.relative_day, weekdays=weekdays, months=months, today=today
+                named,
+                call.relative_day,
+                call.next_week,
+                weekdays=weekdays,
+                months=months,
+                today=today,
             )
             question = day_question(day, named, weekdays=weekdays, months=months, today=today)
         except UnknownNamedDayError as error:

@@ -68,7 +68,7 @@ async def test_the_call_starts_with_the_greeting_and_waits_for_the_caller() -> N
 async def test_choosing_a_time_says_the_free_starts_as_ranges() -> None:
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]
-    _, node = await _run(check, service_id="haircut", day=TUESDAY.isoformat())
+    _, node = await _run(check, service_id="haircut", day_number=TUESDAY.day)
     assert node is not None and node.get("name") == Step.CHOOSE_TIME.value
     # The code says them, as the backend offered them, and the model waits for the choice.
     assert _said(node) == [
@@ -88,7 +88,7 @@ async def test_choosing_a_time_says_the_free_starts_as_ranges() -> None:
 async def test_a_time_that_does_not_work_is_said_with_why_before_the_free_times() -> None:
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]
-    _, node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), start="07:00")
+    _, node = await _run(check, service_id="haircut", day_number=TUESDAY.day, start="07:00")
     assert node is not None
     [said] = _said(node)
     assert said.startswith("A las siete de la mañana queda fuera del horario de ese día, de ")
@@ -98,7 +98,7 @@ async def test_a_time_that_does_not_work_is_said_with_why_before_the_free_times(
 async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> None:
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]
-    _, name_node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), start="15:30")
+    _, name_node = await _run(check, service_id="haircut", day_number=TUESDAY.day, start="15:30")
     assert name_node is not None
     assert set(_functions(name_node)) == {"propose_booking", "check_availability"}
     # The code asks for the name: no second model round to ask it.
@@ -118,7 +118,7 @@ async def test_a_name_given_with_the_chosen_time_skips_asking_for_it() -> None:
     call = await guarded_call()
     graph, _ = _graph(call)
     check = _functions(graph.initial_node())["check_availability"]
-    _, choose = await _run(check, service_id="haircut", day=TUESDAY.isoformat())
+    _, choose = await _run(check, service_id="haircut", day_number=TUESDAY.day)
     assert choose is not None
     assert "client_name" not in _functions(choose)["select_start"].required
     call.caller_speaks()
@@ -132,7 +132,7 @@ async def test_the_booking_is_announced_by_the_code_and_the_model_waits() -> Non
     call = await guarded_call()
     graph, _ = _graph(call)
     check = _functions(graph.initial_node())["check_availability"]
-    _, name_node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), start="15:30")
+    _, name_node = await _run(check, service_id="haircut", day_number=TUESDAY.day, start="15:30")
     assert name_node is not None
     _, confirm = await _run(_functions(name_node)["propose_booking"], client_name="Ana Ejemplo")
     assert confirm is not None
@@ -151,7 +151,7 @@ async def test_the_booking_is_announced_by_the_code_and_the_model_waits() -> Non
 async def test_a_weekday_that_does_not_match_the_date_is_asked_by_the_code() -> None:
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]
-    _, node = await _run(check, service_id="haircut", day=TUESDAY.isoformat(), weekday="jueves")
+    _, node = await _run(check, service_id="haircut", day_number=TUESDAY.day, weekday="jueves")
     assert node is not None and node.get("name") == Step.WHICH_DAY.value
     assert _said(node) == [
         "El veintisiete de octubre es martes. ¿La cita es para el martes veintisiete de octubre "
@@ -162,14 +162,14 @@ async def test_a_weekday_that_does_not_match_the_date_is_asked_by_the_code() -> 
     [task] = node.get("task_messages", [])
     assert "(2026-10-27)" in str(task["content"]) and "(2026-10-29)" in str(task["content"])
     again = _functions(node)["check_availability"]
-    _, chosen = await _run(again, service_id="haircut", day=TUESDAY.isoformat(), weekday="martes")
+    _, chosen = await _run(again, service_id="haircut", day_number=TUESDAY.day, weekday="martes")
     assert chosen is not None and chosen.get("name") == Step.CHOOSE_TIME.value
 
 
 async def test_a_step_that_stays_returns_no_node() -> None:
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]
-    result, node = await _run(check, service_id="massage", day=TUESDAY.isoformat())
+    result, node = await _run(check, service_id="massage", day_number=TUESDAY.day)
     assert (result["status"], node) == ("unknown_service", None)
 
 
@@ -219,7 +219,5 @@ def test_no_schema_constraint_a_provider_could_reject_a_turn_on() -> None:
 async def test_a_time_said_in_words_is_answered_with_the_field_to_correct() -> None:
     graph, _ = _graph(await guarded_call())
     check = _functions(graph.initial_node())["check_availability"]
-    result, node = await _run(
-        check, service_id="haircut", day=TUESDAY.isoformat(), start="seven am"
-    )
+    result, node = await _run(check, service_id="haircut", day_number=TUESDAY.day, start="seven am")
     assert (result, node) == ({"status": "invalid_arguments", "fields": ["start"]}, None)

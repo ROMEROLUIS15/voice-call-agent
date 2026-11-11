@@ -4,9 +4,6 @@ Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú
 
 Hoy es {today}. Horario de atención: {opening_hours}.
 
-Calendario de los próximos días (después de los dos puntos, la fecha para las funciones):
-{calendar}
-
 Servicios (el identificador entre corchetes es para las funciones):
 {services}
 

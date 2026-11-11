@@ -16,7 +16,8 @@ from voice_call_agent.scheduling_backend.scheduling_errors import (
 from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBackend
 
 CONTENT = load_conversation_content()
-HAIRCUT = {"service_id": "haircut", "day": TUESDAY.isoformat()}
+HAIRCUT = {"service_id": "haircut", "day_number": TUESDAY.day}
+"""Tuesday the 27th, named by its day number: the code works the date out."""
 
 
 def _steps(call: GuardedCall, backend: SchedulingBackend | None = None) -> BookingSteps:
@@ -58,7 +59,7 @@ async def test_a_time_that_is_not_free_is_offered_again_with_the_free_starts() -
 async def test_a_closed_day_or_an_unknown_service_stays_on_the_request() -> None:
     steps = _steps(await guarded_call())
     sunday = TUESDAY + timedelta(days=5)
-    closed = await steps.check_availability({"service_id": "haircut", "day": sunday.isoformat()})
+    closed = await steps.check_availability({"service_id": "haircut", "day_number": sunday.day})
     unknown = await steps.check_availability({**HAIRCUT, "service_id": "massage"})
     assert (closed.next_step, closed.result["status"]) == (None, "closed_day")
     assert closed.result["day_spoken"] == "domingo uno de noviembre"
@@ -144,7 +145,7 @@ async def test_a_new_availability_check_drops_what_the_earlier_request_left_pend
     assert outcome.next_step is Step.NAME and steps.proposal is None
     assert steps.slot is not None and steps.slot.service.id == "full"
     closed = await steps.check_availability(
-        {"service_id": "haircut", "day": (TUESDAY + timedelta(days=5)).isoformat()}
+        {"service_id": "haircut", "day_number": (TUESDAY + timedelta(days=5)).day}
     )
     assert closed.next_step is None and steps.slot is None
     assert (await steps.propose_booking({"client_name": "Ana Ejemplo"})).next_step is Step.REQUEST
@@ -174,10 +175,10 @@ async def test_a_weekday_that_does_not_match_the_date_is_asked_before_anything_i
     assert call.decisions == []
 
 
-async def test_the_date_the_caller_said_counts_even_when_the_day_passed_is_the_weekday() -> None:
-    # "El jueves veintisiete": the day passed is Thursday the 29th, the caller said the 27th.
+async def test_the_date_the_caller_said_counts_against_the_weekday_they_said() -> None:
+    # "El jueves veintisiete": the 27th is a Tuesday.
     steps = _steps(await guarded_call())
-    said = {"day": THURSDAY.isoformat(), "weekday": "jueves", "day_number": 27}
+    said = {"weekday": "jueves", "day_number": 27}
     outcome = await steps.check_availability({**HAIRCUT, **said})
     assert outcome.next_step is Step.WHICH_DAY
     assert steps.day_question == DayQuestion(TUESDAY, THURSDAY)
@@ -187,7 +188,7 @@ async def test_a_weekday_that_matches_goes_on_whatever_its_accents_or_case() -> 
     steps = _steps(await guarded_call())
     wednesday = (TUESDAY + timedelta(days=1)).isoformat()
     for day, weekday in ((TUESDAY.isoformat(), " Martes "), (wednesday, "miercoles")):
-        said = {"day": day, "start": "11:00", "weekday": weekday, "day_number": int(day[-2:])}
+        said = {"start": "11:00", "weekday": weekday, "day_number": int(day[-2:])}
         outcome = await steps.check_availability({**HAIRCUT, **said})
         assert (outcome.next_step, outcome.result["status"]) == (Step.NAME, "available")
         assert steps.day_question is None
@@ -214,8 +215,7 @@ async def test_the_month_said_counts_and_the_date_said_is_never_in_the_past() ->
     # A weekday, a day number and a month that disagree, and a day passed in another month:
     # the 20th nearest Tuesday the third of November is in October, already gone.
     steps = _steps(await guarded_call())
-    tuesday = (TUESDAY + timedelta(days=7)).isoformat()
-    said = {"day": tuesday, "weekday": "martes", "day_number": 20, "month": "Diciembre"}
+    said = {"weekday": "martes", "day_number": 20, "month": "Diciembre"}
     outcome = await steps.check_availability({**HAIRCUT, **said})
     assert outcome.next_step is Step.WHICH_DAY
     assert steps.day_question == DayQuestion(date(2026, 12, 20), date(2026, 12, 22))
@@ -251,8 +251,7 @@ async def test_today_tomorrow_and_the_day_after_are_counted_from_today() -> None
     steps = _steps(await guarded_call())
     days = {}
     for relative in ("today", "tomorrow", "day_after_tomorrow"):
-        # A day passed with it is the model's arithmetic: the relative day counts.
-        said = {"service_id": "haircut", "relative_day": relative, "day": "2026-12-01"}
+        said = {"service_id": "haircut", "relative_day": relative}
         days[relative] = (await steps.check_availability(said)).result["day"]
     assert days == {
         "today": "2026-10-26",
@@ -267,13 +266,25 @@ async def test_a_day_number_alone_is_the_next_date_with_it() -> None:
     assert outcome.result["day"] == "2026-10-27"
 
 
-async def test_a_day_that_cannot_be_worked_out_is_answered_with_its_field() -> None:
+async def test_a_weekday_of_next_week_is_the_one_in_the_coming_week() -> None:
+    steps = _steps(await guarded_call())
+    said = {"service_id": "haircut", "weekday": "miércoles", "next_week": True}
+    assert (await steps.check_availability(said)).result["day"] == "2026-11-04"
+
+
+async def test_a_day_that_cannot_be_worked_out_is_answered_with_its_fields() -> None:
     steps = _steps(await guarded_call())
     with reported_error_codes() as codes:
         nothing = await steps.check_availability({"service_id": "haircut"})
         unknown = await steps.check_availability(
-            {"service_id": "haircut", "relative_day": "next_week"}
+            {"service_id": "haircut", "relative_day": "next_month"}
         )
-    assert nothing.result == {"status": "invalid_arguments", "fields": ["day"]}
+        week_alone = await steps.check_availability({"service_id": "haircut", "next_week": True})
+        # The model's own date is never taken: the function has no such argument.
+        own_date = await steps.check_availability({**HAIRCUT, "day": "2026-12-01"})
+    said = ["weekday", "day_number", "relative_day"]
+    assert nothing.result == {"status": "invalid_arguments", "fields": said}
     assert unknown.result == {"status": "invalid_arguments", "fields": ["relative_day"]}
-    assert codes == ["TOOL_ARGUMENTS_INVALID", "TOOL_ARGUMENTS_INVALID"]
+    assert week_alone.result == {"status": "invalid_arguments", "fields": ["weekday"]}
+    assert own_date.result["status"] == "invalid_arguments"
+    assert codes[:3] == ["TOOL_ARGUMENTS_INVALID"] * 3
