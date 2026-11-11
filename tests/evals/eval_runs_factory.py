@@ -24,6 +24,7 @@ def case_run(
         agent_lines=["Hola.", *replies],
         task_scores=task_scores(list(replies)),
         judge_scores=[JudgeScore(c, score, "because") for c, score in judged.items()],
+        model_replies=replies,
     )
 
 
