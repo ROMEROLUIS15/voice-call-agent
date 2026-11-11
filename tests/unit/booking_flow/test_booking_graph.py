@@ -189,7 +189,8 @@ def test_every_function_the_model_receives_is_described() -> None:
         "new_request",
     }
     assert functions["propose_booking"]["required"] == ["client_name"]
-    assert functions["check_availability"]["required"] == ["day", "service_id"]
+    # The day is worked out by the code from the caller's words: the model need not pass it.
+    assert functions["check_availability"]["required"] == ["service_id"]
 
 
 async def test_a_line_the_code_says_is_spoken_and_never_waited_for() -> None:

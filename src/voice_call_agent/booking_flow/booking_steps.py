@@ -27,6 +27,7 @@ from voice_call_agent.booking_flow.named_day import (
     NamedDay,
     UnknownNamedDayError,
     day_question,
+    day_said,
 )
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import spoken_day
@@ -175,52 +176,51 @@ class BookingSteps:
         service = self._catalog.get(call.service_id)
         if service is None:
             return StepOutcome({"status": "unknown_service"}, None)
-        if (unsettled := self._ask_which_day(call)) is not None:
-            return unsettled
-        result = await self._backend.availability(self._call_id, service.id, call.day)
+        asked = self._settle_day(call)
+        if isinstance(asked, StepOutcome):
+            return asked
+        result = await self._backend.availability(self._call_id, service.id, asked)
         # The weekday is the code's, never the model's arithmetic (ADR 0019).
-        day = {"day": call.day.isoformat(), "day_spoken": spoken_day(self._content, call.day)}
+        day = {"day": asked.isoformat(), "day_spoken": spoken_day(self._content, asked)}
         if not isinstance(result, AvailableSlots):
             return StepOutcome({"status": result.kind, **day}, None)
         if not result.slots:
             return StepOutcome({"status": "no_free_starts", **day}, None)
         if call.start is not None and call.start in result.slots:
-            self.slot = Slot(service, call.day, call.start)
+            self.slot = Slot(service, asked, call.start)
             if call.client_name is not None:
                 return await self._propose(self.slot, call.client_name)
             status = {"status": "available", **day, "start": clock_time(call.start)}
             return StepOutcome(status, Step.NAME)
         self.choice = TimeChoice(
             service,
-            call.day,
+            asked,
             result.slots,
             call.start,
             self._guard.caller_turns(),
-            self._weekly_hours.on(call.day),
+            self._weekly_hours.on(asked),
         )
         starts = [clock_time(start) for start in result.slots]
         return StepOutcome(
             {"status": "choose_time", **day, "free_starts": starts}, Step.CHOOSE_TIME
         )
 
-    def _ask_which_day(self, call: CheckAvailabilityArguments) -> StepOutcome | None:
-        """Where to go when the weekday named does not match the date named; `None` if they
-        match, or the caller named no weekday."""
+    def _settle_day(self, call: CheckAvailabilityArguments) -> date | StepOutcome:
+        """The day asked for, worked out from the caller's words; where to go instead when they
+        cannot say a day, or when the weekday named does not match the date named."""
         briefing = self._content.booking_briefing
         named = NamedDay(call.weekday, call.day_number, call.month)
+        weekdays, months, today = briefing.weekdays, briefing.months, self._today
         try:
-            question = day_question(
-                call.day,
-                named,
-                weekdays=briefing.weekdays,
-                months=briefing.months,
-                today=self._today,
+            day = day_said(
+                call.day, named, call.relative_day, weekdays=weekdays, months=months, today=today
             )
+            question = day_question(day, named, weekdays=weekdays, months=months, today=today)
         except UnknownNamedDayError as error:
             report_error(ErrorCode.TOOL_ARGUMENTS_INVALID, fields=",".join(error.fields))
             return StepOutcome({"status": "invalid_arguments", "fields": error.fields}, None)
         if question is None:
-            return None
+            return day
         # Two days were named: nothing is offered for either until the caller says which.
         self.day_question = question
         dates = {
