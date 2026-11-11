@@ -1,12 +1,12 @@
 {
-  "fingerprint": "f330b384f64a387b",
+  "fingerprint": "738372fc5ece5c7a",
   "inputs": {
     "conversation_content": "es-d9a8c973bd82",
     "language_model": "openrouter deepseek/deepseek-v4.1-flash",
     "generation_settings": "a5faa7c7fd29f3ea",
     "agent_tools": "8fc6102256595cfb",
-    "conversation_structure": "938ae2b29b633527",
-    "golden_dataset": "d6fed6b92039",
+    "conversation_structure": "c73190ea5878f7f7",
+    "golden_dataset": "29ac1d8fe228",
     "practice_businesses": "095154c67f753d84",
     "scoring": "f20ee0f6a738302c",
     "judge_model": "google/gemini-3.6-flash"
@@ -16,7 +16,7 @@
     "llm_model": "deepseek/deepseek-v4.1-flash",
     "judge_model": "google/gemini-3.6-flash",
     "repetitions": 3,
-    "measured_at": "2026-11-11T16:26:24.664595Z"
+    "measured_at": "2026-11-11T17:19:40.518026Z"
   },
   "metrics": {
     "admits-test-line": {
@@ -37,7 +37,7 @@
     },
     "brief-replies": {
       "kind": "quality",
-      "score": 0.9
+      "score": 1.0
     },
     "confirms-after-the-answer": {
       "kind": "quality",
