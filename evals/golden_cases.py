@@ -53,6 +53,8 @@ class ScheduleCondition(StrEnum):
     """Another caller books the proposed slot just before the confirmation."""
     UNAVAILABLE = "unavailable"
     """Reads answer; every booking times out."""
+    FULLY_BOOKED = "fully-booked"
+    """Every day is open but has no free start left."""
 
 
 class CallerIntent(StrEnum):
