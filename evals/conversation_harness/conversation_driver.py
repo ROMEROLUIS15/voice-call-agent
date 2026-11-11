@@ -12,7 +12,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 
+import openai
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.frames.frames import ErrorFrame
 from pipecat.services.ai_service import AIService
 
 from evals.conversation_harness.call_transcript import SpokenTurn, call_transcript
@@ -66,6 +68,11 @@ class LanguageModelUnavailableError(Exception):
     measured the provider, not the agent."""
 
 
+class LanguageModelConnectionLostError(LanguageModelUnavailableError):
+    """The connection to the model's provider dropped during the call (a stream cut by the
+    network, a request that timed out): the one failure worth holding the conversation again."""
+
+
 @dataclass(frozen=True)
 class ConversationRecord:
     """What happened in a golden case's conversation."""
@@ -100,15 +107,24 @@ class ConversationRecord:
 
 
 class _PromptKeepingModelFactory:
-    """Creates the model under test and keeps the prompt it was given."""
+    """Creates the model under test, keeps the prompt it was given and notes whether its
+    connection to the provider dropped (the call trace keeps only the error's code)."""
 
     def __init__(self, create: Callable[[str], AIService]) -> None:
         self._create = create
         self.system_prompt = ""
+        self.connection_lost = False
 
     def create(self, system_prompt: str) -> AIService:
         self.system_prompt = system_prompt
-        return self._create(system_prompt)
+        model = self._create(system_prompt)
+        model.add_event_handler("on_error", self._note_error)
+        return model
+
+    async def _note_error(self, _: AIService, error: ErrorFrame) -> None:
+        # `APITimeoutError` is one too: both mean the request never got its answer.
+        if isinstance(error.exception, openai.APIConnectionError):
+            self.connection_lost = True
 
 
 class _RecordingTraceSink:
@@ -156,7 +172,7 @@ async def hold_conversation(
         await transport.hang_up()
         await asyncio.wait_for(call, _END_TIMEOUT_S)
         # Checked after a stall too: a provider failure is what stalls the call.
-        _require_an_available_model(case, sink.traces)
+        _require_an_available_model(case, sink.traces, connection_lost=model.connection_lost)
     [trace] = sink.traces
     return ConversationRecord(
         trace=trace,
@@ -192,12 +208,19 @@ def _session_of(case: GoldenCase) -> tuple[CallSession, AudioFormat]:
             return build_browser_session(call_id), WEBRTC_AUDIO_FORMAT
 
 
-def _require_an_available_model(case: GoldenCase, traces: list[CallTrace]) -> None:
+def _require_an_available_model(
+    case: GoldenCase, traces: list[CallTrace], *, connection_lost: bool
+) -> None:
     failure = ErrorCode.LLM_EXCEPTION
     if failure in case.expected.real_failures:
         return
-    if any(error.code == failure for trace in traces for error in trace.errors):
-        raise LanguageModelUnavailableError(f"{case.id}: the language model's provider failed")
+    if not any(error.code == failure for trace in traces for error in trace.errors):
+        return
+    if connection_lost:
+        raise LanguageModelConnectionLostError(
+            f"{case.id}: the language model's provider failed: its connection dropped"
+        )
+    raise LanguageModelUnavailableError(f"{case.id}: the language model's provider failed")
 
 
 async def _converse(
