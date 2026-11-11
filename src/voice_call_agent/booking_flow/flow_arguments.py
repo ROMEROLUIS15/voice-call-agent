@@ -48,7 +48,21 @@ class _Arguments(BaseModel):
 
 class CheckAvailabilityArguments(_Arguments):
     service_id: str = Field(description="The service's id, from the brackets in the service list.")
-    day: CalendarDay = Field(description="The day, as YYYY-MM-DD.")
+    day: CalendarDay | None = Field(
+        default=None,
+        description=(
+            "The day from the calendar, as YYYY-MM-DD, only when the caller named it in a way the "
+            'other fields cannot say ("el lunes de la semana que viene"); otherwise leave it '
+            "out: the system works the date out from weekday, day_number, month or relative_day."
+        ),
+    )
+    relative_day: str | None = Field(
+        default=None,
+        description=(
+            "today, tomorrow or day_after_tomorrow, when the caller named the day that way "
+            "(hoy, mañana, pasado mañana)."
+        ),
+    )
     weekday: str | None = Field(
         default=None,
         description=(

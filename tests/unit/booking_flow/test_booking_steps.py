@@ -231,3 +231,49 @@ async def test_an_unknown_month_or_a_date_that_does_not_exist_is_answered_with_i
     no_such_day = await steps.check_availability({**HAIRCUT, **missing})
     assert month.result == {"status": "invalid_arguments", "fields": ["month"]}
     assert no_such_day.result == {"status": "invalid_arguments", "fields": ["day_number", "month"]}
+
+
+# The code works the date out from what the caller said (today is Monday the 26th): the model
+# passes the words, never its own arithmetic (ADR 0019).
+async def test_a_weekday_alone_is_the_next_one_from_tomorrow_on() -> None:
+    steps = _steps(await guarded_call())
+    wednesday = await steps.check_availability(
+        {"service_id": "haircut", "weekday": "miércoles", "start": "11:00"}
+    )
+    assert (wednesday.next_step, wednesday.result["day"]) == (Step.NAME, "2026-10-28")
+    assert wednesday.result["day_spoken"] == "miércoles veintiocho de octubre"
+    # Today's weekday alone is next week's: "el lunes" said on a Monday is never today.
+    monday = await steps.check_availability({"service_id": "haircut", "weekday": "lunes"})
+    assert monday.result["day"] == "2026-11-02"
+
+
+async def test_today_tomorrow_and_the_day_after_are_counted_from_today() -> None:
+    steps = _steps(await guarded_call())
+    days = {}
+    for relative in ("today", "tomorrow", "day_after_tomorrow"):
+        # A day passed with it is the model's arithmetic: the relative day counts.
+        said = {"service_id": "haircut", "relative_day": relative, "day": "2026-12-01"}
+        days[relative] = (await steps.check_availability(said)).result["day"]
+    assert days == {
+        "today": "2026-10-26",
+        "tomorrow": "2026-10-27",
+        "day_after_tomorrow": "2026-10-28",
+    }
+
+
+async def test_a_day_number_alone_is_the_next_date_with_it() -> None:
+    steps = _steps(await guarded_call())
+    outcome = await steps.check_availability({"service_id": "haircut", "day_number": 27})
+    assert outcome.result["day"] == "2026-10-27"
+
+
+async def test_a_day_that_cannot_be_worked_out_is_answered_with_its_field() -> None:
+    steps = _steps(await guarded_call())
+    with reported_error_codes() as codes:
+        nothing = await steps.check_availability({"service_id": "haircut"})
+        unknown = await steps.check_availability(
+            {"service_id": "haircut", "relative_day": "next_week"}
+        )
+    assert nothing.result == {"status": "invalid_arguments", "fields": ["day"]}
+    assert unknown.result == {"status": "invalid_arguments", "fields": ["relative_day"]}
+    assert codes == ["TOOL_ARGUMENTS_INVALID", "TOOL_ARGUMENTS_INVALID"]
