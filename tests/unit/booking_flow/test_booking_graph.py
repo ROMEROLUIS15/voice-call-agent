@@ -117,7 +117,7 @@ async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> No
         "Para confirmar: Corte, el martes veintisiete de octubre, a las tres y media "
         "de la tarde, a nombre de Ana Ejemplo. ¿Está bien así?"
     ]
-    assert set(_functions(confirm)) == {"confirm_booking", "change_request"}
+    assert set(_functions(confirm)) == {"confirm_booking", "change_request", "check_availability"}
 
 
 async def test_a_name_given_with_the_chosen_time_skips_asking_for_it() -> None:
@@ -199,6 +199,23 @@ async def test_a_service_queued_in_the_same_turn_keeps_the_first_ones_node() -> 
     result, node = await _run(check, service_id="full", day_number=TUESDAY.day, start="11:00")
     assert result["status"] == "queued"
     assert cast(object, node) is NO_RESPONSE  # Flows' sentinel: stay silent on the node.
+
+
+async def test_the_read_back_says_the_services_waiting_for_the_proposal() -> None:
+    graph, _ = _graph(await guarded_call())
+    check = _functions(graph.initial_node())["check_availability"]
+    said = {"day_number": TUESDAY.day, "start": "11:00"}
+    await _run(check, service_id="haircut", client_name="Ana Ejemplo", **said)
+    result, node = await _run(check, service_id="full", **said)
+    # Queued in the same response as the proposal: the read-back is built again with it, so
+    # the caller hears it waits and does not ask for it again.
+    assert result["status"] == "queued"
+    assert node is not None and cast(object, node) is not NO_RESPONSE
+    assert node["name"] == Step.CONFIRM.value
+    assert _said(node) == [
+        "Para confirmar: Corte, el martes veintisiete de octubre, a las once de la mañana, a "
+        "nombre de Ana Ejemplo. Después seguimos con corte y barba. ¿Está bien así?"
+    ]
 
 
 async def test_the_next_service_is_announced_in_one_line_with_its_read_back() -> None:

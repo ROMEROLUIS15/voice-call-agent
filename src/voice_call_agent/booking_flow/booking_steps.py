@@ -20,13 +20,8 @@ from voice_call_agent.booking_flow.flow_arguments import (
     ProposeBookingArguments,
     SelectStartArguments,
 )
-from voice_call_agent.booking_flow.named_day import (
-    DayQuestion,
-    NamedDay,
-    UnknownNamedDayError,
-    day_question,
-    day_said,
-)
+from voice_call_agent.booking_flow.named_day import DayQuestion
+from voice_call_agent.booking_flow.requested_day import requested_day
 from voice_call_agent.booking_flow.step_outcomes import (
     Step,
     StepOutcome,
@@ -41,8 +36,6 @@ from voice_call_agent.conversation_content.spoken_moments import (
     day_full,
     spoken_day,
 )
-from voice_call_agent.observability.error_reporting import report_error
-from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.scheduling_backend.scheduling_models import (
     AvailabilityResult,
     AvailableSlots,
@@ -153,20 +146,25 @@ class BookingSteps:
         asked = self._settle_day(call)
         if isinstance(asked, StepOutcome):
             return asked
-        if adds:
-            self.pending.append(PendingRequest(service, asked, call.start, call.client_name))
+        if adds and self._request is not None:
+            # Asked again, it waits once, with what was said last.
+            waiting = [waiting for waiting in self.pending if waiting.service.id != service.id]
+            self.pending = [*waiting, PendingRequest(service, asked, call.start, call.client_name)]
             # Asked in the same response as the request: it must not replace that one's step.
-            same_turn = self._request is not None and self._request[1] == self._guard.caller_turns()
-            return StepOutcome(
-                {"status": "queued", "service": service.name}, None, silent=same_turn
-            )
+            same_turn = self._request[1] == self._guard.caller_turns()
+            after = self._catalog[self._request[0]].name
+            queued = {"status": "queued", "service": service.name, "after": after}
+            if self.proposal is not None:  # Read back again, with the services that wait.
+                return StepOutcome(queued, Step.CONFIRM)
+            return StepOutcome(queued, None, silent=same_turn)
         self.pending = [waiting for waiting in self.pending if waiting.service.id != service.id]
         return await self._offer(service, asked, call.start, call.client_name)
 
     def _adds_to_the_request(self, service: ServiceOffering, in_addition: bool | None) -> bool:
         """A different service asked for while one is being booked, in the same response or
-        said to be besides it, waits for it; otherwise it replaces it."""
-        if self._request is None or not (self.slot or self.choice or self.proposal):
+        said to be besides it, waits for it; otherwise it replaces it. The request lasts until
+        it is booked or replaced: a change at the read-back clears its time, not the request."""
+        if self._request is None:
             return False
         service_id, turn = self._request
         same_turn = turn == self._guard.caller_turns()
@@ -208,24 +206,9 @@ class BookingSteps:
     def _settle_day(self, call: CheckAvailabilityArguments) -> date | StepOutcome:
         """The day asked for, worked out from the caller's words; where to go instead when they
         cannot say a day, or when the weekday named does not match the date named."""
-        briefing = self._content.booking_briefing
-        named = NamedDay(call.weekday, call.day_number, call.month)
-        weekdays, months, today = briefing.weekdays, briefing.months, self._today
-        try:
-            day = day_said(
-                named,
-                call.relative_day,
-                call.next_week,
-                weekdays=weekdays,
-                months=months,
-                today=today,
-            )
-            question = day_question(day, named, weekdays=weekdays, months=months, today=today)
-        except UnknownNamedDayError as error:
-            report_error(ErrorCode.TOOL_ARGUMENTS_INVALID, fields=",".join(error.fields))
-            return StepOutcome({"status": "invalid_arguments", "fields": error.fields}, None)
-        if question is None:
-            return day
+        question = requested_day(call, self._content, self._today)
+        if not isinstance(question, DayQuestion):
+            return question
         # Two days were named: nothing is offered for either until the caller says which.
         self.day_question = question
         dates = {
