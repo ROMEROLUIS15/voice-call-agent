@@ -401,6 +401,9 @@ git status    # no .env, token, key or credential file staged
 - Changes reach `main` only through a pull request whose required checks are green; a maintainer
   approves the merge (ADR 0012).
 - Documentation is part of every change: this README, the manifest, the specs and the ADRs.
+  The README always describes the current state: every accepted change updates the sections it
+  affects, and the pull request ([template](.github/pull_request_template.md)) lists them or
+  says why none changed (constitution §8).
 - A change to the prompt, phrases, model, generation settings or tools needs the model evals
   against the baseline.
 - A changed snapshot is reviewed and regenerated with
