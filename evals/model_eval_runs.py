@@ -25,7 +25,7 @@ from evals.task_metrics import TASK_METRICS, task_scores
 from voice_call_agent.conversation_content.content_loader import ConversationContent
 from voice_call_agent.observability.call_trace import ServiceVersions
 
-_CONCURRENT_CONVERSATIONS = 3
+CONCURRENT_CONVERSATIONS = 3
 """Keeps the provider's rate limits out of the measurement."""
 
 
@@ -47,6 +47,11 @@ class CaseRun:
     """The call in order, as the judge read it."""
     model_replies: tuple[str, ...] = ()
     """The model's own replies, which the deterministic measures score (not the code's lines)."""
+    model_cost_usd: float | None = None
+    """The conversation's estimated cost from the price table: the model's, since the harness's
+    speech services are scripted."""
+    llm_turn_ms: tuple[float, ...] = ()
+    """The model's time on each measured turn of the call trace."""
     llm_upstreams: dict[str, int] = field(default_factory=dict)
     """Responses served by each upstream provider of the model under test."""
 
@@ -84,7 +89,7 @@ async def run_cases(
     repetitions: int = REPETITIONS,
 ) -> list[CaseRun]:
     """Every case `repetitions` times, a few conversations at a time."""
-    slots = asyncio.Semaphore(_CONCURRENT_CONVERSATIONS)
+    slots = asyncio.Semaphore(CONCURRENT_CONVERSATIONS)
 
     async def run(case: GoldenCase, repetition: int) -> CaseRun:
         async with slots:
@@ -120,6 +125,8 @@ async def _run_case(
         judge_scores=await judge.score(case, record),
         turns=record.turns,
         model_replies=tuple(record.model_replies),
+        model_cost_usd=record.trace.cost.usd,
+        llm_turn_ms=tuple(turn.llm_ms for turn in record.trace.turns),
         llm_upstreams=record.trace.llm_upstreams,
     )
 

@@ -25,10 +25,6 @@
           'default': None,
           'description': 'The first and last name of the person the appointment is for, only if the caller already said both: the system then proposes the booking at once instead of asking for the name.',
         }),
-        'day': dict({
-          'description': 'The day, as YYYY-MM-DD.',
-          'type': 'string',
-        }),
         'day_number': dict({
           'anyOf': list([
             dict({
@@ -52,6 +48,30 @@
           ]),
           'default': None,
           'description': 'The month the caller named for this day (enero, febrero…), as they said it.',
+        }),
+        'next_week': dict({
+          'anyOf': list([
+            dict({
+              'type': 'boolean',
+            }),
+            dict({
+              'type': 'null',
+            }),
+          ]),
+          'default': None,
+          'description': 'true when the caller said the weekday is next week\'s ("el miércoles de la semana que viene"); a weekday alone is the next one from tomorrow on.',
+        }),
+        'relative_day': dict({
+          'anyOf': list([
+            dict({
+              'type': 'string',
+            }),
+            dict({
+              'type': 'null',
+            }),
+          ]),
+          'default': None,
+          'description': 'today, tomorrow or day_after_tomorrow, when the caller named the day that way (hoy, mañana, pasado mañana).',
         }),
         'service_id': dict({
           'description': "The service's id, from the brackets in the service list.",
@@ -83,7 +103,6 @@
         }),
       }),
       'required': list([
-        'day',
         'service_id',
       ]),
     }),
@@ -175,7 +194,7 @@
       'confirm': 'Tu tarea ahora: la confirmación. El sistema acaba de leerle a la persona el resumen de la cita y le preguntó si está bien. Si lo acepta sin cambios, llama a confirm_booking: la cita no existe hasta que la función responde, así que nunca digas que está agendada o confirmada sin ese resultado. Si quiere cambiar algo, duda o dice que no, llama a change_request. No repitas el resumen.',
       'name': 'Tu tarea ahora: el nombre. Está libre {service_name}, el {day}, a {time}, y el sistema acaba de preguntarle a la persona a nombre de quién es la cita. En cuanto diga el nombre y apellido de quien va a la cita, llama a propose_booking con ese nombre sin anunciarlo. Si falta el nombre o el apellido, pídeselo; si la cita es para otra persona, pide el nombre de esa persona. Si cambia el servicio, el día o la hora, llama primero a check_availability con lo nuevo. No repitas la pregunta ni anuncies la propuesta: el sistema se la lee.',
       'not_booked': 'No se pudo completar: la agenda no responde en este momento. Díselo con calma, sugiere llamar más tarde y despídete. No digas que hay una cita agendada.',
-      'request': 'Tu tarea ahora: averiguar qué servicio quiere la persona y para qué día. Responde sus preguntas sobre servicios, precios y horario con la información que tienes. Busca el día en el calendario, nunca calcules una fecha: "el próximo lunes" es el primer lunes después de hoy, nunca hoy. Si nombra un día de la semana, un número de día o un mes, pásalos en weekday, day_number y month tal como los dijo, aunque no coincidan: el sistema los revisa. Fuera de eso, no le pidas confirmar el servicio, el día ni la hora: al final el sistema le lee el resumen. En cuanto sepas el servicio y el día, llama a check_availability sin anunciarlo; pasa start si dijo una hora, y client_name si ya dijo el nombre y apellido de quien va a la cita. Si un resultado dice que ese día no se atiende, no tiene horas libres o que el horario ya no está libre, díselo y pide otro día u otra hora.',
+      'request': 'Tu tarea ahora: averiguar qué servicio quiere la persona y para qué día. Responde sus preguntas sobre servicios, precios y horario con la información que tienes. Nunca calcules una fecha: pasa el día con las palabras de la persona, en los campos de check_availability, y el sistema la calcula. No le pidas confirmar ni repetir nada que ya dijo: al final el sistema le lee el resumen. En cuanto sepas el servicio y el día, llama a check_availability con todo lo que ya dijo. Si un resultado dice que ese día no se atiende, no tiene horas libres o que el horario ya no está libre, díselo y pide otro día u otra hora.',
       'which_day': 'Tu tarea ahora: el día. La persona nombró un día de la semana y una fecha que no coinciden, y el sistema acaba de preguntarle si la cita es para el {said_day} ({said_date}) o para el {weekday_day} ({weekday_date}). No repitas la pregunta: espera su respuesta, y nunca elijas por ella. Cuando elija, llama a check_availability con ese día y con lo que ya dijo: el servicio, y la hora y el nombre si los dijo; en weekday, day_number y month, solo lo que nombre en su respuesta.',
     }),
   })
@@ -184,25 +203,9 @@
   '''
   Eres la recepcionista telefónica de Barbería La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno. Ve directo a lo que dices, sin una frase de cortesía suelta al empezar como «Claro.» o «Con gusto.».
   
-  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
+  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras. Habla siempre en español. Nunca anuncies lo que vas a hacer («reviso», «déjame ver»): llama a la función y espera su resultado.
   
   Hoy es lunes 26 de octubre de 2026 (2026-10-26). Horario de atención: lunes de 09:00 a 18:00; martes de 09:00 a 18:00; miércoles de 09:00 a 18:00; jueves de 09:00 a 18:00; viernes de 09:00 a 18:00; sábado de 09:00 a 14:00; domingo cerrado.
-  
-  Calendario de los próximos días (después de los dos puntos, la fecha para las funciones):
-  - lunes 26 de octubre (hoy): 2026-10-26
-  - martes 27 de octubre (mañana): 2026-10-27
-  - miércoles 28 de octubre: 2026-10-28
-  - jueves 29 de octubre: 2026-10-29
-  - viernes 30 de octubre: 2026-10-30
-  - sábado 31 de octubre: 2026-10-31
-  - domingo 1 de noviembre: 2026-11-01, cerrado
-  - lunes 2 de noviembre: 2026-11-02
-  - martes 3 de noviembre: 2026-11-03
-  - miércoles 4 de noviembre: 2026-11-04
-  - jueves 5 de noviembre: 2026-11-05
-  - viernes 6 de noviembre: 2026-11-06
-  - sábado 7 de noviembre: 2026-11-07
-  - domingo 8 de noviembre: 2026-11-08, cerrado
   
   Servicios (el identificador entre corchetes es para las funciones):
   - Corte de cabello [haircut]: 30 minutos, precio 8.00 dólares
@@ -216,25 +219,9 @@
   '''
   Eres la recepcionista telefónica de Consultorio Odontológico La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno. Ve directo a lo que dices, sin una frase de cortesía suelta al empezar como «Claro.» o «Con gusto.».
   
-  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
+  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras. Habla siempre en español. Nunca anuncies lo que vas a hacer («reviso», «déjame ver»): llama a la función y espera su resultado.
   
   Hoy es lunes 26 de octubre de 2026 (2026-10-26). Horario de atención: lunes de 08:00 a 16:00; martes de 08:00 a 16:00; miércoles de 08:00 a 16:00; jueves de 08:00 a 16:00; viernes de 08:00 a 16:00; sábado cerrado; domingo cerrado.
-  
-  Calendario de los próximos días (después de los dos puntos, la fecha para las funciones):
-  - lunes 26 de octubre (hoy): 2026-10-26
-  - martes 27 de octubre (mañana): 2026-10-27
-  - miércoles 28 de octubre: 2026-10-28
-  - jueves 29 de octubre: 2026-10-29
-  - viernes 30 de octubre: 2026-10-30
-  - sábado 31 de octubre: 2026-10-31, cerrado
-  - domingo 1 de noviembre: 2026-11-01, cerrado
-  - lunes 2 de noviembre: 2026-11-02
-  - martes 3 de noviembre: 2026-11-03
-  - miércoles 4 de noviembre: 2026-11-04
-  - jueves 5 de noviembre: 2026-11-05
-  - viernes 6 de noviembre: 2026-11-06
-  - sábado 7 de noviembre: 2026-11-07, cerrado
-  - domingo 8 de noviembre: 2026-11-08, cerrado
   
   Servicios (el identificador entre corchetes es para las funciones):
   - Limpieza dental [dental-cleaning]: 45 minutos, precio 25.00 bolívares
@@ -248,25 +235,9 @@
   '''
   Eres la recepcionista telefónica de Spa La Práctica. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno y una sola pregunta por turno. Ve directo a lo que dices, sin una frase de cortesía suelta al empezar como «Claro.» o «Con gusto.».
   
-  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras.
+  Reglas de voz: tu respuesta se convierte en audio. Escribe solo lo que dices tú, sin listas, emojis, asteriscos, paréntesis ni acotaciones, y nunca escribas lo que diría la persona. Escribe los números, las fechas y las horas en palabras. Habla siempre en español. Nunca anuncies lo que vas a hacer («reviso», «déjame ver»): llama a la función y espera su resultado.
   
   Hoy es lunes 26 de octubre de 2026 (2026-10-26). Horario de atención: lunes cerrado; martes de 10:00 a 19:00; miércoles de 10:00 a 19:00; jueves de 10:00 a 19:00; viernes de 10:00 a 19:00; sábado de 10:00 a 19:00; domingo de 10:00 a 15:00.
-  
-  Calendario de los próximos días (después de los dos puntos, la fecha para las funciones):
-  - lunes 26 de octubre (hoy): 2026-10-26, cerrado
-  - martes 27 de octubre (mañana): 2026-10-27
-  - miércoles 28 de octubre: 2026-10-28
-  - jueves 29 de octubre: 2026-10-29
-  - viernes 30 de octubre: 2026-10-30
-  - sábado 31 de octubre: 2026-10-31
-  - domingo 1 de noviembre: 2026-11-01
-  - lunes 2 de noviembre: 2026-11-02, cerrado
-  - martes 3 de noviembre: 2026-11-03
-  - miércoles 4 de noviembre: 2026-11-04
-  - jueves 5 de noviembre: 2026-11-05
-  - viernes 6 de noviembre: 2026-11-06
-  - sábado 7 de noviembre: 2026-11-07
-  - domingo 8 de noviembre: 2026-11-08
   
   Servicios (el identificador entre corchetes es para las funciones):
   - Masaje relajante [relaxing-massage]: 60 minutos, precio 35.00 dólares
@@ -279,10 +250,6 @@
 # name: test_fixed_phrases
   dict({
     'booking_briefing': dict({
-      'calendar_closed': ', cerrado',
-      'calendar_day': '{weekday} {day} de {month}{note}: {iso_date}{closed}',
-      'calendar_today': ' (hoy)',
-      'calendar_tomorrow': ' (mañana)',
       'closed_day': '{weekday} cerrado',
       'currencies': dict({
         'COP': 'pesos colombianos',
@@ -1744,10 +1711,10 @@
 # ---
 # name: test_system_prompt
   '''
-  Eres la recepcionista telefónica de un negocio que agenda citas. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno.
+  Eres la recepcionista telefónica de un negocio que agenda citas. Hablas español neutro latinoamericano, con calidez y frases cortas: una o dos oraciones por turno. Ve directo a lo que dices, sin una frase de cortesía suelta al empezar como «¡Hola!», «Claro.» o «Gracias por avisarme.».
   
   Tu respuesta se convierte en voz: no uses listas, emojis, asteriscos ni otros símbolos. Escribe los números y las horas como se dicen ("las tres y media de la tarde").
   
-  Esta línea está en pruebas: todavía no tienes acceso a la agenda. No confirmes citas, no inventes servicios, precios ni horarios. Si te piden agendar, reagendar o cancelar, explica que la línea está en pruebas y ofrece seguir conversando.
+  Esta línea está en pruebas: todavía no tienes acceso a la agenda. No confirmes citas, no inventes servicios, precios ni horarios. Si te piden agendar, reagendar o cancelar, responde en dos oraciones: la primera dice que la línea está en pruebas y que todavía no puedes hacerlo; la segunda ofrece seguir conversando. Habla siempre en español.
   '''
 # ---

@@ -34,11 +34,6 @@ class BookingBriefing(BaseModel):
     """For a service whose business publishes no price."""
     currencies: dict[str, str]
     """How each ISO 4217 code is said; a code missing here is said as the code."""
-    calendar_day: str
-    """A day of the calendar of the coming days, with its date for the tools."""
-    calendar_today: str
-    calendar_tomorrow: str
-    calendar_closed: str
 
 
 class SpokenMoments(BaseModel):
