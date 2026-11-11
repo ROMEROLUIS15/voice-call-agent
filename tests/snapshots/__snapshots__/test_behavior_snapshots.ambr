@@ -508,7 +508,7 @@
 # ---
 # name: test_model_configuration[openrouter]
   dict({
-    'extra_body': "{'reasoning': {'enabled': False}}",
+    'extra_body': "{'reasoning': {'effort': 'low'}}",
     'filter_incomplete_user_turns': 'False',
     'frequency_penalty': 'NOT_GIVEN',
     'llm_provider': 'openrouter',

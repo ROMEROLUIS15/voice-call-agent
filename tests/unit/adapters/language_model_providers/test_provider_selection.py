@@ -88,12 +88,12 @@ TOGETHER_THEN_VENICE = OpenRouterLLMService.ProviderPreferences(
 )
 
 
-def test_openrouter_sends_the_model_to_together_then_venice_without_reasoning() -> None:
+def test_openrouter_sends_the_model_to_together_then_venice_with_low_effort() -> None:
     choice = select_language_model(_settings(LanguageModelProvider.OPENROUTER))
     assert (choice.provider, choice.model) == ("openrouter", "deepseek/deepseek-v4.1-flash")
     settings = cast(OpenRouterLLMSettings, choice.create("p")._settings)
     assert settings.provider == TOGETHER_THEN_VENICE
-    assert settings.extra == {"extra_body": {"reasoning": {"enabled": False}}}
+    assert settings.extra == {"extra_body": {"reasoning": {"effort": "low"}}}
 
 
 def test_another_openrouter_model_goes_to_any_provider_that_collects_no_data() -> None:
@@ -103,4 +103,4 @@ def test_another_openrouter_model_goes_to_any_provider_that_collects_no_data() -
     assert settings.provider == OpenRouterLLMService.ProviderPreferences(
         require_parameters=True, data_collection="deny"
     )
-    assert settings.extra == {"extra_body": {"reasoning": {"enabled": False}}}
+    assert settings.extra == {"extra_body": {"reasoning": {"effort": "low"}}}
