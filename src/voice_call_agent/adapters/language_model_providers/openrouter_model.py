@@ -37,13 +37,15 @@ TOGETHER_THEN_VENICE = OpenRouterProviderPreferences(
     data_collection="deny",
 )
 """Together first, Venice when Together fails, never another provider: both serve the model with
-tools and reasoning effort at the same price, and neither may collect the call's data."""
+tools and the reasoning setting at the same price, and neither may collect the call's data."""
 ANY_PROVIDER_WITHOUT_DATA_COLLECTION = OpenRouterProviderPreferences(
     require_parameters=True, data_collection="deny"
 )
-LOW_REASONING = {"extra_body": {"reasoning": {"effort": "low"}}}
-"""The same low reasoning effort as on Groq directly (manifest §7), in OpenRouter's own request
-field: the model answers quickly enough for a call."""
+REASONING_OFF = {"extra_body": {"reasoning": {"enabled": False}}}
+"""No reasoning before the reply, in OpenRouter's own request field: at low effort the model still
+reasoned 277 to 400 tokens before a function call, the main part of a function turn's model time
+(manifest §10). The code states the facts the reasoning may have
+protected (the free times, which day, the read-back), and the model evals hold it."""
 
 
 class TimeBoundOpenRouterLLMService(OpenRouterLLMService):
@@ -115,7 +117,7 @@ def openrouter_model_factory(settings: LanguageModelSettings) -> Callable[[str],
         model_settings = OpenRouterLLMSettings(
             system_instruction=system_prompt, model=model, provider=routing
         )
-        model_settings.extra = LOW_REASONING
+        model_settings.extra = REASONING_OFF
         return TimeBoundOpenRouterLLMService(
             api_key=api_key,
             settings=model_settings,
