@@ -364,27 +364,55 @@ async def test_a_second_service_in_the_same_turn_waits_for_the_first() -> None:
     assert steps.proposal is not None and steps.proposal.service_name == "Corte"
 
 
-async def test_once_the_first_is_booked_the_code_goes_on_with_the_next_under_the_same_name() -> (
-    None
-):
+async def test_once_the_first_is_booked_the_next_is_proposed_right_after_it() -> None:
     call = await guarded_call()
     steps = _steps(call)
     await steps.check_availability({**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"})
     await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
     call.caller_speaks()
     booked = await steps.confirm_booking({})
-    # Eleven is taken by the first booking now: the caller chooses another time.
-    assert (booked.next_step, booked.result["status"]) == (Step.CHOOSE_TIME, "booked")
+    # The haircut takes 11:00 to 11:30 (its duration in the catalog): the next starts at 11:30,
+    # under the same name, and the read-back says both so the caller can change them.
+    assert (booked.next_step, booked.result["status"]) == (Step.CONFIRM, "booked")
+    # The confirmation node then reads the proposal back, in the same line (graph test).
     assert booked.said == (
-        "Listo, la cita de corte quedó agendada para el martes veintisiete de "
-        "octubre, a las once de la mañana. Ahora, la de corte y barba."
+        "Listo, la cita de corte quedó agendada para el martes veintisiete de octubre, a las "
+        "once de la mañana. Ahora, la de corte y barba."
     )
+    assert steps.proposal is not None and steps.proposal.start == time(11, 30)
+
+
+async def test_when_the_hours_around_it_are_taken_the_nearest_free_start_is_proposed() -> None:
+    class _Busy(_Delegating):
+        async def availability(self, call_id: str, service_id: str, day: date) -> object:
+            if service_id == "full":  # Other callers booked the hours around eleven.
+                return AvailableSlots(day=day, slots=[time(14, 0), time(15, 0)])
+            return await self._schedule.availability(call_id, service_id, day)
+
+    busy: list[SchedulingBackend] = []
+
+    def in_front(practice: InMemorySchedule) -> SchedulingBackend:
+        busy.append(cast(SchedulingBackend, _Busy(practice)))
+        return busy[0]
+
+    call = await guarded_call(in_front)
+    steps = _steps(call, busy[0])
+    await steps.check_availability({**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"})
+    await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "11:00"})
     call.caller_speaks()
-    chosen = await steps.select_start({"start": "12:00"})
-    # The name goes with it; the read-back says it, so the caller can correct it.
-    assert chosen.next_step is Step.CONFIRM
-    assert steps.proposal is not None and steps.proposal.client_name == "Ana Ejemplo"
-    assert steps.proposal.service_name == "Corte y barba"
+    booked = await steps.confirm_booking({})
+    assert booked.next_step is Step.CONFIRM
+    assert steps.proposal is not None and steps.proposal.start == time(14, 0)
+
+
+async def test_a_different_time_asked_for_the_next_service_is_kept() -> None:
+    call = await guarded_call()
+    steps = _steps(call)
+    await steps.check_availability({**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"})
+    await steps.check_availability({**HAIRCUT, "service_id": "full", "start": "15:00"})
+    call.caller_speaks()
+    await steps.confirm_booking({})
+    assert steps.proposal is not None and steps.proposal.start == time(15, 0)
 
 
 async def test_a_service_added_in_a_later_turn_is_queued_without_dropping_the_first() -> None:

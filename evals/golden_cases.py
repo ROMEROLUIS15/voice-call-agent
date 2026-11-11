@@ -55,6 +55,8 @@ class ScheduleCondition(StrEnum):
     """Reads answer; every booking times out."""
     FULLY_BOOKED = "fully-booked"
     """Every day is open but has no free start left."""
+    OTHERS_BOOKED_AROUND_ELEVEN = "others-booked-around-eleven"
+    """Other callers booked tomorrow 10:30 to 11:00 and 11:30 to 12:30."""
 
 
 class CallerIntent(StrEnum):

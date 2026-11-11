@@ -1,5 +1,5 @@
 id: two-services-in-one-call-at-a-barbershop
-title: The caller asks for two services at once; the code books one, then the other, and the agent never says the second is booked before the code does
+title: The caller asks for two services at once; the code books one, then proposes the other right after it, and the agent never says the second is booked before the code does
 source: hand-written
 phase: 2
 status: active
@@ -11,7 +11,6 @@ language: es
 turns:
   - says: Quiero un corte de cabello y un afeitado para mañana a las once de la mañana, a nombre de Pedro Ejemplo.
   - says: Sí, está bien.
-  - says: A las doce, por favor.
   - says: Sí, confirmo.
 expected:
   intent: book

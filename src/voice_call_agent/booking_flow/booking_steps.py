@@ -13,6 +13,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date, time
 from typing import Any
 
+from voice_call_agent.booking_flow.back_to_back import back_to_back_start
 from voice_call_agent.booking_flow.booking_state import PendingRequest, Slot, TimeChoice
 from voice_call_agent.booking_flow.flow_arguments import (
     CheckAvailabilityArguments,
@@ -43,6 +44,7 @@ from voice_call_agent.conversation_content.spoken_moments import (
 from voice_call_agent.observability.error_reporting import report_error
 from voice_call_agent.observability.error_taxonomy import ErrorCode
 from voice_call_agent.scheduling_backend.scheduling_models import (
+    AvailabilityResult,
     AvailableSlots,
     ClosedDay,
     ServiceOffering,
@@ -171,10 +173,16 @@ class BookingSteps:
         return service.id != service_id and (same_turn or bool(in_addition))
 
     async def _offer(
-        self, service: ServiceOffering, asked: date, start: time | None, client_name: str | None
+        self,
+        service: ServiceOffering,
+        asked: date,
+        start: time | None,
+        client_name: str | None,
+        known: AvailabilityResult | None = None,
     ) -> StepOutcome:
-        """The service's availability that day, and where the conversation goes with it."""
-        result = await self._backend.availability(self._call_id, service.id, asked)
+        """The service's availability that day (`known` if already read), and where the
+        conversation goes with it."""
+        result = known or await self._backend.availability(self._call_id, service.id, asked)
         # The weekday is the code's, never the model's arithmetic (ADR 0019).
         day = {"day": asked.isoformat(), "day_spoken": spoken_day(self._content, asked)}
         if isinstance(result, ClosedDay):
@@ -191,14 +199,7 @@ class BookingSteps:
                 return await self._propose(self.slot, name)
             status = {"status": "available", **day, "start": clock_time(start)}
             return StepOutcome(status, Step.NAME)
-        self.choice = TimeChoice(
-            service,
-            asked,
-            result.slots,
-            start,
-            self._guard.caller_turns(),
-            self._weekly_hours.on(asked),
-        )
+        self._offer_times(service, asked, result.slots, start)
         starts = [clock_time(start) for start in result.slots]
         return StepOutcome(
             {"status": "choose_time", **day, "free_starts": starts}, Step.CHOOSE_TIME
@@ -233,20 +234,20 @@ class BookingSteps:
         }
         return StepOutcome({"status": "weekday_mismatch", **dates}, Step.WHICH_DAY)
 
+    def _offer_times(
+        self, service: ServiceOffering, day: date, starts: list[time], taken: time | None
+    ) -> None:
+        """The free starts the caller chooses from, offered at this caller turn."""
+        hours = self._weekly_hours.on(day)
+        self.choice = TimeChoice(service, day, starts, taken, self._guard.caller_turns(), hours)
+
     async def _propose(self, slot: Slot, client_name: str) -> StepOutcome:
         result = await self._guard.propose(slot.service.id, slot.day, slot.start, client_name)
         if isinstance(result, Proposed):
             self.proposal = result
             return StepOutcome({"status": "proposed"}, Step.CONFIRM)
         if result.reason is ProposalRefusal.SLOT_NOT_OFFERED and result.available_starts:
-            self.choice = TimeChoice(
-                slot.service,
-                slot.day,
-                result.available_starts,
-                slot.start,
-                self._guard.caller_turns(),
-                self._weekly_hours.on(slot.day),
-            )
+            self._offer_times(slot.service, slot.day, result.available_starts, slot.start)
             return StepOutcome({"status": "slot_taken"}, Step.CHOOSE_TIME)
         return StepOutcome({"status": result.reason.value}, Step.REQUEST)
 
@@ -254,10 +255,11 @@ class BookingSteps:
         result = await self._guard.confirm(proposal.proposal_id)
         if isinstance(result, Booked):
             self.booked, self._client_name = proposal, proposal.client_name
+            first = self.slot.service if self.slot is not None else None
             self.slot, self.choice, self.proposal, self._request = None, None, None, None
             if not self.pending:
                 return StepOutcome({"status": "booked"}, Step.BOOKED)
-            return await self._book_the_next(proposal)
+            return await self._book_the_next(proposal, first)
         if result.reason == ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED:
             return StepOutcome({"status": "waiting_for_the_answer"}, None)
         if result.reason == ConfirmationRefusal.BACKEND_UNAVAILABLE:
@@ -266,12 +268,22 @@ class BookingSteps:
         self.slot, self.proposal = None, None
         return StepOutcome({"status": "slot_taken"}, Step.REQUEST, self._content.slot_taken)
 
-    async def _book_the_next(self, done: Proposed) -> StepOutcome:
-        """The code says the booking is done and goes on with the next service asked for."""
+    async def _book_the_next(self, done: Proposed, first: ServiceOffering | None) -> StepOutcome:
+        """The code says the booking is done and goes on with the next service asked for: on
+        the same day and with no other time asked, as close to the first as the schedule allows
+        (right after it, by each service's duration), never over another caller's booking."""
         following = self.pending.pop(0)
         self._request = (following.service.id, self._guard.caller_turns())
+        start, known = following.start, None
+        together = following.day == done.day and following.start in (None, done.start)
+        if together and first is not None:
+            service = following.service
+            known = await self._backend.availability(self._call_id, service.id, following.day)
+            if isinstance(known, AvailableSlots):
+                durations = (first.duration_min, service.duration_min)
+                start = back_to_back_start(known.slots, done.start, *durations) or start
         offered = await self._offer(
-            following.service, following.day, following.start, following.client_name
+            following.service, following.day, start, following.client_name, known
         )
         said = booked_then(
             self._content, done.service_name, done.day, done.start, following.service.name
