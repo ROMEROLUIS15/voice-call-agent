@@ -37,7 +37,11 @@ from voice_call_agent.practice_schedule.practice_catalog import (
     PracticeCatalog,
     load_practice_catalog,
 )
-from voice_call_agent.settings.sections import SchedulingBackendKind, practice_lines
+from voice_call_agent.settings.sections import (
+    SchedulingBackendKind,
+    TwilioMediaStreamsSettings,
+    practice_lines,
+)
 from voice_call_agent.settings.service_settings import ServiceSettings
 from voice_call_agent.speech_pipeline.conversation_runner import PipecatConversationRunner
 from voice_call_agent.speech_pipeline.pipeline_assembly import SpeechServiceFactories
@@ -81,18 +85,24 @@ def compose_service(settings: ServiceSettings) -> ServiceComponents:
     return ServiceComponents(
         supervisor=CallSupervisor(supervision.max_concurrent_calls),
         conversation_runner=runner,
-        call_terminator=(
-            TwilioCallTerminator(twilio.account_sid, twilio.auth_token, twilio.api_timeout_seconds)
-            if twilio is not None
-            else None
-        ),
+        call_terminator=_call_terminator(twilio),
         call_acceptor=WhatsAppCallAcceptor(whatsapp) if whatsapp is not None else None,
         replay_guard=InMemoryReplayGuard(protection.replay_window_seconds),
         rate_limiter=build_rate_limiter(protection.rate_limit_storage_uri),
         shutdown_grace_seconds=supervision.shutdown_grace_seconds,
         business_resolver=schedule,
         practice_lines=_practice_lines(practice_catalog, settings.practice_lines),
+        closed_on_shutdown=(schedule.close,)
+        if isinstance(schedule, CronixSchedulingBackend)
+        else (),
     )
+
+
+def _call_terminator(twilio: TwilioMediaStreamsSettings | None) -> TwilioCallTerminator | None:
+    """Ends phone-line calls through Twilio's REST API when that entry is configured."""
+    if twilio is None:
+        return None
+    return TwilioCallTerminator(twilio.account_sid, twilio.auth_token, twilio.api_timeout_seconds)
 
 
 def _scheduling_backend(

@@ -1,7 +1,7 @@
 """ASGI application: mounts the configured call entries over one speech engine."""
 
 import asyncio
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 
@@ -57,6 +57,8 @@ class ServiceComponents:
     """Present when a scheduling backend is configured; the practice entry resolves with it."""
     practice_lines: tuple[PracticeLine, ...] = ()
     """The practice schedule's numbers, which the practice page offers to dial."""
+    closed_on_shutdown: tuple[Callable[[], Awaitable[None]], ...] = ()
+    """Closes what outlives a call (the scheduling API's pooled connections), once calls drain."""
 
 
 def build_asgi_app(settings: ServiceSettings, components: ServiceComponents) -> ASGIApp:
@@ -115,6 +117,8 @@ def _lifespan(
             await components.supervisor.drain(components.shutdown_grace_seconds)
             if acceptor is not None:
                 await acceptor.stop()
+            for close in components.closed_on_shutdown:
+                await close()
 
     return lifespan
 

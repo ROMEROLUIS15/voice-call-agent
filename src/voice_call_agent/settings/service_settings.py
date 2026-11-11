@@ -86,6 +86,7 @@ class ServiceSettings(BaseSettings):
     scheduling_backend: SchedulingBackendKind = SchedulingBackendKind.NONE
     scheduling_api_url: HttpUrl | None = None
     scheduling_api_signing_secret: SecretStr | None = None
+    scheduling_api_region: str = Field(default="", pattern=r"^([a-z]{2}-[a-z]+-[0-9])?$")
     practice_lines: PracticeLinesSpec = ""
 
     max_concurrent_calls: int = 10
@@ -261,7 +262,11 @@ class ServiceSettings(BaseSettings):
         url, secret = self.scheduling_api_url, self.scheduling_api_signing_secret
         if self.scheduling_backend is not SchedulingBackendKind.API or not (url and secret):
             return None  # Not chosen; an incomplete choice is refused at startup.
-        return SchedulingApiSettings(base_url=str(url).rstrip("/"), signing_secret=secret)
+        return SchedulingApiSettings(
+            base_url=str(url).rstrip("/"),
+            signing_secret=secret,
+            region=self.scheduling_api_region or None,
+        )
 
     def conversation_transcripts(self) -> ConversationTranscriptSettings | None:
         """Where calls leave their transcripts, or `None`: no transcripts."""

@@ -11,6 +11,13 @@ def test_lifespan_starts_and_stops_the_call_acceptor() -> None:
     assert app_under_test.acceptor.stopped
 
 
+def test_lifespan_closes_what_outlives_a_call_on_shutdown() -> None:
+    app_under_test = AppUnderTest()
+    with TestClient(app_under_test.build()):
+        assert app_under_test.closed == []
+    assert app_under_test.closed == ["scheduling api"]
+
+
 def test_liveness() -> None:
     with TestClient(AppUnderTest().build()) as client:
         assert client.get("/health/live").json() == {"status": "ok"}
