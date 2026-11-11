@@ -339,7 +339,7 @@ The current state; what changed, when and why is in the pull requests and in git
 
 **Pending to close phase 0** (needs accounts and real calls): a Venezuelan number on the phone line (§10); 20 measured calls on the phone line; choose the TTS voice with that data (the LLM is chosen, §7); cost per minute on the phone line. The WhatsApp entry is paused (§10): its measured calls, how it coexists with the message webhook and the multi-instance `terminate` risk wait until Meta enables *Calling* on the number.
 
-**Next** (`docs/specs/cronix-connection/tasks.md`, Plan from here): the latency above the 1.0 s target (D4; practice calls p50 1.71 s, the language model the largest part): reasoning off if the model evals hold, then the code saying the results that keep the caller on the same step, then Flux's eager end of turn; then WhatsApp calls with Meta's test number, which needs no messaging limit (stage E). Production goes first for whichever channel is unblocked first: Meta's messaging limit for WhatsApp, or an affordable number for the phone line; a server in São Paulo is contracted then (§11).
+**Next** (`docs/specs/cronix-connection/tasks.md`, Plan from here): the latency above the 1.0 s target (D4; practice calls p50 1.71 s, the language model the largest part): the code saying the results that keep the caller on the same step (reasoning off was measured and not adopted, §10), then Flux's eager end of turn; then WhatsApp calls with Meta's test number, which needs no messaging limit (stage E). Production goes first for whichever channel is unblocked first: Meta's messaging limit for WhatsApp, or an affordable number for the phone line; a server in São Paulo is contracted then (§11).
 
 **Then (ADR 0019):**
 
