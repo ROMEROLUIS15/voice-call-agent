@@ -9,6 +9,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 
+from pipecat.observers.base_observer import BaseObserver
+
 from voice_call_agent.booking_flow.booking_graph import BookingGraph
 from voice_call_agent.booking_flow.booking_steps import BookingSteps
 from voice_call_agent.call_session.session import CallSession
@@ -17,6 +19,7 @@ from voice_call_agent.conversation_content.content_loader import ConversationCon
 from voice_call_agent.observability.backend_timing import TimedSchedulingBackend
 from voice_call_agent.observability.call_trace_recorder import CallTraceRecorder
 from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBackend
+from voice_call_agent.speech_pipeline.read_back_hearing import ReadBackHearing
 from voice_call_agent.write_guards.booking_guard import BookingGuard
 
 
@@ -26,6 +29,8 @@ class CallPlan:
     greeting: str
     """Said when the call connects; a booking flow says it in its first node instead."""
     booking_flow: BookingGraph | None
+    observers: tuple[BaseObserver, ...] = ()
+    """What the call's pipeline reports to the booking flow: whether a read-back was heard."""
 
 
 def plan_call(
@@ -45,12 +50,14 @@ def plan_call(
     today = today_in(business.timezone)
     # Each request the conversation makes lands in the call's trace with how long it took.
     backend = TimedSchedulingBackend(backend, recorder.record_backend_request)
+    hearing = ReadBackHearing()  # A "sí" said over the read-back books nothing.
     guard = BookingGuard(
         call_id=session.call_id,
         catalog=business.services,
         backend=backend,
         caller_turns=lambda: recorder.caller_turns,
         on_decision=recorder.record_write,
+        read_back_heard=hearing.heard,
     )
     steps = BookingSteps(
         call_id=session.call_id,
@@ -66,6 +73,11 @@ def plan_call(
         system_prompt=role,
         greeting=business.greeting,
         booking_flow=BookingGraph(
-            steps=steps, content=content, role=role, greeting=business.greeting
+            steps=steps,
+            content=content,
+            role=role,
+            greeting=business.greeting,
+            on_read_back=hearing.arm,
         ),
+        observers=(hearing,),
     )

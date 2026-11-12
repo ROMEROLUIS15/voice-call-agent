@@ -9,18 +9,33 @@ from pipecat.frames.frames import TTSSpeakFrame
 
 from tests.practice_catalogs import MONDAY, TWO_BUSINESSES
 from tests.write_guard_fixtures import CALL_ID, TUESDAY, GuardedCall, guarded_call
-from voice_call_agent.booking_flow.booking_graph import (
-    BookingGraph,
-    booking_functions,
-    say,
-)
+from voice_call_agent.booking_flow.booking_graph import BookingGraph, booking_functions
 from voice_call_agent.booking_flow.booking_steps import BookingSteps
+from voice_call_agent.booking_flow.spoken_lines import say
 from voice_call_agent.booking_flow.step_outcomes import Step
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 
 CONTENT = load_conversation_content()
 GREETING = "Hola, Barbería Uno."
 ROLE = "rol del negocio"
+
+
+class _Worker:
+    def __init__(self) -> None:
+        self.frames: list[object] = []
+
+    async def queue_frame(self, frame: object) -> None:
+        self.frames.append(frame)
+
+
+async def _enter(node: NodeConfig) -> list[object]:
+    """Runs the node's actions as Flows does on entering it; the frames it queued."""
+    worker = _Worker()
+    manager = type("_Manager", (), {"worker": worker})()  # Only the worker is used.
+    for action in node.get("pre_actions", []):
+        handler = cast(Any, action["handler"])  # Any: Flows types it as either handler shape.
+        await handler(action, cast(FlowManager, manager))
+    return worker.frames
 
 
 def _graph(call: GuardedCall) -> tuple[BookingGraph, BookingSteps]:
@@ -33,7 +48,17 @@ def _graph(call: GuardedCall) -> tuple[BookingGraph, BookingSteps]:
         weekly_hours=TWO_BUSINESSES.business("barbershop").weekly_hours,
         today=MONDAY,
     )
-    return BookingGraph(steps=steps, content=CONTENT, role=ROLE, greeting=GREETING), steps
+    graph = BookingGraph(
+        steps=steps,
+        content=CONTENT,
+        role=ROLE,
+        greeting=GREETING,
+        on_read_back=lambda: READ_BACKS.append("armed"),
+    )
+    return graph, steps
+
+
+READ_BACKS: list[str] = []
 
 
 def _functions(node: NodeConfig) -> dict[str, FlowsFunctionSchema]:
@@ -299,3 +324,45 @@ async def test_a_time_said_in_words_is_answered_with_the_field_to_correct() -> N
     check = _functions(graph.initial_node())["check_availability"]
     result, node = await _run(check, service_id="haircut", day_number=TUESDAY.day, start="seven am")
     assert (result, node) == ({"status": "invalid_arguments", "fields": ["start"]}, None)
+
+
+async def test_every_read_back_is_watched_and_no_other_line_is() -> None:
+    READ_BACKS.clear()
+    call = await guarded_call()
+    graph, _ = _graph(call)
+    await _enter(graph.initial_node())  # The greeting is not watched.
+    assert READ_BACKS == []
+    check = _functions(graph.initial_node())["check_availability"]
+    said = {"day_number": TUESDAY.day, "start": "11:00"}
+    _, confirm = await _run(check, service_id="haircut", client_name="Ana Ejemplo", **said)
+    assert confirm is not None
+    [frame] = await _enter(confirm)
+    # Armed when the line is queued: speech over it from then on is speech over the read-back.
+    assert READ_BACKS == ["armed"] and isinstance(frame, TTSSpeakFrame)
+    await _run(check, service_id="full", **said)
+    call.caller_speaks()
+    _, next_confirm = await _run(_functions(graph.node(Step.CONFIRM))["confirm_booking"])
+    assert next_confirm is not None
+    await _enter(next_confirm)  # The booking done and the next read-back, in one line.
+    assert READ_BACKS == ["armed", "armed"]
+
+
+async def test_a_read_back_not_heard_is_read_again_in_one_line_and_watched_again() -> None:
+    READ_BACKS.clear()
+    heard = [False]
+    call = await guarded_call(read_back_heard=lambda: heard[0])
+    graph, _ = _graph(call)
+    check = _functions(graph.initial_node())["check_availability"]
+    said = {"day_number": TUESDAY.day, "start": "11:00"}
+    _, confirm = await _run(check, service_id="haircut", client_name="Ana Ejemplo", **said)
+    assert confirm is not None
+    await _enter(confirm)
+    call.caller_speaks()  # "Sí" over the read-back.
+    result, again = await _run(_functions(confirm)["confirm_booking"])
+    assert result["status"] == "read_back_repeated"
+    assert again is not None and again["name"] == Step.CONFIRM.value
+    [line] = _said(again)
+    assert line.startswith("Perdón, lo repito completo. Para confirmar: Corte, el martes")
+    await _enter(again)
+    assert READ_BACKS == ["armed", "armed"]
+    assert await call.backend.upcoming_appointments(CALL_ID) == []  # Nothing was written.

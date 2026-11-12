@@ -480,3 +480,20 @@ async def test_a_proposal_tells_the_model_what_it_proposes_but_not_the_name() ->
         "day_spoken": "martes veintisiete de octubre",
         "start": "11:00",
     }
+
+
+async def test_a_yes_said_over_the_read_back_does_not_book_and_the_code_reads_it_again() -> None:
+    heard = [False]
+    call = await guarded_call(read_back_heard=lambda: heard[0])
+    steps = _steps(call)
+    await steps.check_availability({**HAIRCUT, "start": "11:00", "client_name": "Ana Ejemplo"})
+    call.caller_speaks()  # "Sí" over the read-back.
+    again = await steps.confirm_booking({})
+    assert (again.next_step, again.result["status"]) == (Step.CONFIRM, "read_back_repeated")
+    assert again.said == "Perdón, lo repito completo."
+    assert [decision.outcome for decision in call.decisions] == ["proposed", "read_back_not_heard"]
+    heard[0] = True
+    assert (await steps.confirm_booking({})).result["status"] == "waiting_for_the_answer"
+    call.caller_speaks()  # The answer after hearing it whole.
+    booked = await steps.confirm_booking({})
+    assert (booked.next_step, booked.result["status"]) == (Step.BOOKED, "booked")

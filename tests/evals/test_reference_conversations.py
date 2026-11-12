@@ -78,10 +78,12 @@ def _assert_the_transcript_is_in_order(case: GoldenCase, record: ConversationRec
         assert tools == []
         return
     # The booking flow: availability, with the name, on the first caller turn, the
-    # confirmation on the second, after the read-back (ADR 0019).
-    assert [name for _, name in tools] == list(BOOKING_SEQUENCE)
-    (checked, _), (confirmed, _) = tools
-    assert callers[0] < checked < callers[1] < confirmed
+    # confirmation on each later one, after the read-back (ADR 0019); a "sí" said over the
+    # read-back books nothing, and the code reads it again for the next turn to answer.
+    confirmations = ["confirm_booking"] * (len(case.turns) - 1)
+    assert [name for _, name in tools] == [BOOKING_SEQUENCE[0], *confirmations]
+    for asked_at, (called_at, _) in zip(callers, tools, strict=True):
+        assert asked_at < called_at
 
 
 def _assert_the_kept_transcript_shows_what_was_said(
@@ -101,7 +103,8 @@ def _assert_the_kept_transcript_shows_what_was_said(
     assert callers == [f"caller: {turn.says}" for turn in case.turns]
     tools = [line.split()[2] for line in lines if line.startswith("agent called ")]
     results = [line.split()[0] for line in lines if " returned: " in line]
-    expected = [] if case.expected.tool_call is None else list(BOOKING_SEQUENCE)
+    confirmations = ["confirm_booking"] * (len(case.turns) - 1)
+    expected = [] if case.expected.tool_call is None else [BOOKING_SEQUENCE[0], *confirmations]
     assert tools == results == expected
 
 
@@ -150,5 +153,10 @@ async def test_a_line_said_with_a_function_call_does_not_end_the_turn(case: Gold
     [model] = models
     assert model.caller_messages == [turn.says for turn in case.turns]
     tools = [call.name for turn in record.turns for call in turn.tool_calls]
-    assert tools == list(BOOKING_SEQUENCE)
+    # A caller who barges in may land on the line said with the call or on the read-back after
+    # it; over the read-back, the "sí" books nothing and the next answer confirms again.
+    check, *confirmations = tools
+    assert check == BOOKING_SEQUENCE[0]
+    assert 1 <= len(confirmations) <= len(case.turns) - 1
+    assert set(confirmations) == {BOOKING_SEQUENCE[1]}
     assert record.trace.outcome == case.expected.outcome

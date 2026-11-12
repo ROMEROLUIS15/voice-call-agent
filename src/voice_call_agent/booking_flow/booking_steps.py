@@ -253,6 +253,9 @@ class BookingSteps:
             return await self._book_the_next(proposal, first)
         if result.reason == ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED:
             return StepOutcome({"status": "waiting_for_the_answer"}, None)
+        if result.reason == ConfirmationRefusal.READ_BACK_NOT_HEARD:  # Spoken over: read again.
+            again = self._content.read_back_again
+            return StepOutcome({"status": "read_back_repeated"}, Step.CONFIRM, again)
         if result.reason == ConfirmationRefusal.BACKEND_UNAVAILABLE:
             return backend_unavailable(self._content)
         # The backend refused the write, such as a slot taken since it was offered.

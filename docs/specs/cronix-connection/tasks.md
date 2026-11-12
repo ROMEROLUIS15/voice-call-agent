@@ -286,6 +286,13 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         nothing was booked, since the model once said the time was held. Golden cases
         `a-time-outside-the-hours-chosen-at-a-barbershop`,
         `a-time-changed-at-the-read-back-at-a-barbershop`; model evals every measure 1.00.
+  - [x] A "sí" said over the read-back booked (found comparing with other voice frameworks,
+        2026-11-12): barge-in cut the read-back and the caller's answer still confirmed. Now a
+        read-back spoken over, or started while the caller was still talking, is not heard: the
+        write guard refuses with `read_back_not_heard` and the code reads it again. Muting the
+        caller during the read-back was tried first and dropped: 11 of 17 reference
+        conversations stalled because a "sí" said as it ended was lost. Golden case
+        `confirmation-said-over-the-read-back` updated (proposed, read_back_not_heard, booked).
 
 ## Plan from here (2026-10-31)
 

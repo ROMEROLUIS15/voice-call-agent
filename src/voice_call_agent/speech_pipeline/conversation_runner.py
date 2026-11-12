@@ -135,7 +135,7 @@ class PipecatConversationRunner:
                 enable_metrics=True,
                 enable_usage_metrics=True,
             ),
-            observers=recorder.observers,
+            observers=[*recorder.observers, *plan.observers],
         )
         # Signals belong to the HTTP server, which drains calls before stopping.
         runner = WorkerRunner(handle_sigint=False, handle_sigterm=False)

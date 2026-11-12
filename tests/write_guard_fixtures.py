@@ -27,8 +27,10 @@ class GuardedCall:
 
 async def guarded_call(
     wrap: Callable[[InMemorySchedule], SchedulingBackend] | None = None,
+    read_back_heard: Callable[[], bool] = lambda: True,
 ) -> GuardedCall:
-    """A resolved barbershop call; `wrap` puts something in front of the schedule (a failure)."""
+    """A resolved barbershop call; `wrap` puts something in front of the schedule (a failure);
+    `read_back_heard` says whether the caller heard the last read-back whole."""
     practice = schedule()
     await practice.resolve_call_business(barbershop_phone_call(CALL_ID))
     turns = [0]
@@ -39,5 +41,6 @@ async def guarded_call(
         backend=wrap(practice) if wrap else practice,
         caller_turns=lambda: turns[0],
         on_decision=decisions.append,
+        read_back_heard=read_back_heard,
     )
     return GuardedCall(practice, guard, turns, decisions)

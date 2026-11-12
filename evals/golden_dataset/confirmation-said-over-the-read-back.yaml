@@ -1,5 +1,5 @@
 id: confirmation-said-over-the-read-back
-title: The caller says yes while the summary is still being read; the confirmation step still starts and the agent books
+title: The caller says yes while the summary is still being read; that yes books nothing, the code reads the summary again in full, and the yes said after it books
 source: practice-failure
 phase: 2
 status: active
@@ -12,6 +12,7 @@ turns:
   - says: Buenas, quiero un corte de cabello para mañana a las tres de la tarde. Me llamo Ana Ejemplo.
   - says: Sí, está bien.
     barge_in: true
+  - says: Sí, está bien.
 expected:
   intent: book
   data:
@@ -26,7 +27,7 @@ expected:
       day: "2026-10-27"
       start: "15:00"
       client_name: Ana Ejemplo
-  writes: [proposed, booked]
+  writes: [proposed, read_back_not_heard, booked]
   outcome: booked
   identity_verified: false
   agent_interrupted: true
