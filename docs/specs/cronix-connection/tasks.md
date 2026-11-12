@@ -275,6 +275,17 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         offers `check_availability` for an added service, and the read-back says the services
         that wait. Golden case `a-service-added-at-the-read-back-at-a-barbershop`; model evals
         with no regression (`brief-replies` 0.97, within its margin; the rest 1.00).
+  - [x] Fluency and register (practice call against production's Cronix, 2026-11-11): the model
+        answered a time outside the free starts on its own, a change at the read-back took two
+        model rounds (`change_request`, then `check_availability`: 1.5 + 2.5 s), and the goodbye
+        switched from tú to usted. Now a chosen time that is not free goes to `select_start`, and
+        the code says why and the nearest free times; a concrete change at the read-back goes
+        straight to `check_availability`; the code's question for the time names neither tú nor
+        usted ("¿A qué hora sería la cita?", the judge's new register check caught "¿Cuál te
+        sirve?" at a business that greets with usted); and after `change_request` the code says
+        nothing was booked, since the model once said the time was held. Golden cases
+        `a-time-outside-the-hours-chosen-at-a-barbershop`,
+        `a-time-changed-at-the-read-back-at-a-barbershop`; model evals every measure 1.00.
 
 ## Plan from here (2026-10-31)
 

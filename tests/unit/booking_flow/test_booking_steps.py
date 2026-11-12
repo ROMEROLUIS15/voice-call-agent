@@ -116,8 +116,14 @@ async def test_only_an_offered_start_can_be_chosen_once_the_caller_answers() -> 
     assert (early.next_step, early.result["status"]) == (None, "waiting_for_the_choice")
     call.caller_speaks()
     refused = await steps.select_start({"start": "03:00"})
+    # A time that is not free goes back to the choice: the code says why and the free times.
+    assert (refused.next_step, refused.result) == (
+        Step.CHOOSE_TIME,
+        {"status": "not_offered", "start": "03:00"},
+    )
+    assert steps.choice is not None and steps.choice.taken == time(3, 0)
+    call.caller_speaks()
     chosen = await steps.select_start({"start": "11:00"})
-    assert (refused.next_step, refused.result["status"]) == (None, "not_offered")
     assert chosen.next_step is Step.NAME
     assert steps.slot is not None and steps.slot.start == time(11, 0)
 
@@ -178,6 +184,11 @@ async def test_a_change_of_mind_goes_back_to_the_request_with_nothing_pending() 
     await steps.propose_booking({"client_name": "Ana Ejemplo"})
     outcome = await steps.change_request({})
     assert outcome.next_step is Step.REQUEST
+    # The code says nothing was booked: the model never improvises that a time is held.
+    assert outcome.said == (
+        "Está bien, la cita todavía no quedó agendada. ¿Qué cambiamos, o la dejamos para otra "
+        "ocasión?"
+    )
     assert (steps.slot, steps.choice, steps.proposal) == (None, None, None)
     assert (await steps.confirm_booking({})).next_step is Step.REQUEST
 

@@ -1,0 +1,26 @@
+id: a-time-changed-at-the-read-back-at-a-barbershop
+title: The caller changes the time while the proposal is read back; the new time is checked and read back in one step, and only the new one is booked
+source: practice-failure
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Quiero un corte de cabello para mañana a las once de la mañana, a nombre de Pedro Ejemplo.
+  - says: Mejor a las doce del mediodía.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "12:00"
+    name: Pedro Ejemplo
+  writes: [proposed, proposed, booked]
+  outcome: booked
+  identity_verified: true
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, read-back, change]
