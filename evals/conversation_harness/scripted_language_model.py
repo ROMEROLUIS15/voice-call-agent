@@ -1,7 +1,7 @@
 """A language model that answers with a fixed line, records what it was given and, when the case
 has a write, books it through the booking flow (ADR 0019): it checks the availability with the
-name, which proposes, on the first caller turn, and confirms on the second, after the code read the
-proposal back."""
+name, which proposes, on the first caller turn, and confirms from the second on, after the code read
+the proposal back."""
 
 import asyncio
 from datetime import date
@@ -81,7 +81,8 @@ class ScriptedLanguageModel(LLMService):
 
         The availability check, with the name the caller said, answers the first caller turn;
         the proposal is made as soon as its node offers it (the name step, when the name was not
-        taken with the check); the confirmation answers the caller turn after the read-back.
+        taken with the check); the confirmation answers each caller turn after the read-back,
+        until one is to a read-back heard whole.
         """
         if self._write is None or not messages:
             return None
@@ -97,7 +98,7 @@ class ScriptedLanguageModel(LLMService):
             return _call("check_availability", arguments, context)
         if "propose_booking" in offered:
             return _call("propose_booking", {"client_name": write["client_name"]}, context)
-        if "confirm_booking" in offered and after_caller and turn == 2:
+        if "confirm_booking" in offered and after_caller and turn >= 2:  # Again after a re-read.
             return _call("confirm_booking", {}, context)
         return None
 

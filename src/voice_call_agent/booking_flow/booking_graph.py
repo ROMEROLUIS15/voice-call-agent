@@ -14,7 +14,6 @@ from typing import Any
 
 from pipecat.flows import (
     NO_RESPONSE,
-    ActionConfig,
     FlowArgs,
     FlowManager,
     FlowsDirectFunction,
@@ -24,7 +23,6 @@ from pipecat.flows import (
 
 # `_NoResponse` is the type of Flows' public `NO_RESPONSE` sentinel, which it does not export.
 from pipecat.flows.types import _NoResponse
-from pipecat.frames.frames import TTSSpeakFrame
 from pydantic import BaseModel
 
 from voice_call_agent.booking_flow.booking_steps import BookingSteps
@@ -38,6 +36,7 @@ from voice_call_agent.booking_flow.spoken_free_times import (
     free_times_said,
     requested_for_model,
 )
+from voice_call_agent.booking_flow.spoken_lines import joined, say
 from voice_call_agent.booking_flow.step_outcomes import JsonObject, Step, StepOutcome
 from voice_call_agent.conversation_content.content_loader import BookingTasks, ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import (
@@ -74,13 +73,21 @@ class BookingGraph:
     """The nodes of one call's booking conversation."""
 
     def __init__(
-        self, *, steps: BookingSteps, content: ConversationContent, role: str, greeting: str
+        self,
+        *,
+        steps: BookingSteps,
+        content: ConversationContent,
+        role: str,
+        greeting: str,
+        on_read_back: Callable[[], None] = lambda: None,
     ) -> None:
-        """`role` is the booking prompt with the call's business; `greeting`, the business's."""
+        """`role` is the booking prompt with the call's business; `greeting`, the business's;
+        `on_read_back` runs as each read-back is queued (a "sí" said over it books nothing)."""
         self._steps = steps
         self._content = content
         self._role = role
         self._greeting = greeting
+        self._on_read_back = on_read_back
 
     def initial_node(self) -> NodeConfig:
         """The request, after the business's greeting, waiting for the caller to speak."""
@@ -185,7 +192,7 @@ class BookingGraph:
                 self._check_availability(),  # Another service besides it: read back with it.
             ],
         )
-        node["pre_actions"] = [say(read_back)]
+        node["pre_actions"] = [say(read_back, before=self._on_read_back)]
         node["respond_immediately"] = False
         return node
 
@@ -218,16 +225,8 @@ class BookingGraph:
             if outcome.next_step is None:
                 return outcome.result, None
             node = self.node(outcome.next_step)
-            if outcome.said is not None:
-                # The code says the result, and the model waits for the caller: one line with
-                # the node's own, so the caller hears one reply (the harness counts them too).
-                actions = node.get("pre_actions", [])
-                lines = [
-                    outcome.said,
-                    *(action["text"] for action in actions if action["type"] == "say"),
-                ]
-                others = [action for action in actions if action["type"] != "say"]
-                node["pre_actions"] = [say(" ".join(lines)), *others]
+            if outcome.said is not None:  # The code says the result; the model waits.
+                node["pre_actions"] = joined(outcome.said, node.get("pre_actions", []))
                 node["respond_immediately"] = False
             return outcome.result, node
 
@@ -238,22 +237,6 @@ class BookingGraph:
             required=[key for key in properties if key in _required(name)],
             handler=run,
         )
-
-
-def say(text: str) -> ActionConfig:
-    """A line the code says on entering a node, before its task and functions apply.
-
-    Not Flows' built-in `tts_say`: Flows applies the node only once that action's completion
-    frame reaches the end of the pipeline, and a caller who speaks over the line drops the frame,
-    so the node never applies and the model answers with the previous node's functions (Pipecat
-    issue #5263, open in 1.14). A custom action is not waited for: the node applies at once and
-    the line is still spoken, and kept in the context, as the caller hears it.
-    """
-    return {"type": "say", "handler": _speak, "text": text}
-
-
-async def _speak(action: dict[str, Any], flow_manager: FlowManager) -> None:
-    await flow_manager.worker.queue_frame(TTSSpeakFrame(text=action["text"]))
 
 
 def _node(

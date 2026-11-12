@@ -7,7 +7,7 @@ is the idempotency key (INV-2, INV-6). The code never reads the caller's words.
 """
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, time
 from enum import StrEnum
 from typing import Literal
@@ -83,6 +83,8 @@ class ConfirmationRefusal(StrEnum):
     UNKNOWN_PROPOSAL = "unknown_proposal"
     ALREADY_CONFIRMED = "already_confirmed"
     CALLER_HAS_NOT_ANSWERED = "caller_has_not_answered"
+    READ_BACK_NOT_HEARD = "read_back_not_heard"
+    """The caller spoke over the read-back: their answer is not to the whole proposal."""
     BACKEND_UNAVAILABLE = "backend_unavailable"
 
 
@@ -121,12 +123,15 @@ class BookingGuard:
         backend: SchedulingBackend,
         caller_turns: Callable[[], int],
         on_decision: Callable[[WriteDecision], None],
+        read_back_heard: Callable[[], bool] = lambda: True,
     ) -> None:
+        """`read_back_heard` says whether the caller heard the last read-back whole."""
         self._call_id = call_id
         self._catalog = {service.id: service for service in catalog}
         self._backend = backend
         self._caller_turns = caller_turns
         self._on_decision = on_decision
+        self._read_back_heard = read_back_heard
         self._pending: dict[UUID, _Proposal] = {}
         self._confirmed: dict[UUID, str] = {}
 
@@ -172,6 +177,12 @@ class BookingGuard:
         if self._caller_turns() <= proposal.caller_turn:
             return self._refuse_confirmation(
                 ConfirmationRefusal.CALLER_HAS_NOT_ANSWERED, proposal_id, proposal
+            )
+        if not self._read_back_heard():
+            # Read back again: the caller answers anew once they heard all of it.
+            self._pending[proposal_id] = replace(proposal, caller_turn=self._caller_turns())
+            return self._refuse_confirmation(
+                ConfirmationRefusal.READ_BACK_NOT_HEARD, proposal_id, proposal
             )
         try:
             result = await self._backend.book_appointment(_booking_request(self._call_id, proposal))
