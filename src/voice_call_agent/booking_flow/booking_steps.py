@@ -105,11 +105,17 @@ class BookingSteps:
         call = validated_arguments(SelectStartArguments, arguments)
         if isinstance(call, StepOutcome):
             return call
-        if self.choice is None or call.start not in self.choice.starts:
+        if self.choice is None:
             return StepOutcome({"status": "not_offered"}, None)
         if self._guard.caller_turns() <= self.choice.offered_at_turn:
             # The model picked a time the caller has not chosen yet: the caller chooses it.
             return StepOutcome({"status": "waiting_for_the_choice"}, None)
+        if call.start not in self.choice.starts:  # The code says why, and the nearest free times.
+            choice, start = self.choice, call.start
+            self._offer_times(choice.service, choice.day, choice.starts, start)
+            return StepOutcome(
+                {"status": "not_offered", "start": clock_time(start)}, Step.CHOOSE_TIME
+            )
         self.slot = Slot(self.choice.service, self.choice.day, call.start)
         if (name := call.client_name or self._client_name) is not None:
             return await answering(self._content, self._propose(self.slot, name))
@@ -132,7 +138,7 @@ class BookingSteps:
         """The caller wants something else: back to the request, nothing chosen or proposed is
         kept; the services waiting for this one still wait."""
         self.slot, self.choice, self.proposal = None, None, None
-        return StepOutcome({"status": "changing"}, Step.REQUEST)
+        return StepOutcome({"status": "changing"}, Step.REQUEST, self._content.changing)
 
     async def _check_availability(self, call: CheckAvailabilityArguments) -> StepOutcome:
         service = self._catalog.get(call.service_id)

@@ -1,0 +1,27 @@
+id: a-time-outside-the-hours-chosen-at-a-barbershop
+title: Offered the free times, the caller picks one outside the hours; the code says why and offers the nearest free times, and the model does not answer it on its own
+source: practice-failure
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Quiero un corte de cabello para mañana, a nombre de Pedro Ejemplo.
+  - says: A las ocho de la noche.
+  - says: Entonces a las once de la mañana.
+  - says: Sí, está bien.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    time: "11:00"
+    name: Pedro Ejemplo
+  writes: [proposed, booked]
+  outcome: booked
+  identity_verified: true
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, choose-time, said-by-the-code]

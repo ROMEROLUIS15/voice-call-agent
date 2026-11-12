@@ -79,7 +79,7 @@ async def test_choosing_a_time_says_the_free_starts_as_ranges() -> None:
     # The code says them, as the backend offered them, and the model waits for the choice.
     assert _said(node) == [
         "El martes veintisiete de octubre hay horas libres de las nueve de la mañana a las "
-        "cinco y media de la tarde. ¿Cuál te sirve?"
+        "cinco y media de la tarde. ¿A qué hora sería la cita?"
     ]
     assert node.get("respond_immediately") is False
     functions = _functions(node)
@@ -199,6 +199,22 @@ async def test_a_service_queued_in_the_same_turn_keeps_the_first_ones_node() -> 
     result, node = await _run(check, service_id="full", day_number=TUESDAY.day, start="11:00")
     assert result["status"] == "queued"
     assert cast(object, node) is NO_RESPONSE  # Flows' sentinel: stay silent on the node.
+
+
+async def test_a_chosen_time_that_is_not_free_is_answered_by_the_code() -> None:
+    call = await guarded_call()
+    graph, _ = _graph(call)
+    check = _functions(graph.initial_node())["check_availability"]
+    _, choose = await _run(check, service_id="haircut", day_number=TUESDAY.day)
+    assert choose is not None
+    call.caller_speaks()
+    result, node = await _run(_functions(choose)["select_start"], start="03:00")
+    assert result == {"status": "not_offered", "start": "03:00"}
+    # The code says why and offers again; the model does not answer it in a second round.
+    assert node is not None and node["name"] == Step.CHOOSE_TIME.value
+    [said] = _said(node)
+    assert said.startswith("A las tres de la madrugada queda fuera del horario de ese día")
+    assert node.get("respond_immediately") is False
 
 
 async def test_the_read_back_says_the_services_waiting_for_the_proposal() -> None:

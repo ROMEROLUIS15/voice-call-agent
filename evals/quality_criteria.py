@@ -103,6 +103,8 @@ QUALITY_CRITERIA: dict[str, QualityCriterion] = {
                 "Check that every turn of the assistant that says something is in neutral Latin "
                 "American Spanish, without regional slang.",
                 "Check that it is warm and polite.",
+                "Check that it addresses the caller as the business's greeting does, with tú or "
+                "with usted, the same in every turn, the goodbye included.",
                 "Check that each of its turns responds to what the caller has just said.",
                 "Judge only the language, the tone and whether each turn responds: whether what "
                 "it says is true is another criterion, not this one.",
