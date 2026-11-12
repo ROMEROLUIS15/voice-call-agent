@@ -61,6 +61,8 @@ async def test_reference_conversation(case: GoldenCase) -> None:
     # The model hears every caller turn, in order, whatever the agent was saying.
     assert model.caller_messages == [turn.says for turn in case.turns]
     assert record.trace.services.prompt_version == CONTENT.version
+    # The read-back and its question are one line of the code, never a reply of the model's.
+    assert not any("¿Está bien así?" in reply for reply in record.model_replies)
     _assert_the_transcript_is_in_order(case, record)
     [transcript] = transcripts.transcripts
     _assert_the_kept_transcript_shows_what_was_said(case, record, transcript, greeting)

@@ -103,6 +103,12 @@ class RecordingTextToSpeech(TTSService):
         """The last reply counted is a model response nothing has followed yet: a function call
         it made, which a provider's response announces after its end, takes it back."""
         self._greeted = False
+        self._joins_the_last_line = False
+        self._aliases: dict[str, str] = {}
+        """TTS contexts that continue the line of an earlier one."""
+        self._code_reply_open = False
+        """The last thing said was a line of the code: a line right after it (the question
+        after a read-back) belongs to the same reply."""
         self.code_lines: list[str] = []
         """What the code said after the greeting, such as a proposal's read-back."""
         self._tool_calls: dict[int, tuple[RecordedToolCall, ...]] = {}
@@ -137,10 +143,18 @@ class RecordingTextToSpeech(TTSService):
         )
         code_reply = False
         if isinstance(frame, TTSSpeakFrame):
-            code_reply = self._greeted
-            if code_reply:
-                self.code_lines.append(" ".join(frame.text.split()))
+            code_reply = self._greeted and not self._code_reply_open
+            text = " ".join(frame.text.split())
+            if self._greeted and self._code_reply_open and self.code_lines:
+                self.code_lines[-1] = f"{self.code_lines[-1]} {text}"  # Same line, as heard.
+            elif self._greeted:
+                self.code_lines.append(text)
+            if self._greeted:
+                self.last_reply_completed_at = time.monotonic()
+                self._code_reply_open = True
             self._greeted = True
+        elif isinstance(frame, LLMFullResponseStartFrame | FunctionCallInProgressFrame):
+            self._code_reply_open = False
         if model_reply or code_reply:
             self.replies_completed += 1
             self.last_reply_completed_at = time.monotonic()
@@ -148,6 +162,8 @@ class RecordingTextToSpeech(TTSService):
             self._counted_model_reply_open = model_reply
 
     def _follow_the_model(self, frame: Frame) -> None:
+        if isinstance(frame, TTSSpeakFrame) and self._code_reply_open:
+            self._joins_the_last_line = True  # Its speech is the same line of the agent.
         if isinstance(frame, LLMFullResponseStartFrame):
             self._reply_says_something = False
         elif isinstance(frame, LLMTextFrame) and frame.text.strip():
@@ -163,6 +179,10 @@ class RecordingTextToSpeech(TTSService):
             self._unspoken_tool_calls.append(call)
 
     async def run_tts(self, text: str, context_id: str) -> AsyncGenerator[Frame | None, None]:
+        if self._joins_the_last_line and context_id not in self._lines and self._lines:
+            self._aliases[context_id] = next(reversed(self._lines))
+            self._joins_the_last_line = False
+        context_id = self._aliases.get(context_id, context_id)
         if context_id not in self._lines and self._unspoken_tool_calls:
             self._tool_calls[len(self._lines)] = tuple(self._unspoken_tool_calls)
             self._unspoken_tool_calls.clear()

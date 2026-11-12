@@ -293,6 +293,17 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         caller during the read-back was tried first and dropped: 11 of 17 reference
         conversations stalled because a "sí" said as it ended was lost. Golden case
         `confirmation-said-over-the-read-back` updated (proposed, read_back_not_heard, booked).
+  - [x] An answer during "¿Está bien así?" counted as speaking over the read-back (practice call
+        against production's Cronix, 2026-11-12): the caller said "sí" about 2.2 s before a
+        13.1 s read-back ended and was asked again twice. The facts and the question are now two
+        lines, each its own speech, and only the facts are watched. The eval harness counts the
+        code's consecutive lines as one reply and one agent line, and the caller speaks after
+        0.3 s of silence, not in the gap between them.
+  - [ ] A second service asked for "right after" once the first is already booked gets no
+        back-to-back start: the code computes it only for a queued service (model evals,
+        2026-11-12: in one of three repetitions the model booked the first at "Sí, pero también
+        un afeitado, seguido del corte" and asked for the second's time; `bookings-completed`
+        0.96).
 
 ## Plan from here (2026-10-31)
 

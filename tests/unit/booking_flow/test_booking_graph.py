@@ -138,9 +138,12 @@ async def test_the_proposal_is_read_back_by_the_code_and_the_model_waits() -> No
     _, confirm = await _run(_functions(name_node)["propose_booking"], client_name="Ana Ejemplo")
     assert confirm is not None and confirm.get("name") == Step.CONFIRM.value
     assert confirm.get("respond_immediately") is False
+    # The facts, then the question as a line of its own: the caller who answers during the
+    # question heard every fact (the read-back is watched until the facts end).
     assert _said(confirm) == [
         "Para confirmar: Corte, el martes veintisiete de octubre, a las tres y media "
-        "de la tarde, a nombre de Ana Ejemplo. ¿Está bien así?"
+        "de la tarde, a nombre de Ana Ejemplo.",
+        "¿Está bien así?",
     ]
     assert set(_functions(confirm)) == {"confirm_booking", "change_request", "check_availability"}
 
@@ -156,7 +159,8 @@ async def test_a_name_given_with_the_chosen_time_skips_asking_for_it() -> None:
     select = _functions(choose)["select_start"]
     _, confirm = await _run(select, start="15:30", client_name="Ana Ejemplo")
     assert confirm is not None and confirm.get("name") == Step.CONFIRM.value
-    assert _said(confirm)[0].endswith("a nombre de Ana Ejemplo. ¿Está bien así?")
+    assert _said(confirm) == [_said(confirm)[0], "¿Está bien así?"]
+    assert _said(confirm)[0].endswith("a nombre de Ana Ejemplo.")
 
 
 async def test_the_booking_is_announced_by_the_code_and_the_model_waits() -> None:
@@ -255,7 +259,8 @@ async def test_the_read_back_says_the_services_waiting_for_the_proposal() -> Non
     assert node["name"] == Step.CONFIRM.value
     assert _said(node) == [
         "Para confirmar: Corte, el martes veintisiete de octubre, a las once de la mañana, a "
-        "nombre de Ana Ejemplo. Después seguimos con corte y barba. ¿Está bien así?"
+        "nombre de Ana Ejemplo. Después seguimos con corte y barba.",
+        "¿Está bien así?",
     ]
 
 
@@ -271,7 +276,8 @@ async def test_the_next_service_is_announced_in_one_line_with_its_read_back() ->
     _, node = await _run(confirm)
     assert node is not None and node["name"] == "confirm"
     # One line, so the caller hears one reply: the booking done, the next service, its read-back.
-    [line] = _said(node)
+    line, question = _said(node)
+    assert question == "¿Está bien así?"
     assert line.startswith("Listo, la cita de corte quedó agendada")
     assert "Ahora, la de corte y barba. Para confirmar: Corte y barba" in line
 
@@ -336,9 +342,10 @@ async def test_every_read_back_is_watched_and_no_other_line_is() -> None:
     said = {"day_number": TUESDAY.day, "start": "11:00"}
     _, confirm = await _run(check, service_id="haircut", client_name="Ana Ejemplo", **said)
     assert confirm is not None
-    [frame] = await _enter(confirm)
+    facts, question = await _enter(confirm)
     # Armed when the line is queued: speech over it from then on is speech over the read-back.
-    assert READ_BACKS == ["armed"] and isinstance(frame, TTSSpeakFrame)
+    assert READ_BACKS == ["armed"] and isinstance(facts, TTSSpeakFrame)
+    assert isinstance(question, TTSSpeakFrame) and question.text == "¿Está bien así?"
     await _run(check, service_id="full", **said)
     call.caller_speaks()
     _, next_confirm = await _run(_functions(graph.node(Step.CONFIRM))["confirm_booking"])
@@ -361,8 +368,22 @@ async def test_a_read_back_not_heard_is_read_again_in_one_line_and_watched_again
     result, again = await _run(_functions(confirm)["confirm_booking"])
     assert result["status"] == "read_back_repeated"
     assert again is not None and again["name"] == Step.CONFIRM.value
-    [line] = _said(again)
+    line, question = _said(again)
+    assert question == "¿Está bien así?"
     assert line.startswith("Perdón, lo repito completo. Para confirmar: Corte, el martes")
     await _enter(again)
     assert READ_BACKS == ["armed", "armed"]
     assert await call.backend.upcoming_appointments(CALL_ID) == []  # Nothing was written.
+
+
+async def test_only_the_facts_of_the_read_back_are_watched() -> None:
+    READ_BACKS.clear()
+    graph, _ = _graph(await guarded_call())
+    check = _functions(graph.initial_node())["check_availability"]
+    said = {"day_number": TUESDAY.day, "start": "11:00", "client_name": "Ana Ejemplo"}
+    _, confirm = await _run(check, service_id="haircut", **said)
+    assert confirm is not None
+    facts, question = confirm["pre_actions"]
+    # Each line is its own speech: the watch is armed by the facts and spans only them.
+    assert cast(dict[str, Any], facts)["before"] is not None
+    assert cast(dict[str, Any], question).get("before") is None
