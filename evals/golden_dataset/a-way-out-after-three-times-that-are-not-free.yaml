@@ -1,0 +1,27 @@
+id: a-way-out-after-three-times-that-are-not-free
+title: The caller picks three times in a row that are not free; the code offers to try again or reach the business directly, the caller prefers to stop, and the code says goodbye and ends the call with nothing booked
+source: hand-written
+phase: 2
+status: active
+levels: [model]
+channel: whatsapp
+schedule: open
+business: practice-barbershop
+language: es
+turns:
+  - says: Quiero un corte de cabello para mañana, a nombre de Pedro Ejemplo.
+  - says: A las ocho de la noche.
+  - says: Entonces a las nueve de la noche.
+  - says: ¿Y a las diez de la noche?
+  - says: No, mejor llamo más tarde.
+expected:
+  intent: book
+  data:
+    service: corte de cabello
+    day: mañana
+    name: Pedro Ejemplo
+  writes: []
+  outcome: info_only
+  identity_verified: true
+  quality: [invents-nothing, natural-spanish]
+tags: [booking, way-out, said-by-the-code]

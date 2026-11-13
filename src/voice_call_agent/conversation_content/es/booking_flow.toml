@@ -17,6 +17,10 @@ booked = """Tu tarea ahora: el sistema acaba de decirle a la persona que la cita
 
 not_booked = """El sistema acaba de decirle a la persona que la agenda no responde y que la cita no quedó agendada. No lo repitas: si dice algo más, despídete en una oración. Nunca digas que hay una cita agendada."""
 
+offer_way_out = """Tu tarea ahora: la salida. El sistema acaba de decirle a la persona que no se está logrando agendar la cita por teléfono, y le ofreció intentarlo una vez más o comunicarse directamente con el negocio. No lo repitas: espera su respuesta. Si quiere intentarlo, llama a keep_trying. Si prefiere no seguir, llama a end_call sin decir nada: el sistema se despide. Nunca digas que hay una cita agendada."""
+
+end = """La llamada termina: el sistema se despide. No digas nada."""
+
 [choices]
 # The free times in the choose_time task: said aloud, then as the function takes them.
 free_time = "{spoken} ({clock})"

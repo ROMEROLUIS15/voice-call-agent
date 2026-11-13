@@ -23,13 +23,18 @@ from pipecat.flows import (
 
 # `_NoResponse` is the type of Flows' public `NO_RESPONSE` sentinel, which it does not export.
 from pipecat.flows.types import _NoResponse
-from pydantic import BaseModel
+from pipecat.frames.frames import TTSSpeakFrame
 
 from voice_call_agent.booking_flow.booking_steps import BookingSteps
 from voice_call_agent.booking_flow.flow_arguments import (
     CheckAvailabilityArguments,
     ProposeBookingArguments,
     SelectStartArguments,
+)
+from voice_call_agent.booking_flow.function_schemas import (
+    FUNCTION_DESCRIPTIONS,
+    properties,
+    required,
 )
 from voice_call_agent.booking_flow.spoken_free_times import (
     free_times_for_model,
@@ -38,6 +43,7 @@ from voice_call_agent.booking_flow.spoken_free_times import (
 )
 from voice_call_agent.booking_flow.spoken_lines import joined, say
 from voice_call_agent.booking_flow.step_outcomes import JsonObject, Step, StepOutcome
+from voice_call_agent.booking_flow.way_out import WayOut
 from voice_call_agent.conversation_content.content_loader import BookingTasks, ConversationContent
 from voice_call_agent.conversation_content.spoken_moments import (
     booking_done,
@@ -49,21 +55,6 @@ from voice_call_agent.conversation_content.spoken_moments import (
 
 StepFunction = Callable[[Mapping[str, Any]], Awaitable[StepOutcome]]
 
-FUNCTION_DESCRIPTIONS = {
-    "check_availability": (
-        "Free start times of one day for one service, and whether the time the caller asked for "
-        "is free. Call it as soon as the service and the day are known."
-    ),
-    "select_start": "Record the start time the caller chose, one of the free times offered.",
-    "propose_booking": (
-        "Propose the booking of the chosen service, day and time under the name of the person "
-        "it is for. The system then reads it to the caller and asks whether it is right."
-    ),
-    "confirm_booking": "Book the proposal the caller just heard, only if they accept it unchanged.",
-    "change_request": "The caller wants to change something, hesitates or says no.",
-    "new_request": "The caller wants another appointment.",
-}
-"""What each function is for, as the model reads it; the same in every call."""
 
 NextNode = NodeConfig | _NoResponse | None
 """Where a function sends the call: a node, staying silent on the current one, or staying."""
@@ -88,6 +79,19 @@ class BookingGraph:
         self._role = role
         self._greeting = greeting
         self._on_read_back = on_read_back
+        self._way_out = WayOut(content)
+
+    async def model_replied(self, flow_manager: FlowManager, *, said_something: bool) -> None:
+        """A response of the model ended: one that said nothing is a stall, which the code
+        answers instead of leaving the caller in silence; the third in a row offers the way out."""
+        if said_something:
+            self._way_out.stalls.moved_on()
+        elif self._way_out.model_silent():
+            node = self.node(Step.OFFER_WAY_OUT)
+            node["pre_actions"] = joined(self._content.offer_way_out, [])
+            await flow_manager.set_node_from_config(node)
+        else:
+            await flow_manager.worker.queue_frame(TTSSpeakFrame(text=self._content.model_silent))
 
     def initial_node(self) -> NodeConfig:
         """The request, after the business's greeting, waiting for the caller to speak."""
@@ -106,6 +110,8 @@ class BookingGraph:
             Step.CONFIRM: self._confirm,
             Step.BOOKED: self._booked,
             Step.NOT_BOOKED: self._not_booked,
+            Step.OFFER_WAY_OUT: self._offer_way_out,
+            Step.END: self._end,
         }
         return builders[step]()
 
@@ -130,7 +136,7 @@ class BookingGraph:
         return node
 
     def _check_availability(self) -> FlowsFunctionSchema:
-        schema = _properties(CheckAvailabilityArguments)
+        schema = properties(CheckAvailabilityArguments)
         return self._function("check_availability", schema, self._steps.check_availability)
 
     def _choose_time(self) -> NodeConfig:
@@ -145,7 +151,7 @@ class BookingGraph:
             requested=requested_for_model(self._content, choice),
         )
         select = self._function(
-            "select_start", _properties(SelectStartArguments), self._steps.select_start
+            "select_start", properties(SelectStartArguments), self._steps.select_start
         )
         node = _node(Step.CHOOSE_TIME, task, [select, self._check_availability()])
         node["pre_actions"] = [say(free_times_said(self._content, choice))]
@@ -163,7 +169,7 @@ class BookingGraph:
             time=spoken_time(self._content, slot.start),
         )
         propose = self._function(
-            "propose_booking", _properties(ProposeBookingArguments), self._steps.propose_booking
+            "propose_booking", properties(ProposeBookingArguments), self._steps.propose_booking
         )
         node = _node(Step.NAME, task, [propose, self._check_availability()])
         node["pre_actions"] = [say(self._content.name_ask)]
@@ -211,6 +217,20 @@ class BookingGraph:
     def _not_booked(self) -> NodeConfig:
         return _node(Step.NOT_BOOKED, self._tasks.not_booked, [])
 
+    def _offer_way_out(self) -> NodeConfig:
+        """The code offered to try again or reach the business; the model waits for the answer."""
+        keep = self._function("keep_trying", {}, self._way_out.keep_trying)
+        end = self._function("end_call", {}, self._way_out.end_call)
+        node = _node(Step.OFFER_WAY_OUT, self._tasks.offer_way_out, [keep, end])
+        node["respond_immediately"] = False
+        return node
+
+    def _end(self) -> NodeConfig:
+        """The code says goodbye and the call ends once it was said (Flows' end action)."""
+        node = _node(Step.END, self._tasks.end, [])
+        node["pre_actions"] = [{"type": "end_conversation", "text": self._content.goodbye}]
+        return node
+
     @property
     def _tasks(self) -> BookingTasks:
         return self._content.booking_flow.tasks
@@ -221,7 +241,7 @@ class BookingGraph:
         """A function of a node: it runs its step and moves to the node its outcome names."""
 
         async def run(args: FlowArgs, flow_manager: FlowManager) -> tuple[JsonObject, NextNode]:
-            outcome = await step(args)
+            outcome = self._way_out.tally(await step(args))
             if outcome.silent:
                 return outcome.result, NO_RESPONSE
             if outcome.next_step is None:
@@ -236,7 +256,7 @@ class BookingGraph:
             name=name,
             description=FUNCTION_DESCRIPTIONS[name],
             properties=properties,
-            required=[key for key in properties if key in _required(name)],
+            required=[key for key in properties if key in required(name)],
             handler=run,
         )
 
@@ -249,37 +269,3 @@ def _node(
         task_messages=[{"role": "developer", "content": task}],
         functions=functions,
     )
-
-
-def _properties(arguments: type[BaseModel]) -> dict[str, Any]:
-    """The JSON Schema properties of an arguments model."""
-    schema = arguments.model_json_schema()
-    return {
-        field: {key: value for key, value in spec.items() if key != "title"}
-        for field, spec in schema["properties"].items()
-    }
-
-
-_ARGUMENTS: dict[str, type[BaseModel]] = {
-    "check_availability": CheckAvailabilityArguments,
-    "select_start": SelectStartArguments,
-    "propose_booking": ProposeBookingArguments,
-}
-
-
-def _required(name: str) -> set[str]:
-    model = _ARGUMENTS.get(name)
-    return set(model.model_json_schema().get("required", [])) if model else set()
-
-
-def booking_functions() -> dict[str, dict[str, Any]]:
-    """Each booking function as the model receives it, the same in every call: what the
-    behaviour fingerprint and the snapshots follow."""
-    return {
-        name: {
-            "description": description,
-            "properties": _properties(model) if (model := _ARGUMENTS.get(name)) else {},
-            "required": sorted(_required(name)),
-        }
-        for name, description in FUNCTION_DESCRIPTIONS.items()
-    }

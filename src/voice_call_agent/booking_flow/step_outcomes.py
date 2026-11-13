@@ -28,6 +28,8 @@ class Step(StrEnum):
     CONFIRM = "confirm"
     BOOKED = "booked"
     NOT_BOOKED = "not_booked"
+    OFFER_WAY_OUT = "offer_way_out"
+    END = "end"
 
 
 @dataclass(frozen=True)

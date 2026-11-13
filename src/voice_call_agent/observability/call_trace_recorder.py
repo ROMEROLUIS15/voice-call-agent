@@ -2,6 +2,7 @@
 
 import time
 from collections import Counter
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 from pipecat.observers.base_observer import BaseObserver
@@ -44,12 +45,17 @@ class CallTraceRecorder:
         self._writes: list[WriteDecision] = []
         self._backend_requests: list[BackendRequest] = []
         self._specs: dict[ErrorCode, ErrorSpec] = {}
+        self._replies = SilentReplyObserver()
         self.observers: list[BaseObserver] = [
             self._latency.observer,
             self._usage,
             ProviderErrorObserver(),
-            SilentReplyObserver(),
+            self._replies,
         ]
+
+    def on_model_reply(self, listener: Callable[[bool], Awaitable[None]]) -> None:
+        """`listener` is told whether each finished model response said or did something."""
+        self._replies.listeners.append(listener)
 
     @property
     def call_id(self) -> str:

@@ -139,7 +139,7 @@ class PipecatConversationRunner:
         )
         # Signals belong to the HTTP server, which drains calls before stopping.
         runner = WorkerRunner(handle_sigint=False, handle_sigterm=False)
-        start = _conversation_start(plan, assembled, worker, transport)
+        start = _conversation_start(plan, assembled, worker, transport, recorder)
         _start_on_connect_and_stop_on_hang_up(transport, runner, start)
         await runner.add_workers(worker)
         await runner.run()
@@ -171,6 +171,7 @@ def _conversation_start(
     assembled: AssembledPipeline,
     worker: PipelineWorker,
     transport: BaseTransport,
+    recorder: CallTraceRecorder,
 ) -> Callable[[], Awaitable[None]]:
     """What happens when the caller connects: the booking flow's first node, which says the
     business's greeting, or the generic greeting of a call that books nothing."""
@@ -189,7 +190,14 @@ def _conversation_start(
         context_aggregator=assembled.context_aggregator,
         transport=transport,
     )
-    initial_node = plan.booking_flow.initial_node()
+    graph = plan.booking_flow
+    initial_node = graph.initial_node()
+
+    async def model_replied(said_something: bool) -> None:
+        await graph.model_replied(flows, said_something=said_something)
+
+    # A response that said nothing is answered by the code, not left as silence.
+    recorder.on_model_reply(model_replied)
 
     async def start_flow() -> None:
         await flows.initialize(initial_node)
