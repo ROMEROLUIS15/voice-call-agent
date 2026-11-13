@@ -304,6 +304,15 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         2026-11-12: in one of three repetitions the model booked the first at "Sí, pero también
         un afeitado, seguido del corte" and asked for the second's time; `bookings-completed`
         0.96).
+  - [x] No way out of a call that does not move forward (compared with other voice frameworks,
+        2026-11-13): after three stalls in a row the code offers to try again or reach the
+        business directly, and a call the caller ends gets the code's goodbye. Stalls: a service
+        not offered, a day not understood, a chosen time not free, a read-back spoken over, or
+        a model response that said nothing, which the code now answers. In 32 practice calls,
+        none had three stalls in a row; the model left the caller in silence three times. Golden
+        case `a-way-out-after-three-times-that-are-not-free`.
+  - [ ] A transfer to a person instead of "reach the business directly": needs the business's
+        phone in `calls/start` (a contract change in Cronix) and a live phone line to try it.
 
 ## Plan from here (2026-10-31)
 

@@ -20,7 +20,7 @@ from evals.judge_scoring import JUDGE_MODEL
 from voice_call_agent.adapters.language_model_providers.provider_selection import (
     language_model_factory,
 )
-from voice_call_agent.booking_flow.booking_graph import booking_functions
+from voice_call_agent.booking_flow.function_schemas import booking_functions
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.practice_schedule.practice_catalog import load_practice_catalog
 from voice_call_agent.settings.sections import LanguageModelProvider, LanguageModelSettings

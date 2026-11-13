@@ -1,6 +1,8 @@
 """Pipeline observers that feed the call trace: provider usage, caller turns, provider errors and
 replies that said nothing."""
 
+from collections.abc import Awaitable, Callable
+
 from pipecat.frames.frames import (
     ErrorFrame,
     FunctionCallsStartedFrame,
@@ -91,19 +93,28 @@ class SilentReplyObserver(BaseObserver):
     def __init__(self) -> None:
         super().__init__(observe_every_push=False)
         self._responding = False
-        self._did_something = False
+        self._spoke = False
+        self._called = False
+        self.listeners: list[Callable[[bool], Awaitable[None]]] = []
+        """Told whether each finished response that called no tool said something (a booking
+        flow answers a silence instead of leaving the caller without a reply); a response that
+        called a tool is followed by its result, not by the caller."""
 
     async def on_push_frame(self, data: FramePushed) -> None:
         frame = data.frame
         if isinstance(frame, LLMFullResponseStartFrame):
-            self._responding, self._did_something = True, False
-        elif isinstance(frame, FunctionCallsStartedFrame) or (
-            isinstance(frame, LLMTextFrame) and frame.text.strip()
-        ):
-            self._did_something = True
+            self._responding, self._spoke, self._called = True, False, False
+        elif isinstance(frame, FunctionCallsStartedFrame):
+            self._called = True
+        elif isinstance(frame, LLMTextFrame) and frame.text.strip():
+            self._spoke = True
         elif isinstance(frame, InterruptionFrame):
             self._responding = False
         elif isinstance(frame, LLMFullResponseEndFrame) and self._responding:
             self._responding = False
-            if not self._did_something:
+            if self._called:
+                return
+            if not self._spoke:
                 report_error(ErrorCode.LLM_EMPTY_RESPONSE)
+            for listener in self.listeners:
+                await listener(self._spoke)

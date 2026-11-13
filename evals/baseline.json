@@ -1,12 +1,12 @@
 {
-  "fingerprint": "ef0c303a4b241120",
+  "fingerprint": "f76a261c43aa9a7e",
   "inputs": {
-    "conversation_content": "es-c221711e2166",
+    "conversation_content": "es-2755025929a3",
     "language_model": "openrouter deepseek/deepseek-v4.1-flash",
     "generation_settings": "a5faa7c7fd29f3ea",
-    "agent_tools": "8fc6102256595cfb",
-    "conversation_structure": "91672b18cd41efff",
-    "golden_dataset": "c765765bc2d5",
+    "agent_tools": "0ebf211dfb708ce3",
+    "conversation_structure": "611c415c21f064e6",
+    "golden_dataset": "7051d2b897d5",
     "practice_businesses": "095154c67f753d84",
     "scoring": "eada6711b3e6a8b8",
     "judge_model": "google/gemini-3.6-flash"
@@ -16,7 +16,7 @@
     "llm_model": "deepseek/deepseek-v4.1-flash",
     "judge_model": "google/gemini-3.6-flash",
     "repetitions": 3,
-    "measured_at": "2026-11-12T22:30:14.621559Z"
+    "measured_at": "2026-11-13T18:12:02.537084Z"
   },
   "metrics": {
     "admits-test-line": {
@@ -29,7 +29,7 @@
     },
     "bookings-completed": {
       "kind": "quality",
-      "score": 0.9608
+      "score": 1.0
     },
     "books-what-was-asked": {
       "kind": "security",

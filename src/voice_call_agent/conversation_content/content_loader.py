@@ -76,6 +76,8 @@ class BookingTasks(BaseModel):
     confirm: str
     booked: str
     not_booked: str
+    offer_way_out: str
+    end: str
 
 
 class RequestedTimeTexts(BaseModel):
@@ -187,6 +189,12 @@ class ConversationContent(BaseModel):
     """What the code says when the caller changes or hesitates at the read-back: nothing held."""
     backend_unavailable: str
     """What the code says when the scheduling backend does not answer: nothing was booked."""
+    offer_way_out: str
+    """What the code says after three stalls in a row: try again or reach the business."""
+    model_silent: str
+    """What the code says when the model said nothing."""
+    goodbye: str
+    """The last line of a call the caller chose to end after the way out."""
     booking_briefing: BookingBriefing
     spoken_moments: SpokenMoments
     booking_flow: BookingFlowTexts
@@ -216,6 +224,9 @@ class _Phrases(BaseModel):
     slot_taken: str
     changing: str
     backend_unavailable: str
+    offer_way_out: str
+    model_silent: str
+    goodbye: str
     booking_briefing: BookingBriefing
     spoken_moments: SpokenMoments
 
@@ -257,6 +268,9 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         slot_taken=phrases.slot_taken,
         changing=phrases.changing,
         backend_unavailable=phrases.backend_unavailable,
+        offer_way_out=phrases.offer_way_out,
+        model_silent=phrases.model_silent,
+        goodbye=phrases.goodbye,
         booking_briefing=phrases.booking_briefing,
         spoken_moments=phrases.spoken_moments,
         booking_flow=booking_flow,

@@ -9,8 +9,9 @@ from pipecat.frames.frames import TTSSpeakFrame
 
 from tests.practice_catalogs import MONDAY, TWO_BUSINESSES
 from tests.write_guard_fixtures import CALL_ID, TUESDAY, GuardedCall, guarded_call
-from voice_call_agent.booking_flow.booking_graph import BookingGraph, booking_functions
+from voice_call_agent.booking_flow.booking_graph import BookingGraph
 from voice_call_agent.booking_flow.booking_steps import BookingSteps
+from voice_call_agent.booking_flow.function_schemas import booking_functions
 from voice_call_agent.booking_flow.spoken_lines import say
 from voice_call_agent.booking_flow.step_outcomes import Step
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
@@ -296,6 +297,8 @@ def test_every_function_the_model_receives_is_described() -> None:
         "confirm_booking",
         "change_request",
         "new_request",
+        "keep_trying",
+        "end_call",
     }
     assert functions["propose_booking"]["required"] == ["client_name"]
     # The day is worked out by the code from the caller's words: the model need not pass it.
@@ -387,3 +390,61 @@ async def test_only_the_facts_of_the_read_back_are_watched() -> None:
     # Each line is its own speech: the watch is armed by the facts and spans only them.
     assert cast(dict[str, Any], facts)["before"] is not None
     assert cast(dict[str, Any], question).get("before") is None
+
+
+OFFER = (
+    "Parece que no estoy logrando agendar la cita por teléfono. Podemos intentarlo una vez más, o "
+    "también se puede comunicar directamente con el negocio. ¿Qué hacemos?"
+)
+
+
+async def test_the_third_stall_in_a_row_offers_the_way_out_and_both_answers_work() -> None:
+    call = await guarded_call()
+    graph, _ = _graph(call)
+    check = _functions(graph.initial_node())["check_availability"]
+    _, choose = await _run(check, service_id="haircut", day_number=TUESDAY.day)
+    assert choose is not None
+    node: NodeConfig = choose
+    for start in ("20:00", "21:00", "22:00"):
+        call.caller_speaks()
+        _, next_node = await _run(_functions(node)["select_start"], start=start)
+        assert next_node is not None
+        node = next_node
+    assert node["name"] == Step.OFFER_WAY_OUT.value
+    assert _said(node) == [OFFER] and node.get("respond_immediately") is False
+    assert set(_functions(node)) == {"keep_trying", "end_call"}
+    _, request = await _run(_functions(node)["keep_trying"])
+    assert request is not None and request["name"] == Step.REQUEST.value
+    _, end = await _run(_functions(node)["end_call"])
+    assert end is not None and end["name"] == Step.END.value
+    # The code says the goodbye, and only then does the call end; nothing is offered after it.
+    assert end.get("pre_actions") == [
+        {"type": "end_conversation", "text": "Gracias por llamar. Hasta luego."}
+    ]
+    assert _functions(end) == {}
+    assert await call.backend.upcoming_appointments(CALL_ID) == []
+
+
+class _Flows:
+    def __init__(self) -> None:
+        self.worker = _Worker()
+        self.nodes: list[NodeConfig] = []
+
+    async def set_node_from_config(self, node: NodeConfig) -> None:
+        self.nodes.append(node)
+
+
+async def test_a_silent_model_is_answered_and_the_third_silence_offers_the_way_out() -> None:
+    graph, _ = _graph(await guarded_call())
+    flows = _Flows()
+    manager = cast(FlowManager, flows)
+    await graph.model_replied(manager, said_something=False)
+    await graph.model_replied(manager, said_something=True)  # A reply: the count starts over.
+    await graph.model_replied(manager, said_something=False)
+    await graph.model_replied(manager, said_something=False)
+    said = [cast(TTSSpeakFrame, frame).text for frame in flows.worker.frames]
+    assert said == ["Perdón, no alcancé a responder. ¿Lo repetimos?"] * 3
+    assert flows.nodes == []
+    await graph.model_replied(manager, said_something=False)  # The third in a row.
+    [offer] = flows.nodes
+    assert offer["name"] == Step.OFFER_WAY_OUT.value and _said(offer) == [OFFER]
