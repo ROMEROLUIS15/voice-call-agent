@@ -192,7 +192,9 @@ class BookingGraph:
                 self._check_availability(),  # Another service besides it: read back with it.
             ],
         )
-        node["pre_actions"] = [say(read_back, before=self._on_read_back)]
+        # The facts, watched for speech over them, then the question as a line of its own.
+        question = say(self._content.read_back_question)
+        node["pre_actions"] = [say(read_back, before=self._on_read_back), question]
         node["respond_immediately"] = False
         return node
 

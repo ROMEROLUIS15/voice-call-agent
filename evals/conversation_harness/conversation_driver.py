@@ -56,6 +56,8 @@ _REPLY_TIMEOUT_S = 30.0
 _END_TIMEOUT_S = 10.0
 _SILENT_REPLY_S = 1.0
 """A reply whose audio all played before the model finished is over after this much silence."""
+_SETTLED_S = 0.3
+"""The agent is silent this long before the caller speaks: one reply's lines play back to back."""
 _POLL_S = 0.01
 
 
@@ -254,7 +256,9 @@ def _reply_over(tts: RecordingTextToSpeech, transport: LoopbackTransport, replie
     output = transport.output()
     if tts.replies_completed < replies or output.speech_starts == 0 or output.speaking:
         return False
-    silent_since_reply = output.last_silence_at > tts.last_reply_completed_at
+    # Silent for a moment, not between two lines of one reply (a read-back and its question).
+    settled = time.monotonic() - output.last_silence_at >= _SETTLED_S
+    silent_since_reply = output.last_silence_at > tts.last_reply_completed_at and settled
     return silent_since_reply or time.monotonic() - tts.last_reply_completed_at > _SILENT_REPLY_S
 
 

@@ -300,7 +300,7 @@
       ),
     }),
     'greeting': 'Hola, gracias por llamar. ¿En qué te puedo ayudar?',
-    'read_back': 'Para confirmar: {service}, el {day}, a {time}, a nombre de {name}. ¿Está bien así?',
+    'read_back': 'Para confirmar: {service}, el {day}, a {time}, a nombre de {name}.',
     'spoken_moments': dict({
       'day': '{weekday} {day} de {month}',
       'day_parts': tuple(

@@ -13,10 +13,13 @@ which_day = "El {date} es {weekday}. ¿La cita es para el {said_day} o para el {
 name_ask = "¿A nombre de quién sería la cita?"
 # The code reads back the proposal it validated, before the caller's yes (ADR 0019). Neither
 # "tú" nor "usted": the register is the business's.
-read_back = "Para confirmar: {service}, el {day}, a {time}, a nombre de {name}. ¿Está bien así?"
+read_back = "Para confirmar: {service}, el {day}, a {time}, a nombre de {name}."
 # The same read-back while other services the caller asked for wait for this one: the caller
 # hears they are kept and does not ask for them again.
-read_back_then = "Para confirmar: {service}, el {day}, a {time}, a nombre de {name}. Después seguimos con {next}. ¿Está bien así?"
+read_back_then = "Para confirmar: {service}, el {day}, a {time}, a nombre de {name}. Después seguimos con {next}."
+# The question after the read-back, spoken as a line of its own: a caller who answers during it
+# heard every fact, so it does not count as speaking over the read-back.
+read_back_question = "¿Está bien así?"
 # Before reading the proposal back again, when the caller spoke over it: their answer was not to
 # the whole proposal, so nothing is booked until they answer after hearing all of it.
 read_back_again = "Perdón, lo repito completo."

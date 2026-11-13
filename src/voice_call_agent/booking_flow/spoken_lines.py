@@ -23,13 +23,16 @@ def say(text: str, *, before: Callable[[], None] | None = None) -> ActionConfig:
 
 
 def joined(said: str, actions: list[ActionConfig]) -> list[ActionConfig]:
-    """The code's result and the node's own lines as one line, so the caller hears one reply
-    (the harness counts them too); what runs before any of them runs before it."""
-    lines = [action for action in actions if action["type"] == "say"]
-    befores = (cast(dict[str, Any], line).get("before") for line in lines)
-    before = next((run for run in befores if run is not None), None)
-    text = " ".join([said, *(line["text"] for line in lines)])
-    return [say(text, before=before), *(action for action in actions if action["type"] != "say")]
+    """The code's result said with the node's first line, as one line, so the caller hears one
+    reply; what runs before that line runs before it. The node's later lines stay apart, as the
+    question after a read-back does."""
+    first = next((index for index, action in enumerate(actions) if action["type"] == "say"), None)
+    if first is None:
+        return [say(said), *actions]
+    line = actions[first]
+    before = cast(dict[str, Any], line).get("before")
+    merged = say(f"{said} {line['text']}", before=before)
+    return [*actions[:first], merged, *actions[first + 1 :]]
 
 
 async def _speak(action: dict[str, Any], flow_manager: FlowManager) -> None:
