@@ -15,7 +15,7 @@ Security has to be checked on every change, not at the end: vulnerable dependenc
 | Tests and coverage (≥ 85 %) | pytest with pytest-cov |
 | Static security analysis | bandit 1.9.4 |
 | Known vulnerable dependencies | pip-audit 2.10.1 |
-| Secrets in the code and the whole history | gitleaks v8.30.1 |
+| Secrets in the code and the whole history | gitleaks v8.30.1, its default rules extended by `.gitleaks.toml` |
 
 Every tool is pinned (`uv.lock` for the Python ones, `rev:` for gitleaks), so a check gives the same verdict everywhere.
 
@@ -27,3 +27,6 @@ Every tool is pinned (`uv.lock` for the Python ones, `rev:` for gitleaks), so a 
 ## Consequences
 *   Easier: a failing check reproduces locally with one command; security checks block merges from the first commit.
 *   Harder: gitleaks is built from source by pre-commit (Go is needed locally; CI runners have it), and the first run is slower until cached. The coverage threshold rises with the dialog (phase 2) and is never lowered to make a change pass.
+
+## Changes
+2026-11-14 · gitleaks reads `.gitleaks.toml`: its default rules plus a connection string that carries its password and any environment file but `.env.example`. Against fake secrets of the kinds the project handles, the default rules caught a JWT and three API keys and missed a database URL with its password; with the file, all five and the file itself. The whole history still scans clean. The Supabase CLI's working folder (`supabase/`, with a local stack's keys) is ignored.

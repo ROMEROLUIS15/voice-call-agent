@@ -362,7 +362,7 @@ Details: [golden dataset](docs/evals/golden-dataset.md).
 | Identity | The phone line's caller ID can be spoofed: reading, rescheduling or cancelling there needs a second factor (v1.1); callers are greeted by name only on WhatsApp |
 | HTTP | Security headers on every response, no `Server` header, CORS closed, trusted hosts, no API docs in production, error responses that reveal nothing |
 | Limits | Rate limits per client address and route; request bodies and WebSocket messages capped at 64 KiB |
-| Secrets | Environment variables only, loaded as `SecretStr`; never in code, logs or errors; gitleaks on every commit |
+| Secrets | Environment variables only, loaded as `SecretStr`; never in code, logs or errors; gitleaks (with `.gitleaks.toml`) on every commit and on the whole history in CI |
 | Development surfaces | The practice entry, practice schedule, transcripts and log file are refused outside development |
 
 Behind a proxy, set `TRUSTED_PROXY_ADDRESSES` and `ALLOWED_HOSTS`; with several instances, a

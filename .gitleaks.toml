@@ -1,0 +1,21 @@
+# Secret scanning: gitleaks' default rules, plus what they missed when measured on 2026-11-14
+# against fake secrets of the kinds this project handles (a database URL with its password
+# passed unnoticed). Read by the pre-commit hook (staged changes) and by CI (whole history).
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "connection-string-password"
+description = "A connection string that carries its password"
+regex = '''(?i)\b(?:postgres(?:ql)?|mysql|mariadb|redis|rediss|mongodb(?:\+srv)?|amqps?)://[^:/\s@]+:([^@/\s]{6,})@'''
+secretGroup = 1
+keywords = ["postgres", "mysql", "mariadb", "redis", "mongodb", "amqp"]
+
+[[rules]]
+id = "environment-file"
+description = "An environment file: only .env.example, with placeholders, belongs in the repository"
+path = '''(?:^|/)(?:\.env(?:\.[\w.-]+)?|[\w.-]+\.env)$'''
+
+[[rules.allowlists]]
+paths = ['''(?:^|/)\.env\.example$''']

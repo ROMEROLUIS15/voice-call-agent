@@ -116,7 +116,7 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 
 | Id | Threat | Mitigation | Proof | Status |
 |---|---|---|---|---|
-| T-27 | A secret is committed (S10) | `.env` ignored; `.env.example` without values; gitleaks on every commit and on the whole history in CI | `test_environment_example.py`, `gitleaks` hooks | M |
+| T-27 | A secret is committed (S10) | `.env` and the Supabase CLI's `supabase/` ignored; `.env.example` without values; gitleaks on every commit and on the whole history in CI, with `.gitleaks.toml` adding connection strings with a password and environment files; GitHub secret scanning with push protection on the repository | `test_environment_example.py`, `gitleaks` hooks, `.gitleaks.toml` | M |
 | T-28 | Secrets or personal data in logs (S9) | `SecretStr`; `hide_input_in_errors`; loguru `diagnose=False`; phones and names redacted; production at `INFO` | `test_service_settings.py`, `test_call_logging.py` | M |
 | T-29 | Vulnerable or malicious dependency (S10) | Exact pins for the engine and security tools, committed `uv.lock`, pip-audit in CI; third-party GitHub Actions pinned by commit SHA | `pip-audit` hook | P (no automated update PRs yet) |
 | T-30 | Insecure code patterns (S10) | bandit and ruff `S` rules in CI | `bandit` hook | M |
@@ -182,3 +182,4 @@ Status: **M** mitigated and tested · **P** partial · **F** future phase.
 | 2026-10-28 | The default model is DeepSeek V4.1 Flash through OpenRouter to Together, then Venice, both required not to collect data (`data_collection: deny`): two new destinations of what callers say; never DeepSeek's own API (ADR 0020) | S6 |
 | 2026-10-29 | The scheduling backend through Cronix's signed phone agent API (T-45): a new destination of what callers say (the caller's number and name of a booking); a practice call carries a fictitious caller number | S6 |
 | 2026-10-27 | actionlint joins the quality gate (security job): T-32 relied on it, but no hook or job ran it | S12 |
+| 2026-11-14 | T-27: gitleaks missed a database URL with its password (measured with fake secrets); `.gitleaks.toml` adds it and environment files; the Supabase CLI's working folder is ignored | S10 |
