@@ -21,6 +21,7 @@ from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import LLMService
 from pipecat.services.settings import LLMSettings
 
+from evals.conversation_harness.schedule_conditions import HARNESS_NOW
 from evals.conversation_harness.scripted_settings import complete_settings
 from evals.golden_cases import ExpectedToolCall
 from voice_call_agent.conversation_content.content_loader import load_conversation_content
@@ -79,7 +80,8 @@ class ScriptedLanguageModel(LLMService):
     ) -> FunctionCallFromLLM | None:
         """The function the booking flow's current node offers for the write, if it is due.
 
-        The availability check, with the name the caller said, answers the first caller turn;
+        The availability check, with the name the caller said, answers each caller turn of the
+        request step;
         the proposal is made as soon as its node offers it (the name step, when the name was not
         taken with the check); the confirmation answers each caller turn after the read-back,
         until one is to a read-back heard whole.
@@ -89,18 +91,32 @@ class ScriptedLanguageModel(LLMService):
         offered, after_caller = _offered_functions(context), messages[-1].get("role") == "user"
         write = self._write.arguments
         turn = len(self.caller_messages)
-        if "check_availability" in offered and after_caller and turn == 1:
+        # The request step offers only the availability check: answered on the first turn, and
+        # again when the code asked the caller for a day they had not said.
+        if offered == {"check_availability"} and after_caller:
             arguments = {key: write[key] for key in ("service_id", "start", "client_name")}
-            # The day as a caller says it, its number and month: the code works the date out.
-            day = date.fromisoformat(write["day"])
-            months = load_conversation_content().booking_briefing.months
-            arguments |= {"day_number": str(day.day), "month": months[day.month - 1]}
+            # Every name of the day (today or tomorrow, its weekday, its number and month): the
+            # code keeps those the caller said and works the date out from them.
+            arguments |= _names_of(date.fromisoformat(write["day"]))
             return _call("check_availability", arguments, context)
         if "propose_booking" in offered:
             return _call("propose_booking", {"client_name": write["client_name"]}, context)
         if "confirm_booking" in offered and after_caller and turn >= 2:  # Again after a re-read.
             return _call("confirm_booking", {}, context)
         return None
+
+
+def _names_of(day: date) -> dict[str, str]:
+    briefing = load_conversation_content().booking_briefing
+    names = {
+        "weekday": briefing.weekdays[day.weekday()],
+        "day_number": str(day.day),
+        "month": briefing.months[day.month - 1],
+    }
+    relative = ("today", "tomorrow", "day_after_tomorrow")
+    if 0 <= (ahead := (day - HARNESS_NOW.date()).days) < len(relative):
+        names["relative_day"] = relative[ahead]
+    return names
 
 
 def _call(name: str, arguments: dict[str, str], context: LLMContext) -> FunctionCallFromLLM:

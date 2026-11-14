@@ -311,6 +311,11 @@ What changes in Cronix is tracked here, not in Cronix's own specs, unless the ch
         a model response that said nothing, which the code now answers. In 32 practice calls,
         none had three stalls in a row; the model left the caller in silence three times. Golden
         case `a-way-out-after-three-times-that-are-not-free`.
+  - [x] The model wrote the caller's turn into its reply and checked a day the caller never
+        said (a practice call, 2026-11-14; one of 35 transcripts): the role and what follows
+        it are cut before the voice, and each day field is looked up in what the caller said;
+        when none was, the code asks for the day. Golden case
+        `a-day-the-caller-never-said-at-a-barbershop`.
   - [ ] A transfer to a person instead of "reach the business directly": needs the business's
         phone in `calls/start` (a contract change in Cronix) and a live phone line to try it.
 

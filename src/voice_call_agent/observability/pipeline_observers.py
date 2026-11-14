@@ -26,17 +26,20 @@ from voice_call_agent.observability.error_taxonomy import ErrorCode
 
 
 class UsageObserver(BaseObserver):
-    """Accumulates the usage the providers report, and counts the caller's final transcripts."""
+    """Accumulates the usage the providers report, and counts and keeps the caller's final
+    transcripts (a day the model passes is checked against them)."""
 
     def __init__(self) -> None:
         super().__init__(observe_every_push=False)
         self.usage = ProviderUsage()
         self.caller_turns = 0
+        self.caller_words: list[str] = []
 
     async def on_push_frame(self, data: FramePushed) -> None:
         frame = data.frame
         if isinstance(frame, TranscriptionFrame):
             self.caller_turns += 1
+            self.caller_words.append(frame.text)
         elif isinstance(frame, MetricsFrame):
             for metric in frame.data:
                 self._add(metric)

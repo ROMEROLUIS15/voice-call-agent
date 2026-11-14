@@ -28,3 +28,6 @@ CLAUDE.local.md
 /voice-ai-testing-guide.md
 /pipecat-investigation.md
 /docs/ai-engineering.md
+
+# Supabase CLI working files (local stack keys) if the CLI is run from this folder: never committed
+/supabase/

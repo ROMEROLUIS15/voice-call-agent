@@ -32,6 +32,8 @@ booked_next = "Listo, la cita de {service} quedó agendada para el {day}, a {tim
 closed_day = "El {day} no se atiende. ¿Para qué otro día sería la cita?"
 no_free_starts = "El {day} ya no quedan horas libres. ¿Para qué otro día sería la cita?"
 slot_taken = "Esa hora se acaba de ocupar. ¿Para qué otra hora o día sería la cita?"
+# When the model asked for a day the caller never said: the caller says it.
+day_not_said = "¿Para qué día sería la cita?"
 # When the caller hesitates or says no to the read-back: nothing is held or booked, and the code
 # says so instead of the model, which once said the time was held.
 changing = "Está bien, la cita todavía no quedó agendada. ¿Qué cambiamos, o la dejamos para otra ocasión?"
@@ -52,6 +54,11 @@ months = [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ]
+# How a caller names today, tomorrow and the day after: a day the model passes is checked
+# against the caller's words.
+relative_days = { today = ["hoy", "esta tarde", "esta noche", "esta mañana", "ahorita", "ahora mismo"], tomorrow = ["mañana"], day_after_tomorrow = ["pasado mañana"] }
+# How a caller names the first day of a month, besides its number.
+first_of_month = "primero"
 today = "{weekday} {day} de {month} de {year} ({iso_date})"
 open_day = "{weekday} de {opens} a {closes}"
 closed_day = "{weekday} cerrado"

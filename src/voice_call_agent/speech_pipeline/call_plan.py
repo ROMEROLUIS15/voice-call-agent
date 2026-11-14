@@ -67,6 +67,7 @@ def plan_call(
         content=content,
         weekly_hours=business.weekly_hours,
         today=today,
+        caller_words=lambda: recorder.caller_words,
     )
     role = booking_prompt(content, business, today)
     return CallPlan(

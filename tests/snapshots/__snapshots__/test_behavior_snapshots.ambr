@@ -286,6 +286,7 @@
         'USD': 'dólares',
         'VES': 'bolívares',
       }),
+      'first_of_month': 'primero',
       'months': tuple(
         'enero',
         'febrero',
@@ -303,6 +304,22 @@
       'no_price': ', precio no publicado',
       'open_day': '{weekday} de {opens} a {closes}',
       'price': ', precio {price} {currency}',
+      'relative_days': dict({
+        'day_after_tomorrow': tuple(
+          'pasado mañana',
+        ),
+        'today': tuple(
+          'hoy',
+          'esta tarde',
+          'esta noche',
+          'esta mañana',
+          'ahorita',
+          'ahora mismo',
+        ),
+        'tomorrow': tuple(
+          'mañana',
+        ),
+      }),
       'service': '{name} [{id}]: {minutes} minutos',
       'today': '{weekday} {day} de {month} de {year} ({iso_date})',
       'weekdays': tuple(

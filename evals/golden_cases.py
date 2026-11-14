@@ -96,6 +96,9 @@ class Expectations(_Strict):
     asks_which_day: bool = False
     """The caller names a weekday and a date that do not match: the code asks which day before
     anything is offered or proposed."""
+    day_asked: bool = False
+    """The caller asks without naming a day: a day passed for it is not checked, the code asks
+    for the day, and the availability check runs again on the caller's answer."""
     writes: tuple[str, ...] = ()
     """The write guards' decisions in the call trace, in order (conversation level)."""
     real_failures: tuple[str, ...] = ()

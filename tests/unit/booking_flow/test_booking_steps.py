@@ -6,7 +6,7 @@ from typing import cast
 
 from tests.browser_peer import reported_error_codes
 from tests.practice_catalogs import MONDAY, TWO_BUSINESSES
-from tests.write_guard_fixtures import CALL_ID, TUESDAY, GuardedCall, guarded_call
+from tests.write_guard_fixtures import CALL_ID, EVERY_DAY_WORD, TUESDAY, GuardedCall, guarded_call
 from voice_call_agent.booking_flow.booking_steps import BookingSteps
 from voice_call_agent.booking_flow.named_day import DayQuestion
 from voice_call_agent.booking_flow.step_outcomes import Step
@@ -29,7 +29,11 @@ HAIRCUT = {"service_id": "haircut", "day_number": TUESDAY.day}
 """Tuesday the 27th, named by its day number: the code works the date out."""
 
 
-def _steps(call: GuardedCall, backend: SchedulingBackend | None = None) -> BookingSteps:
+def _steps(
+    call: GuardedCall,
+    backend: SchedulingBackend | None = None,
+    caller_words: str = EVERY_DAY_WORD,
+) -> BookingSteps:
     return BookingSteps(
         call_id=CALL_ID,
         catalog=TWO_BUSINESSES.business("barbershop").services,
@@ -38,6 +42,7 @@ def _steps(call: GuardedCall, backend: SchedulingBackend | None = None) -> Booki
         content=CONTENT,
         weekly_hours=TWO_BUSINESSES.business("barbershop").weekly_hours,
         today=MONDAY,
+        caller_words=lambda: caller_words,
     )
 
 
@@ -497,3 +502,72 @@ async def test_a_yes_said_over_the_read_back_does_not_book_and_the_code_reads_it
     call.caller_speaks()  # The answer after hearing it whole.
     booked = await steps.confirm_booking({})
     assert (booked.next_step, booked.result["status"]) == (Step.BOOKED, "booked")
+
+
+# A day the caller never said is never checked: the model wrote it (ADR 0019).
+async def test_a_day_the_caller_never_said_is_asked_for_by_the_code() -> None:
+    call = await guarded_call()
+    steps = _steps(call, caller_words="Quiero un corte. Mejor que sea un afeitado.")
+    with reported_error_codes() as codes:
+        weekday = await steps.check_availability({"service_id": "haircut", "weekday": "sábado"})
+        tomorrow = await steps.check_availability(
+            {"service_id": "haircut", "relative_day": "tomorrow"}
+        )
+    for outcome in (weekday, tomorrow):
+        assert (outcome.next_step, outcome.result) == (Step.REQUEST, {"status": "day_not_said"})
+        assert outcome.said == CONTENT.day_not_said
+    assert codes == ["DAY_NOT_SAID", "DAY_NOT_SAID"]
+    assert (steps.choice, steps.slot, steps.day_question) == (None, None, None)
+
+
+async def test_the_day_said_in_words_or_digits_counts_whatever_its_accents() -> None:
+    steps = _steps(await guarded_call(), caller_words="Para el miercoles, el diecinueve no.")
+    outcome = await steps.check_availability({"service_id": "haircut", "weekday": "miércoles"})
+    assert (outcome.next_step, outcome.result["day"]) == (Step.CHOOSE_TIME, "2026-10-28")
+    for said in ("el diecinueve de noviembre", "el 19 de Noviembre"):
+        steps = _steps(await guarded_call(), caller_words=said)
+        day = {"day_number": 19, "month": "noviembre"}
+        outcome = await steps.check_availability({"service_id": "haircut", **day})
+        assert outcome.result["day"] == "2026-11-19"
+
+
+async def test_a_day_field_the_caller_did_not_say_is_left_out_of_a_day_they_said() -> None:
+    # "El diecinueve" with a weekday the model worked out itself: only the date said counts.
+    steps = _steps(await guarded_call(), caller_words="Para el diecinueve.")
+    said = {"service_id": "haircut", "day_number": 19, "weekday": "martes"}
+    with reported_error_codes() as codes:
+        outcome = await steps.check_availability(said)
+    assert (outcome.next_step, outcome.result["day"]) == (Step.CHOOSE_TIME, "2026-11-19")
+    assert steps.day_question is None
+    assert codes == []
+
+
+async def test_the_same_day_passed_as_the_code_said_it_is_that_day() -> None:
+    # "Para mañana", then "y también un afeitado ese mismo día": the model passes the day the
+    # code said (martes veintisiete de octubre), which the caller never said in those words.
+    steps = _steps(await guarded_call(), caller_words="Un corte para mañana. Ese mismo día.")
+    first = await steps.check_availability({"service_id": "haircut", "relative_day": "tomorrow"})
+    assert first.result["day"] == "2026-10-27"
+    same = {"weekday": "martes", "day_number": 27, "month": "octubre"}
+    with reported_error_codes() as codes:
+        again = await steps.check_availability({"service_id": "haircut", **same})
+    assert (again.next_step, again.result["day"]) == (Step.CHOOSE_TIME, "2026-10-27")
+    assert codes == []
+
+
+async def test_a_month_passed_with_a_day_number_said_is_kept() -> None:
+    # "El veintiséis del mes que viene": no month named, the model's month stays.
+    steps = _steps(await guarded_call(), caller_words="El veintiséis del mes que viene.")
+    outcome = await steps.check_availability(
+        {"service_id": "haircut", "day_number": 26, "month": "noviembre"}
+    )
+    assert outcome.result["day"] == "2026-11-26"
+
+
+async def test_today_said_in_other_words_counts_whatever_its_case() -> None:
+    for said in ("Para esta tarde.", "Ahorita, si se puede.", "Esta noche."):
+        steps = _steps(await guarded_call(), caller_words=said)
+        outcome = await steps.check_availability(
+            {"service_id": "haircut", "relative_day": " Today "}
+        )
+        assert outcome.result["day"] == "2026-10-26"
