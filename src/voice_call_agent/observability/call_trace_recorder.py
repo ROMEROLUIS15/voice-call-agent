@@ -66,6 +66,11 @@ class CallTraceRecorder:
         """Final caller transcripts so far: the write guards read it during the call."""
         return self._usage.caller_turns
 
+    @property
+    def caller_words(self) -> str:
+        """Everything the caller said so far: a day the model passes is checked against it."""
+        return " ".join(self._usage.caller_words)
+
     def record_write(self, decision: WriteDecision) -> None:
         self._writes.append(decision)
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 from tests.practice_catalogs import MONDAY, TWO_BUSINESSES, barbershop_phone_call, schedule
+from voice_call_agent.conversation_content.content_loader import load_conversation_content
 from voice_call_agent.observability.call_trace import WriteDecision
 from voice_call_agent.practice_schedule.in_memory_schedule import InMemorySchedule
 from voice_call_agent.scheduling_backend.scheduling_port import SchedulingBackend
@@ -12,6 +13,16 @@ from voice_call_agent.write_guards.booking_guard import BookingGuard
 
 TUESDAY = MONDAY + timedelta(days=1)
 CALL_ID = "CA-barber"
+_BRIEFING = load_conversation_content().booking_briefing
+EVERY_DAY_WORD = " ".join(
+    [
+        *_BRIEFING.weekdays,
+        *_BRIEFING.months,
+        *(phrase for phrases in _BRIEFING.relative_days.values() for phrase in phrases),
+        *(str(number) for number in range(1, 32)),
+    ]
+)
+"""What the caller said in tests that are not about it: every word that names a day."""
 
 
 @dataclass

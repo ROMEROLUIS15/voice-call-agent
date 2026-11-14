@@ -9,7 +9,7 @@ The call's booking state lives in this object rather than in `FlowManager.state`
 fills: Pipecat's state is an untyped dict, and the write guard needs typed, validated values.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date, time
 from typing import Any
 
@@ -67,11 +67,14 @@ class BookingSteps:
         content: ConversationContent,
         weekly_hours: WeeklyHours,
         today: date,
+        caller_words: Callable[[], str],
     ) -> None:
         """`today` is the date in the business's time zone: the other day asked about when a
         weekday does not match the date is never in the past."""
         self._call_id = call_id
         self._today = today
+        self._caller_words = caller_words  # What the caller said so far: a day is checked on it.
+        self._settled_days: set[date] = set()  # Worked out from the caller's words, then said.
         self._weekly_hours = weekly_hours
         self._catalog = {service.id: service for service in catalog}
         self._backend = backend
@@ -212,11 +215,16 @@ class BookingSteps:
     def _settle_day(self, call: CheckAvailabilityArguments) -> date | StepOutcome:
         """The day asked for, worked out from the caller's words; where to go instead when they
         cannot say a day, or when the weekday named does not match the date named."""
-        question = requested_day(call, self._content, self._today)
+        question = requested_day(
+            call, self._content, self._today, self._caller_words(), self._settled_days
+        )
         if not isinstance(question, DayQuestion):
+            if isinstance(question, date):
+                self._settled_days.add(question)
             return question
         # Two days were named: nothing is offered for either until the caller says which.
         self.day_question = question
+        self._settled_days |= {question.said_date, question.weekday_date}
         dates = {
             "date": question.said_date.isoformat(),
             "weekday_date": question.weekday_date.isoformat(),

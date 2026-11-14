@@ -8,7 +8,7 @@ from pipecat.flows import NO_RESPONSE, FlowManager, FlowsFunctionSchema, NodeCon
 from pipecat.frames.frames import TTSSpeakFrame
 
 from tests.practice_catalogs import MONDAY, TWO_BUSINESSES
-from tests.write_guard_fixtures import CALL_ID, TUESDAY, GuardedCall, guarded_call
+from tests.write_guard_fixtures import CALL_ID, EVERY_DAY_WORD, TUESDAY, GuardedCall, guarded_call
 from voice_call_agent.booking_flow.booking_graph import BookingGraph
 from voice_call_agent.booking_flow.booking_steps import BookingSteps
 from voice_call_agent.booking_flow.function_schemas import booking_functions
@@ -48,6 +48,7 @@ def _graph(call: GuardedCall) -> tuple[BookingGraph, BookingSteps]:
         content=CONTENT,
         weekly_hours=TWO_BUSINESSES.business("barbershop").weekly_hours,
         today=MONDAY,
+        caller_words=lambda: EVERY_DAY_WORD,
     )
     graph = BookingGraph(
         steps=steps,

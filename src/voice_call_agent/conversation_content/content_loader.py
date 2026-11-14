@@ -24,6 +24,10 @@ class BookingBriefing(BaseModel):
     weekdays: tuple[str, ...] = Field(min_length=7, max_length=7)
     """Monday first, as `date.weekday()` counts."""
     months: tuple[str, ...] = Field(min_length=12, max_length=12)
+    relative_days: dict[str, tuple[str, ...]]
+    """The ways a caller says `today`, `tomorrow` and `day_after_tomorrow`."""
+    first_of_month: str
+    """How a caller names the first day of a month, besides its number."""
     today: str
     open_day: str
     closed_day: str
@@ -185,6 +189,8 @@ class ConversationContent(BaseModel):
     """What the code says when that day has no free start left; takes `{day}`."""
     slot_taken: str
     """What the code says when the time was taken before the caller's confirmation."""
+    day_not_said: str
+    """What the code says when the model asked for a day the caller never said."""
     changing: str
     """What the code says when the caller changes or hesitates at the read-back: nothing held."""
     backend_unavailable: str
@@ -222,6 +228,7 @@ class _Phrases(BaseModel):
     closed_day: str
     no_free_starts: str
     slot_taken: str
+    day_not_said: str
     changing: str
     backend_unavailable: str
     offer_way_out: str
@@ -266,6 +273,7 @@ def load_conversation_content(locale: str = DEFAULT_LOCALE) -> ConversationConte
         closed_day=phrases.closed_day,
         no_free_starts=phrases.no_free_starts,
         slot_taken=phrases.slot_taken,
+        day_not_said=phrases.day_not_said,
         changing=phrases.changing,
         backend_unavailable=phrases.backend_unavailable,
         offer_way_out=phrases.offer_way_out,

@@ -12,7 +12,13 @@ from voice_call_agent.booking_flow.step_outcomes import JsonObject
 STALLS = frozenset({"unknown_service", "invalid_arguments", "not_offered", "read_back_repeated"})
 """Results of a turn that did not move the call forward."""
 SLIPS = frozenset(
-    {"waiting_for_the_choice", "waiting_for_the_answer", "no_slot_chosen", "nothing_to_confirm"}
+    {
+        "waiting_for_the_choice",
+        "waiting_for_the_answer",
+        "no_slot_chosen",
+        "nothing_to_confirm",
+        "day_not_said",
+    }
 )
 """The model's own slips, which the code corrects before the caller notices."""
 LIMIT = 3

@@ -27,6 +27,7 @@ class ErrorCode(StrEnum):
     STT_EXCEPTION = "STT_EXCEPTION"
     LLM_EXCEPTION = "LLM_EXCEPTION"
     LLM_EMPTY_RESPONSE = "LLM_EMPTY_RESPONSE"
+    MODEL_LEAKED_TURN = "MODEL_LEAKED_TURN"
     TTS_EXCEPTION = "TTS_EXCEPTION"
     PIPELINE_EXCEPTION = "PIPELINE_EXCEPTION"
     CALL_TASK_FAILED = "CALL_TASK_FAILED"
@@ -52,6 +53,7 @@ class ErrorCode(StrEnum):
     IDENTITY_MISMATCH = "IDENTITY_MISMATCH"
     # The agent's tools and the write guards.
     TOOL_ARGUMENTS_INVALID = "TOOL_ARGUMENTS_INVALID"
+    DAY_NOT_SAID = "DAY_NOT_SAID"
     WRITE_PROPOSAL_REFUSED = "WRITE_PROPOSAL_REFUSED"
     WRITE_CONFIRMATION_REFUSED = "WRITE_CONFIRMATION_REFUSED"
     # Capacity.
@@ -110,6 +112,7 @@ ERROR_CATALOG: dict[ErrorCode, ErrorSpec] = {
         _failure(ErrorCode.STT_EXCEPTION, _E, "speech-to-text service failed"),
         _failure(ErrorCode.LLM_EXCEPTION, _E, "language model service failed"),
         _failure(ErrorCode.LLM_EMPTY_RESPONSE, _E, "the language model answered nothing"),
+        _failure(ErrorCode.MODEL_LEAKED_TURN, _E, "the model wrote a turn into its reply; dropped"),
         _failure(ErrorCode.TTS_EXCEPTION, _E, "text-to-speech service failed"),
         _failure(ErrorCode.PIPELINE_EXCEPTION, _E, "pipeline processor failed"),
         _failure(ErrorCode.CALL_TASK_FAILED, _E, "call ended with an unhandled error"),
@@ -134,6 +137,7 @@ ERROR_CATALOG: dict[ErrorCode, ErrorSpec] = {
         _outcome(
             ErrorCode.TOOL_ARGUMENTS_INVALID, "the model called a tool with invalid arguments"
         ),
+        _outcome(ErrorCode.DAY_NOT_SAID, "the model asked for a day the caller never said"),
         _outcome(ErrorCode.WRITE_PROPOSAL_REFUSED, "a write proposal did not pass validation"),
         _outcome(
             ErrorCode.WRITE_CONFIRMATION_REFUSED,
