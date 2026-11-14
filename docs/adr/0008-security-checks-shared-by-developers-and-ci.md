@@ -11,7 +11,7 @@ Security has to be checked on every change, not at the end: vulnerable dependenc
 
 | Concern | Tool |
 |---|---|
-| Lint, format, types | ruff, `mypy --strict` |
+| Lint, format, types | ruff, `mypy --strict` with Pydantic's plugin (a model built in code is checked for its fields' types and unknown fields) |
 | Tests and coverage (≥ 85 %) | pytest with pytest-cov |
 | Static security analysis | bandit 1.9.4 |
 | Known vulnerable dependencies | pip-audit 2.10.1 |
@@ -30,3 +30,5 @@ Every tool is pinned (`uv.lock` for the Python ones, `rev:` for gitleaks), so a 
 
 ## Changes
 2026-11-14 · gitleaks reads `.gitleaks.toml`: its default rules plus a connection string that carries its password and any environment file but `.env.example`. Against fake secrets of the kinds the project handles, the default rules caught a JWT and three API keys and missed a database URL with its password; with the file, all five and the file itself. The whole history still scans clean. The Supabase CLI's working folder (`supabase/`, with a local stack's keys) is ignored.
+
+2026-11-14 · Pydantic's mypy plugin checks the models built in code (`init_typed`, `init_forbid_extra` in `[tool.pydantic-mypy]`). Before, a model's constructor took any type, so `CheckAvailabilityArguments(day_number="27")` passed mypy and failed only at run time; now mypy reports it. Data from outside (the model's tool calls, settings, files) is still validated by Pydantic at run time, in its lax mode. No existing code needed a change.
