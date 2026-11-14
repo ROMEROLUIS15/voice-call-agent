@@ -73,6 +73,12 @@ python_version = "3.12"
 files = ["src", "tests", "evals"]
 plugins = ["pydantic.mypy"]
 
+[tool.pydantic-mypy]
+# A model built in code is checked like any call: its fields' types and no unknown field.
+# Data from outside (the model's tool calls, settings, files) is still validated at run time.
+init_typed = true
+init_forbid_extra = true
+
 [[tool.mypy.overrides]]
 # The Twilio SDK ships no type information; it is only used inside
 # `call_transports/twilio_media_streams/`.
